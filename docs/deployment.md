@@ -9,7 +9,8 @@ binary, a container, or behind a reverse proxy at a sub-path.
 A running steward needs:
 
 1. **The binary** (or Docker image).
-2. **A Postgres URL** — via `--db`, `STEWARD_DB`, or `[database].url`.
+2. **A Postgres URL** — via `--db`, `STEWARD_DB`, or the primary `source`'s
+   `url` in `config/steward.hcl`.
 3. **A secret key** — via `STEWARD_SECRET_KEY` or `[steward].secret_key`.
    Required.
 4. **A config directory** — optional, but without it no tables are exposed.
@@ -34,6 +35,40 @@ docker run -d --name steward -p 8686:8686 \
   writable mount enables live editing (see below).
 - Mount a named volume at `/data` so users, sessions and audit survive restarts.
 - Bind to `0.0.0.0` inside the container so the published port is reachable.
+
+## Deploy to Fly.io + Supabase
+
+The repo ships a [`fly.toml`](https://github.com/De-Rus/steward/blob/main/fly.toml)
+that builds the image from the `Dockerfile` and runs the bundled Acme demo. To
+run it — swap in your own config and database as you go.
+
+1. **Database — Supabase.** Create a free project and copy its **Transaction
+   pooler** connection string (host ends in `…pooler.supabase.com`, port
+   `6543`). steward auto-detects that pooler and disables the prepared-statement
+   cache for it (see [below](#connection-pooling-note)).
+
+2. **App — Fly.** Pick an app name in `fly.toml` (`app = "…"`), then:
+
+   ```bash
+   fly apps create your-steward
+   fly secrets set \
+     STEWARD_DB="postgresql://postgres.__ref__:PASSWORD@aws-0-…pooler.supabase.com:6543/postgres" \
+     STEWARD_SECRET_KEY="$(openssl rand -hex 32)" \
+     STEWARD_ADMIN_EMAIL="you@example.com" \
+     STEWARD_ADMIN_PASSWORD="a-strong-password"
+   fly deploy
+   ```
+
+Secrets are set with `fly secrets set` and **never** committed to `fly.toml`.
+The `[env]` block there carries only non-secrets (`STEWARD_CONFIG`,
+`STEWARD_LISTEN`, `STEWARD_SECURE_COOKIES`). To serve your **own** admin instead
+of the demo, point `STEWARD_CONFIG` at your bundle (bake it into the image or
+mount a volume) rather than `/demo/admin`.
+
+steward's SQLite state lives on the machine's ephemeral disk here; the admin user
+re-bootstraps from `STEWARD_ADMIN_*` on each fresh machine. Mount a Fly volume at
+`/data` (and set `STEWARD_DATA=/data`) if you want sessions and the audit log to
+survive redeploys.
 
 ## Environment-first configuration
 

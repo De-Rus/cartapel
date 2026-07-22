@@ -18,24 +18,25 @@ secret material (`.hcl`, `.toml`, `.env`, dotfiles) is never served.
 ## Custom pages
 
 A custom page is a full-screen module in the sidebar. Each page is its own
-folder holding a `page.hcl`, placed inside the group folder it belongs to —
-exactly like a table config:
+folder holding a `screen.hcl` that sets `module`, placed inside a group folder
+under `screens/` — exactly like a table:
 
 ```
 admin/
-  overview/                    # a group folder (_group.hcl → "Overview")
-    _group.hcl
-    ops/                       # → slug "ops", group "Overview"
-      page.hcl
-      ops.js                   # the page module (co-located)
-      queries.hcl              # queries this page reads
+  screens/
+    overview/                  # a group folder (_group.hcl → "Overview")
+      _group.hcl
+      ops/                     # → slug "ops", group "Overview"
+        screen.hcl
+        ops.tsx                # the page module (co-located)
+        queries.hcl            # queries this page reads
 ```
 
 ```hcl
-# admin/screens/overview/ops/page.hcl
+# admin/screens/overview/ops/screen.hcl
 label  = "Operations"
 icon   = "satellite"
-module = "ops.js"          # optional; defaults to "<slug>.js"
+module = "ops.tsx"         # the co-located page module (.tsx / .ts / .js)
 roles  = ["ops"]           # omit → admin only
 ```
 
@@ -47,7 +48,7 @@ roles  = ["ops"]           # omit → admin only
 | `roles` | Roles that may see the page. Omit → admin only. |
 
 The **slug is the page folder's name** and the **group is the enclosing group
-folder** — both are folder-derived, so `page.hcl` carries neither (a stray `slug`
+folder** — both are folder-derived, so `screen.hcl` carries neither (a stray `slug`
 or `group` is rejected). A page folder placed directly under the config root is
 ungrouped.
 
@@ -158,7 +159,7 @@ export default ({ api }) => {
 ## Embedding a configured table — `AdminTable`
 
 A page module can render a table's **configured** list (its columns, labels,
-formats and row drill-down from `<table>.hcl`) without re-declaring anything —
+formats and row drill-down from `screen.hcl`) without re-declaring anything —
 the bridge for mixing zero-config tables with bespoke UI on one screen:
 
 ```js

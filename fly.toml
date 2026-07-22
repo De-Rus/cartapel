@@ -1,0 +1,31 @@
+# Fly.io deployment for the steward demo (app + Supabase Postgres).
+# See docs/deployment.md → "Deploy to Fly.io + Supabase" for the full flow.
+#
+#   fly apps create steward-demo          # pick your own name, then set it below
+#   fly secrets set STEWARD_DB=… STEWARD_SECRET_KEY=… STEWARD_ADMIN_PASSWORD=…
+#   fly deploy
+#
+# STEWARD_DB / STEWARD_SECRET_KEY / STEWARD_ADMIN_EMAIL / STEWARD_ADMIN_PASSWORD
+# are SECRETS — never put them here. Set them with `fly secrets set`.
+
+app = "steward-demo"
+primary_region = "cdg"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  STEWARD_CONFIG = "/demo/admin"
+  STEWARD_LISTEN = "0.0.0.0:8686"
+  STEWARD_SECURE_COOKIES = "true"
+
+[http_service]
+  internal_port = 8686
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

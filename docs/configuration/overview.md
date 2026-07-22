@@ -8,57 +8,55 @@ portable, versionable folder you point `--config` at.
 There is an in-app visual builder that edits this same config, but it writes the
 identical HCL. The files are the source of truth.
 
-## Folders are navigation groups
+## Layout: `config/` + `screens/`
 
-The layout of the config directory *is* the layout of the sidebar. One folder
-per navigation group, plus the reserved `config/` folder for globals:
+The layout of the config directory *is* the layout of the sidebar. Globals live
+in the reserved `config/` folder; everything you navigate to — tables and pages —
+lives under `screens/`, one folder per navigation group:
 
 ```
 admin/
-├── config/                 # reserved — globals + shared assets, never a group
-│   ├── steward.hcl        #   brand, theme, database, defaults
-│   ├── auth.hcl           #   roles & permissions
-│   ├── dashboard.hcl      #   dashboard widgets
-│   └── widgets/           #   shared custom-widget JS (served at /static)
-│       ├── sparkline.js
-│       ├── statuspill.js
-│       └── minibar.js
-├── market-data/           # a folder IS a sidebar group
-│   ├── _group.hcl         #   its label, icon, order, table order
-│   ├── instruments.hcl    #   one file per exposed table
-│   └── exchanges.hcl
-├── bots-live/
-│   ├── _group.hcl
-│   └── bots.hcl
-└── overview/
-    ├── _group.hcl
-    └── ops/               # a custom page: its own folder with a page.hcl
-        ├── page.hcl       #   slug = folder name, group = enclosing folder
-        ├── ops.js         #   the page module
-        └── queries.hcl    #   named read-only queries the page calls
+├── config/                     # reserved — globals + shared assets, never a group
+│   ├── steward.hcl            #   brand, theme, the `main` source, defaults
+│   ├── auth.hcl               #   roles & permissions
+│   ├── dashboard.hcl          #   dashboard widgets
+│   └── widgets/               #   shared custom-widget JS (served at /static)
+│       └── sparkline.js
+└── screens/                    # every table and page lives here
+    ├── customers/              # a folder under screens/ IS a sidebar group
+    │   ├── _group.hcl         #   its label, icon, order, table order
+    │   ├── customers/         #   one folder per table — the folder name is the table
+    │   │   └── screen.hcl     #     list/fields/actions (empty = introspected defaults)
+    │   └── subscriptions/
+    │       └── screen.hcl
+    └── overview/
+        └── summary/            # a scripted page instead of a table
+            ├── screen.hcl     #   module = "summary.tsx"
+            ├── summary.tsx     #   the page module (co-located)
+            └── queries.hcl     #   named read-only queries the page calls
 ```
 
-The folder a table's `.hcl` lives in is its sidebar group — the single source of
-truth for grouping. Config files are discovered recursively; load order is
-deterministic (files sorted by path).
+The folder a table lives in (under `screens/`) is its sidebar group — the single
+source of truth for grouping. Config files are discovered recursively; load order
+is deterministic (files sorted by path).
 
-- A **table config** is any `<table>.hcl` whose stem matches a real table.
+- A **table** is a folder holding a `screen.hcl`; the **folder name is the table
+  name**. An empty `screen.hcl` renders the table from introspected defaults.
 - A folder's **`_group.hcl`** names and orders that sidebar group.
-- A **`page.hcl`** in its own subfolder is a custom full-screen page.
+- A **scripted page** is the same shape — a folder whose `screen.hcl` sets
+  `module = "<name>.tsx"` next to the module. See [Pages & queries](/configuration/pages-and-queries).
 - A **`queries.hcl`** in any folder contributes named read-only queries.
-- Root-level table files (directly under `admin/`) land in an "Ungrouped"
-  section.
 
 ## The reserved `config/` folder
 
-`config/` is special: it is never a sidebar group and is never scanned for table
-configs. It holds exactly three global files plus a `widgets/` asset folder:
+`config/` is special: it is never a sidebar group and is never scanned for
+tables. It holds exactly three global files plus a `widgets/` asset folder:
 
 | File | Contents |
 | --- | --- |
-| `config/steward.hcl` | Brand, logo, locale, `per_page`, the secret key, `theme { }`, and the `database { }` block. |
+| `config/steward.hcl` | Brand, logo, locale, `per_page`, the secret key, `theme { }`, and the `source "…" { }` blocks. |
 | `config/auth.hcl` | `role "…" { }` blocks — the permission model. See [Roles & permissions](/roles-and-permissions). |
-| `config/dashboard.hcl` | The home dashboard's `widget { }` blocks. See [Dashboard](/configuration/dashboard). |
+| `config/dashboard.hcl` | The home dashboard's `panel { }` blocks. See [Dashboard](/configuration/dashboard). |
 | `config/widgets/*.js` | Shared custom-widget web components, served at `/static/config/widgets/`. See [Pages & queries](/configuration/pages-and-queries). |
 
 Putting anything else in `config/` is a loud load error. Folders whose name
@@ -81,10 +79,12 @@ theme {
   mode   = "auto"             # "light" | "dark" | "auto"
 }
 
-database {
-  url     = "env:STEWARD_DB"
+# The database steward reads. Exactly one postgres source must be `primary`.
+source "main" {
+  type    = "postgres"
+  url     = "env:STEWARD_DB"   # or a literal postgres:// url
   schemas = ["public"]
-  engine  = "postgres"        # only "postgres" is supported today
+  primary = true
 }
 ```
 
@@ -99,7 +99,7 @@ Top-level `[steward]` keys:
 | `per_page` | number | Default list page size (a table's `list.per_page` overrides it). |
 | `secret_key` | string | Session-signing root. Supports `env:`/`${}`. Overridden by `STEWARD_SECRET_KEY`. **Required** somewhere. |
 | `theme { }` | block | Theme preset, accent, per-mode CSS token overrides, logos. |
-| `database { }` | block | Connection URL, schema(s), engine. |
+| `source "…" { }` | block | A named data source. The `primary` postgres one is the database steward introspects. |
 
 ### `theme { }`
 
@@ -111,14 +111,22 @@ Top-level `[steward]` keys:
 | `mode` | Force `light`, `dark`, or `auto` (default). |
 | `logo_light` / `logo_dark` | Per-mode brand logo, overriding `brand_logo` for that mode. |
 
-### `database { }`
+### `source "…" { }`
+
+The database is declared as a named source. Define at least one `postgres`
+source and mark it `primary` — that is what steward introspects and serves.
 
 | Key | Description |
 | --- | --- |
-| `url` | Connection URL. Supports `env:NAME` / `${NAME}`. |
-| `schema` | Single-schema shorthand. |
-| `schemas` | List of schemas — every one is introspected. |
-| `engine` | Reserved for future engines; must be `postgres`. |
+| `type` | `"postgres"` for the database, or `"http"` for a read-only JSON source a custom page can call. |
+| `url` | Connection URL (postgres) or endpoint (http). Supports `env:NAME` / `${NAME}`. |
+| `schemas` | List of schemas to introspect (postgres). Defaults to `["public"]`. |
+| `primary` | Marks the one postgres source steward introspects. Exactly one is required. |
+| `token_env` / `header` | For `http` sources: attach a secret from this env var under `header` (default `x-admin-token`). The secret never reaches the browser. |
+| `roles` | Restrict a source to these roles (non-admins need an explicit match). |
+
+`--db postgres://…` / `STEWARD_DB` overrides the `primary` source's URL, so the
+same bundle can run against dev, staging or prod by swapping one env var.
 
 ## Environment interpolation
 
@@ -127,8 +135,10 @@ with the environment variable `NAME`. Use it to keep secrets out of committed
 config:
 
 ```hcl
-database {
-  url = "env:DATABASE_URL"
+source "main" {
+  type    = "postgres"
+  url     = "env:STEWARD_DB"
+  primary = true
 }
 
 secret_key = "${STEWARD_SECRET_KEY}"
@@ -158,5 +168,5 @@ raw editor), not through the visual form.
 
 ## Next
 
-- **[Tables](/configuration/tables)** — every block in a `<table>.hcl`.
+- **[Tables](/configuration/tables)** — every block in a `screen.hcl`.
 - **[Groups & navigation](/configuration/groups-and-nav)** — `_group.hcl` in detail.

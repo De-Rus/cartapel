@@ -1,12 +1,13 @@
 # Tables
 
-A `<table>.hcl` file registers one database table with the panel and describes
-how it renders. The file's **stem is the table name**: `instruments.hcl`
-configures the `instruments` table. An empty file is valid — the table then
+A `screen.hcl` registers one database table with the panel and describes how it
+renders. It lives in a table folder under a group — `screens/<group>/<table>/screen.hcl`
+— and the **folder name is the table name**: `screens/sales/orders/screen.hcl`
+configures the `orders` table. An empty `screen.hcl` is valid — the table then
 renders entirely from introspected defaults.
 
-Only tables with a config file are exposed. See
-[the allowlist model](/configuration/overview#folders-are-navigation-groups).
+Only tables with a `screen.hcl` are exposed. See
+[the allowlist model](/configuration/overview#layout-config-screens).
 
 ## Anatomy
 
@@ -200,7 +201,7 @@ Which roles may invoke an action is controlled in `config/auth.hcl` via the role
 From the reference config, lightly abridged:
 
 ```hcl
-# bots-live/bots.hcl
+# screens/bots-live/bots/screen.hcl
 label        = "bot"
 label_plural = "Bots"
 

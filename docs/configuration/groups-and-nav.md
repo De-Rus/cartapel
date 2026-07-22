@@ -1,8 +1,8 @@
 # Groups & navigation
 
-The sidebar is built from your folder layout. Each folder under the config root
-(other than the reserved `config/`) is a navigation group, and the table configs
-inside it are that group's entries.
+The sidebar is built from your folder layout. Each folder under `screens/` is a
+navigation group, and the table (and page) folders inside it are that group's
+entries.
 
 ## `_group.hcl`
 
@@ -11,11 +11,11 @@ name is the group's stable key (its slug); the file supplies presentation and
 ordering.
 
 ```hcl
-# market-data/_group.hcl
-label       = "Market data"
-icon        = "trending-up"
-order       = 3
-table_order = ["instruments", "exchanges", "universes", "funding_rates", "logos"]
+# screens/customers/_group.hcl
+label       = "Customers"
+icon        = "users"
+order       = 1
+table_order = ["customers", "subscriptions"]
 ```
 
 | Key | Type | Description |
@@ -34,18 +34,17 @@ table_order = ["instruments", "exchanges", "universes", "funding_rates", "logos"
 ## Grouping rules
 
 - A folder may hold only a `_group.hcl` — an empty, table-less group is valid.
-- A folder without a `_group.hcl` still groups its tables, but under the folder
-  name with no custom label/icon.
-- **Root-level table files** (a `.hcl` directly under the config root, not in any
-  folder) render in an "Ungrouped" section.
-- Folders whose name begins with an underscore (like `config`) are never sidebar
-  groups. A `_group.hcl` in such a folder is ignored with a warning.
+- A group folder without a `_group.hcl` still groups its tables, but under the
+  folder name with no custom label/icon.
+- Folders whose name begins with an underscore are never sidebar groups. A
+  `_group.hcl` in such a folder is ignored with a warning.
 
 ## Moving a table between groups
 
-A table's identity and its URL are its **stem** (the filename), never its group.
-Moving `instruments.hcl` from one folder to another changes which sidebar group
-it appears in but does not change its identity or any deep links to its records.
+A table's identity and its URL are its **folder name** (the table name), never
+its group. Moving a table's folder from one group to another changes which
+sidebar group it appears in but does not change its identity or any deep links
+to its records.
 
 ::: warning Renaming a group changes custom page URLs
 Custom pages are identified as `<group-slug>/<page-slug>` (both folder-derived).

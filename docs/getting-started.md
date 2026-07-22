@@ -46,10 +46,10 @@ steward serve \
   --data ./steward-data
 ```
 
-- `--db` — the Postgres connection URL. You can also set it in config
-  (`[database].url`) or via `STEWARD_DB`.
-- `--schema` — the Postgres schema to introspect (defaults to `public`). Use
-  `[database].schemas` in config for more than one.
+- `--db` — the Postgres connection URL. It overrides the URL of the primary
+  `source` declared in config (see below); you can also set it via `STEWARD_DB`.
+- `--schema` — the Postgres schema to introspect (defaults to `public`). Set the
+  source's `schemas` list for more than one.
 - `--config` — a directory of HCL config files (see below). Optional, but
   without it no tables are exposed.
 - `--data` — where steward keeps its **own** state (users, sessions, audit log,
@@ -107,22 +107,34 @@ An introspected-but-unconfigured table is absent from the navigation and 404s if
 you hit its URL directly. This means an empty panel is normal until you add a
 config.
 
-The smallest possible config is an empty file. Create a folder (it becomes a
-sidebar group) and drop a file named after your table:
+First, tell steward which database to read — the reserved `config/steward.hcl`
+declares the primary `source` (its URL comes from `STEWARD_DB` / `--db`):
 
-```bash
-mkdir -p admin/catalog
-touch admin/catalog/products.hcl
+```hcl
+# admin/config/steward.hcl
+source "main" {
+  type    = "postgres"
+  url     = "env:STEWARD_DB"
+  primary = true
+}
 ```
 
-`admin/catalog/products.hcl` — even empty — registers the `products` table. It
-renders with introspected defaults: all columns in the list, sensible widgets
-for each type, FKs as links, timestamps localized.
+Now expose a table. The smallest possible table config is an empty `screen.hcl`
+in a table folder under a group — the **folder name is the table**:
+
+```bash
+mkdir -p admin/screens/catalog/products
+touch admin/screens/catalog/products/screen.hcl
+```
+
+That empty `screen.hcl` registers the `products` table. It renders with
+introspected defaults: all columns in the list, sensible widgets for each type,
+FKs as links, timestamps localized.
 
 From there you refine it:
 
 ```hcl
-# admin/catalog/products.hcl
+# admin/screens/catalog/products/screen.hcl
 label_plural = "Products"
 
 list {
@@ -142,10 +154,10 @@ field "in_stock" {
 }
 ```
 
-And you need a `_group.hcl` in the folder to name the sidebar group:
+And a `_group.hcl` in the group folder names the sidebar group:
 
 ```hcl
-# admin/catalog/_group.hcl
+# admin/screens/catalog/_group.hcl
 label = "Catalog"
 icon  = "package"   # any lucide icon name
 order = 1
@@ -157,5 +169,5 @@ the Catalog group appears with your Products table inside it.
 ## What's next
 
 - **[Configuration overview](/configuration/overview)** — the full config model.
-- **[Tables](/configuration/tables)** — every option in a `<table>.hcl`.
+- **[Tables](/configuration/tables)** — every option in a `screen.hcl`.
 - **[Fields & widgets](/configuration/fields-and-widgets)** — the widget library.

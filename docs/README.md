@@ -18,7 +18,7 @@ docs/
 ├── deployment.md               # Docker, env, writable config volume, reverse proxy
 ├── configuration/
 │   ├── overview.md             # HCL, folders = groups, config/
-│   ├── tables.md               # <table>.hcl: list / display / detail / edit / permissions / actions
+│   ├── tables.md               # screen.hcl: list / display / detail / edit / permissions / actions
 │   ├── fields-and-widgets.md   # the widget library, params, format, color, interpolation
 │   ├── detail-views.md         # detail.mode, sections, sidebar, inlines
 │   ├── groups-and-nav.md       # _group.hcl, ordering
