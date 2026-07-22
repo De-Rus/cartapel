@@ -652,7 +652,7 @@ mod tests {
     fn saved_views_round_trip() {
         let store = Store::open_memory();
         let id = store
-            .view_create("dani@x.io", "bots", "Active bots", "f_active=1&sort=-id", false)
+            .view_create("admin@example.com", "bots", "Active bots", "f_active=1&sort=-id", false)
             .unwrap();
         let other = store
             .view_create("someone@x.io", "bots", "Shared view", "q=btc", true)
@@ -661,7 +661,7 @@ mod tests {
             .view_create("someone@x.io", "bots", "Private", "q=eth", false)
             .unwrap();
 
-        let out = store.views_list("dani@x.io", Some("bots")).unwrap();
+        let out = store.views_list("admin@example.com", Some("bots")).unwrap();
         let rows = out["rows"].as_array().unwrap();
         // own view + the shared one, but not someone else's private view
         let names: Vec<&str> = rows.iter().map(|r| r["name"].as_str().unwrap()).collect();
@@ -677,11 +677,11 @@ mod tests {
         assert_eq!(shared_row["shared"], serde_json::json!(true));
 
         // table filter isolates
-        let empty = store.views_list("dani@x.io", Some("orders")).unwrap();
+        let empty = store.views_list("admin@example.com", Some("orders")).unwrap();
         assert!(empty["rows"].as_array().unwrap().is_empty());
 
         let (owner, table) = store.view_meta(id).unwrap();
-        assert_eq!(owner, "dani@x.io");
+        assert_eq!(owner, "admin@example.com");
         assert_eq!(table, "bots");
 
         store.view_delete(id).unwrap();
@@ -692,9 +692,9 @@ mod tests {
     #[test]
     fn audit_for_row_filters_to_table_and_pk() {
         let store = Store::open_memory();
-        store.audit("dani@x.io", "bots", Some("7"), "update", None);
-        store.audit("dani@x.io", "bots", Some("8"), "update", None);
-        store.audit("dani@x.io", "orders", Some("7"), "delete", None);
+        store.audit("admin@example.com", "bots", Some("7"), "update", None);
+        store.audit("admin@example.com", "bots", Some("8"), "update", None);
+        store.audit("admin@example.com", "orders", Some("7"), "delete", None);
 
         let out = store.audit_for_row("bots", "7").unwrap();
         let rows = out["rows"].as_array().unwrap();

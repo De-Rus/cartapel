@@ -24,7 +24,6 @@ services:
     environment:
       STEWARD_DB: postgres://acme:acme@db:5432/acme
       STEWARD_CONFIG: /demo/admin
-      STEWARD_BASE_PATH: /manage
       STEWARD_SECRET_KEY: demo-secret-not-for-production
       STEWARD_SECURE_COOKIES: "false"
       STEWARD_ADMIN_EMAIL: admin@acme.test

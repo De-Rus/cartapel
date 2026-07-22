@@ -239,39 +239,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn shipped_admin_bundle_serves_static_and_rejects_config() {
-        let dir = PathBuf::from("../admin");
-        if !dir.exists() {
-            return;
-        }
-        let cfg = crate::config::load(Some(&dir)).expect("shipped admin loads");
-        assert_eq!(cfg.steward.brand.as_deref(), Some("sixtysix"), "steward global from config");
-        assert!(cfg.auth.roles.contains_key("ops"), "auth global from config");
-        assert!(!cfg.dashboard.widgets.is_empty(), "dashboard global from config");
-
-        assert_eq!(
-            get(&dir, "config/widgets/minibar.js").await.status(),
-            StatusCode::OK,
-            "shared widget-kind served at /static/config/widgets/",
-        );
-        assert_eq!(
-            get(&dir, "screens/overview/cache/cache.tsx").await.status(),
-            StatusCode::OK,
-            "page module served at /static/screens/overview/cache/",
-        );
-        assert_eq!(
-            get(&dir, "config/steward.hcl").await.status(),
-            StatusCode::BAD_REQUEST,
-            "globals are never served as assets",
-        );
-        assert_eq!(
-            get(&dir, "../Cargo.toml").await.status(),
-            StatusCode::BAD_REQUEST,
-            "traversal out of the bundle is rejected",
-        );
-    }
-
-    #[tokio::test]
     async fn rejects_hcl_traversal_and_missing_config_dir() {
         let dir = bundle();
         assert_eq!(

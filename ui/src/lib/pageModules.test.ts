@@ -2,7 +2,7 @@ import { transform } from 'sucrase'
 import { describe, expect, it } from 'vitest'
 import * as sxModule from './sx'
 
-const modules = import.meta.glob('../../../../admin/**/*.tsx', {
+const modules = import.meta.glob('../../../demo/**/*.tsx', {
   query: '?raw',
   import: 'default',
   eager: true,
@@ -26,15 +26,15 @@ Object.assign(stubSx, {
   useRef: (v: unknown) => ({ current: v }),
 })
 
-describe('admin .tsx page modules', () => {
-  const files = Object.keys(modules).map((p) => p.replace(/.*\/admin\//, ''))
+describe('demo .tsx page modules', () => {
+  const files = Object.keys(modules).map((p) => p.replace(/.*\/demo\//, ''))
 
   it('finds the page modules', () => {
     expect(files.length).toBeGreaterThanOrEqual(1)
   })
 
   for (const path of Object.keys(modules)) {
-    const name = path.replace(/.*\/admin\//, '')
+    const name = path.replace(/.*\/demo\//, '')
     it(`${name} transpiles and renders`, () => {
       const { code } = transform(modules[path], {
         transforms: ['typescript', 'jsx', 'imports'],

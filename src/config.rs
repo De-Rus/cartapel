@@ -1754,7 +1754,7 @@ panel {
     fn steward_globals_round_trip() {
         let sc: StewardConfig = hcl::from_str(
             r#"
-brand = "sixtysix"
+brand = "acme"
 per_page = 100
 
 theme {

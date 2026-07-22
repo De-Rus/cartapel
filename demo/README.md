@@ -12,9 +12,14 @@ worked reference for how a config directory is laid out.
     Postgres source), `auth.hcl` (a read-only `support` role that masks
     `subscriptions.api_token`), `dashboard.hcl` (stat tiles + a bar chart + a
     recent-orders table).
-  - `customers/`, `catalog/`, `sales/` — one folder per sidebar group, each with
-    a `_group.hcl` and a `.hcl` per table (currency formatting, filters, and
-    `update` actions like "Mark shipped").
+  - `screens/` — one folder per sidebar group (`_group.hcl`), each holding a
+    folder per table with its `screen.hcl` (currency formatting, filters, and
+    `update` actions like "Mark shipped"):
+    - `screens/customers/{customers,subscriptions}/screen.hcl`
+    - `screens/catalog/products/screen.hcl`
+    - `screens/sales/{orders,order_items}/screen.hcl`
+    - `screens/overview/summary/` — a **scripted page** (`screen.hcl` with
+      `module = "summary.tsx"` + the `summary.tsx` module) built on the `sx` SDK.
 
 Run it from the repo root with `docker compose up`, then open
-http://localhost:8686/manage (`admin@acme.test` / `acme-admin`).
+http://localhost:8686 (`admin@acme.test` / `acme-admin`).

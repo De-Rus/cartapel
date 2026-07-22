@@ -625,13 +625,13 @@ mod tests {
         def.row_filter.insert("bots".into(), "owner_email = {actor.email}".into());
         let _ = make_config_role(&state, "support", &def);
 
-        let u = CurrentUser { email: "dani@x.io".into(), role: "support".into() };
+        let u = CurrentUser { email: "admin@example.com".into(), role: "support".into() };
         assert_eq!(state.role_level(&u, "bots"), crate::state::Level::Read);
         assert_eq!(state.role_level(&u, "instruments"), crate::state::Level::None);
         assert!(state.masked_columns(&u, "bots").contains(&"secret".to_string()));
         assert_eq!(
             state.row_filter(&u, "bots"),
-            Some("owner_email = 'dani@x.io'".to_string())
+            Some("owner_email = 'admin@example.com'".to_string())
         );
 
         let unknown = CurrentUser { email: "x@x.io".into(), role: "ghost".into() };

@@ -21,7 +21,7 @@ describe('theme presets', () => {
   })
 
   it('maps unknown / legacy preset names to the steward base', () => {
-    expect(presetOf('sixtysix')).toBe('steward')
+    expect(presetOf('legacy')).toBe('steward')
     expect(presetOf('django')).toBe('steward')
     expect(presetOf(null)).toBe('steward')
     expect(presetOf('anything')).toBe('steward')
@@ -50,8 +50,8 @@ describe('theme presets', () => {
     expect(css).toContain('--accent-btn-ink:hsl(220 30% 7%);')
   })
 
-  it('legacy preset:"sixtysix" still resolves to the neutral base + its own overrides', () => {
-    const { dark } = resolveTheme({ preset: 'sixtysix', dark: { band: '#000' } })
+  it('legacy preset:"legacy" still resolves to the neutral base + its own overrides', () => {
+    const { dark } = resolveTheme({ preset: 'legacy', dark: { band: '#000' } })
     expect(dark.page).toBe('#0d0d0d')
     expect(dark.band).toBe('#000')
   })

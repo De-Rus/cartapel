@@ -6,7 +6,7 @@ source of truth, and customization is code you version, not a GUI you click.
 
 ```bash
 git clone … && cd steward
-docker compose up            # → populated demo on http://localhost:8686/manage
+docker compose up            # → populated demo on http://localhost:8686
 ```
 
 - **Opt-in tables**: the admin exposes only the tables you register with a
@@ -35,7 +35,7 @@ your own database:
 docker compose up
 ```
 
-Then open **http://localhost:8686/manage** and log in with
+Then open **http://localhost:8686** and log in with
 `admin@acme.test` / `acme-admin`. The stack is `db` (Postgres, auto-seeded from
 [`demo/seed.sql`](demo/seed.sql)) + `steward` (built from this repo, config in
 [`demo/admin/`](demo/admin/)). Nothing is written to your machine outside the
@@ -60,59 +60,55 @@ export STEWARD_SECRET_KEY=$(openssl rand -hex 32)
 export STEWARD_ADMIN_EMAIL=you@example.com STEWARD_ADMIN_PASSWORD=change-me
 steward serve \
   --config ./admin --data ./steward-data \
-  --base-path /manage --listen 0.0.0.0:8686
+  --listen 0.0.0.0:8686
 ```
 
 `--db postgres://…` / `STEWARD_DB` overrides the primary source's URL, so the
-same config runs against staging or prod by swapping one env var.
+same config runs against staging or prod by swapping one env var. To serve the
+panel under a sub-path (e.g. behind a reverse proxy at `/admin`), add
+`--base-path /admin`.
 
 `--config` points at a directory of HCL files:
 
 ```
 admin/
-├── config/              # reserved framework folder — globals + shared assets
-│   ├── steward.hcl     #   brand, defaults
-│   ├── auth.hcl        #   roles, field masking, row-level filters
-│   ├── dashboard.hcl   #   widgets
-│   └── widgets/        #   shared widget-kind JS (minibar.js, sparkline.js, …)
-├── market-data/        # a folder IS a sidebar group
-│   ├── _group.hcl      #   its label, icon (lucide), order
-│   ├── instruments.hcl #   one file per table you want to customize
-│   └── exchanges.hcl
-├── bots-live/
-│   ├── _group.hcl
-│   └── bots.hcl
-└── overview/
-    ├── _group.hcl
-    └── ops/            # a custom page: its own folder holding a page.hcl
-        └── page.hcl    #   slug = folder name, group = enclosing folder
+├── config/                   # reserved — globals, never a sidebar group
+│   ├── steward.hcl          #   brand, defaults, the `main` postgres source
+│   ├── auth.hcl             #   roles, field masking, row-level filters
+│   └── dashboard.hcl        #   home widgets (SQL stat tiles, charts, tables)
+└── screens/                  # every table and page lives here
+    ├── customers/            # a folder under screens/ IS a sidebar group
+    │   ├── _group.hcl       #   its label, icon (lucide), order
+    │   ├── customers/       #   one folder per table — the folder name is the table
+    │   │   └── screen.hcl   #     list/fields/actions (empty file = introspected defaults)
+    │   └── subscriptions/
+    │       └── screen.hcl
+    └── overview/
+        └── summary/          # a scripted page instead of a table
+            ├── screen.hcl   #   module = "summary.tsx"
+            └── summary.tsx  #   authored with the sx SDK
 ```
 
-The `admin/` root reads exactly like the sidebar: one folder per nav group, plus
-the reserved `config/` folder. `config/` is never a sidebar group and is never
-scanned for table configs — it holds only the three globals
-(`steward.hcl`/`auth.hcl`/`dashboard.hcl`) and the served `widgets/` assets.
+`config/` is never a sidebar group and is never scanned for tables — it holds
+only the three globals (`steward.hcl`/`auth.hcl`/`dashboard.hcl`).
 
-The folder a table's `.hcl` lives in is its sidebar group — the single source of
-truth for grouping. Each folder carries a `_group.hcl` (`label`, `icon`, `order`);
-groups sort by `order` then `label`. A folder may hold only a `_group.hcl` (an
-empty, table-less group). Root-level table files land in an "Ungrouped" section.
+Under `screens/`, each folder is a sidebar group carrying a `_group.hcl`
+(`label`, `icon`, `order`); groups sort by `order` then `label`. Inside a group,
+each table is a subfolder whose `screen.hcl` configures it — and the folder name
+*is* the table name. A scripted page is the same shape: a subfolder whose
+`screen.hcl` sets `module = "<name>.tsx"` next to the module authored with the
+`sx` SDK. See the [configuration docs](docs/configuration/pages-and-queries.md).
 
-Custom pages (JS-plugin modules) follow the same folder-as-group rule: each is a
-subfolder with a `page.hcl`, and the page's slug is that folder's name while its
-group is the enclosing group folder. See the [configuration docs](docs/configuration/pages-and-queries.md).
-
-The admin is an allowlist: only tables with a `.hcl` file are exposed. To add a
-table, create its config (an empty file is enough — it then renders with
-introspected defaults); an admin can author one in-app from the generated
-template. Unconfigured tables are absent from the nav and 404 by direct URL, so
-there is no denylist to maintain. See [`docs/`](docs/) for the full option
-surface and [`demo/admin/`](demo/admin/) for a worked example config.
+The admin is an allowlist: only tables with a `screen.hcl` are exposed (an empty
+file is enough — it renders with introspected defaults), and an admin can author
+one in-app from the generated template. Unconfigured tables are absent from the
+nav and 404 by direct URL, so there is no denylist to maintain. See [`docs/`](docs/)
+for the full option surface and [`demo/admin/`](demo/admin/) for a worked example.
 
 ## Configuration sketch
 
 ```hcl
-# admin/instruments.hcl
+# admin/screens/market-data/instruments/screen.hcl
 list {
   columns = ["symbol", "exchange", "asset_class", "active"]
   search  = ["symbol", "name"]
