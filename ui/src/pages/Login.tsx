@@ -69,7 +69,7 @@ export default function Login() {
             </label>
             <input
               id="login-email"
-              type="email"
+              type="text"
               required
               autoFocus
               autoComplete="username"
