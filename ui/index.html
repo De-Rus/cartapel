@@ -12,6 +12,13 @@
       // The server substitutes %BASE_PATH% with the runtime --base-path / STEWARD_BASE_PATH.
       // In dev (Vite) the placeholder is left as-is and treated as root by lib/base.ts.
       window.__STEWARD_BASE__ = '%BASE_PATH%'
+      // Resolve a built asset against the runtime mount prefix (used by lazy JS
+      // chunks); keeps assets under {base}/assets so a sub-path proxy forwards them.
+      window.__stewardAsset = function (f) {
+        var b = window.__STEWARD_BASE__
+        b = b && b.indexOf('%') === -1 ? b.replace(/\/+$/, '') : ''
+        return b + '/' + f
+      }
     </script>
   </head>
   <body>

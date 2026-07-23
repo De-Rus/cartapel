@@ -48,7 +48,13 @@ pub async fn spa_handler(uri: Uri, base_path: axum::extract::State<String>) -> R
             // JSON-encode it (the placeholder sits in a JS string literal) so a
             // value with a quote or `</script>` can't break out.
             let base_json = serde_json::to_string(&base).unwrap_or_else(|_| "\"\"".to_string());
-            let html = String::from_utf8_lossy(&index.data).replace("'%BASE_PATH%'", &base_json);
+            let mut html = String::from_utf8_lossy(&index.data).replace("'%BASE_PATH%'", &base_json);
+            // The HTML entry refs are emitted root-absolute (`/assets/…`); prefix
+            // them with the mount path so a sub-path proxy forwards them (lazy JS
+            // chunks already resolve via window.__stewardAsset).
+            if !base.is_empty() {
+                html = html.replace("/assets/", &format!("{base}/assets/"));
+            }
             (
                 [
                     (header::CONTENT_TYPE, "text/html; charset=utf-8".to_string()),
