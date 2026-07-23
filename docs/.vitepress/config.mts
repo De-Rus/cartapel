@@ -1,11 +1,15 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
+  // GitHub Pages project site serves under /steward/. Override with DOCS_BASE=/
+  // when deploying to a custom domain (root).
+  base: process.env.DOCS_BASE || '/steward/',
   title: 'steward',
   description:
     'A single-binary, code-first admin panel for your existing Postgres. Point the Rust binary at your database and get introspected CRUD, configured with HCL you version like code.',
   lang: 'en-US',
   cleanUrls: true,
+  ignoreDeadLinks: [/^https?:\/\/localhost/],
   lastUpdated: true,
   appearance: 'dark',
 

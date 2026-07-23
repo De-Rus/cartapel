@@ -54,8 +54,9 @@ enum Command {
         /// Directory for steward's own state (users, sessions, audit)
         #[arg(long, env = "STEWARD_DATA", default_value = "./steward-data")]
         data: PathBuf,
-        /// URL prefix the panel is served under
-        #[arg(long, env = "STEWARD_BASE_PATH", default_value = "")]
+        /// URL prefix the panel is served under. Defaults to `/admin` to match
+        /// the SPA's build-time base (vite.config `base`); keep the two in sync.
+        #[arg(long, env = "STEWARD_BASE_PATH", default_value = "/admin")]
         base_path: String,
         #[arg(long, env = "STEWARD_LISTEN", default_value = "127.0.0.1:8686")]
         listen: String,
