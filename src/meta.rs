@@ -913,6 +913,7 @@ pub async fn public_branding_handler(State(state): State<Arc<AppState>>) -> Json
         "locale": cfg.steward.locale,
         "strings": cfg.steward.strings,
         "base_path": state.base_path,
+        "demo_login": cfg.steward.demo_login,
     }))
 }
 

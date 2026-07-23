@@ -33,6 +33,14 @@ export default function Login() {
     applyThemeConfig(meta?.theme)
   }, [meta?.theme])
 
+  // Public-demo convenience: pre-fill the one-click demo credentials.
+  useEffect(() => {
+    if (meta?.demo_login) {
+      setEmail(meta.demo_login.user)
+      setPassword(meta.demo_login.password)
+    }
+  }, [meta?.demo_login])
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setBusy(true)
@@ -62,6 +70,11 @@ export default function Login() {
             <BrandMark logo={logo} name={meta?.brand} size="login" />
           </div>
         </div>
+        {meta?.demo_login && (
+          <div className="mb-4 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-center text-[13px] text-sec">
+            Public demo — credentials pre-filled. Just press <b>Enter</b>.
+          </div>
+        )}
         <form onSubmit={submit} className="space-y-3">
           <div>
             <label className="mb-1 block text-[13px] text-sec" htmlFor="login-email">

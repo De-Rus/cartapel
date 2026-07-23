@@ -164,6 +164,7 @@ export interface ThemeConfig {
 export interface Meta {
   brand: string
   base_path: string
+  demo_login?: { user: string; password: string } | null
   tables: TableMeta[]
   nav?: NavGroup[]
   user: User

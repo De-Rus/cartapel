@@ -78,6 +78,22 @@ pub struct StewardConfig {
         serialize_with = "hcl::ser::labeled_block"
     )]
     pub sources: BTreeMap<String, NamedSource>,
+    /// When set, the login page pre-fills these credentials and shows a "public
+    /// demo" hint — one-click entry for a hosted (read-only) demo. Enable it ONLY
+    /// for a demo: it exposes the credentials on the unauthenticated /public API.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "ser_opt_block"
+    )]
+    pub demo_login: Option<DemoLogin>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DemoLogin {
+    pub user: String,
+    pub password: String,
 }
 
 
