@@ -28,18 +28,18 @@ detail {
   mode    = "page"        # "page" | "drawer" | "modal"
   columns = 1             # section grid column count
   tabs    = true          # render sections as tabs
-  stats   = ["installs", "rating_avg", "favorites"]
+  stats   = ["mrr", "plan", "country"]
 
   section {
     title       = "Identity"
-    fields      = ["name", "kind", "tags"]
+    fields      = ["name", "email", "country"]
     span        = 2         # span both columns
     collapsible = true
   }
 
   section {
-    title  = "Content"
-    fields = ["summary", "description", "source"]
+    title  = "Account"
+    fields = ["plan", "mrr", "active"]
   }
 }
 ```
@@ -61,7 +61,7 @@ so a `number` shows a big figure and a `custom:minibar` rating shows its bar.
 
 ```hcl
 detail {
-  stats = ["install_count", "rating_avg", "favorites", "category"]
+  stats = ["mrr", "plan", "active", "country"]
 }
 ```
 
@@ -77,15 +77,15 @@ written; any field not placed in a section falls into a trailing "Other" group.
 detail {
   section {
     title  = "Identity"
-    fields = ["id", "symbol", "name", "source", "exchange"]
+    fields = ["id", "name", "email", "country"]
   }
   section {
-    title  = "Classification"
-    fields = ["asset_class", "base", "quote", "currency", "country"]
+    title  = "Plan"
+    fields = ["plan", "mrr"]
   }
   section {
     title  = "Status"
-    fields = ["active", "has_logo"]
+    fields = ["active", "created_at"]
   }
 }
 ```
@@ -101,7 +101,7 @@ Per-section options:
 
 ::: tip Two ways to assign a field to a section
 You can either list fields inside `section { fields = [...] }`, or tag a field
-from its own block with `field "notes" { group = "Metadata" }`. Use whichever
+from its own block with `field "email" { group = "Contact" }`. Use whichever
 reads better; they compose.
 :::
 
@@ -117,7 +117,7 @@ Override the auto rail only when you want a specific, curated set:
 ```hcl
 detail {
   sidebar {
-    fields = ["id", "owner_id", "created_at", "updated_at"]
+    fields = ["id", "customer_id", "product_id", "started_at", "renews_at"]
   }
 }
 ```
@@ -141,7 +141,7 @@ List child table names and steward infers the foreign key:
 
 ```hcl
 relations {
-  inlines = ["bot_signals", "bot_notifications"]
+  inlines = ["orders", "subscriptions"]
 }
 ```
 
@@ -157,10 +157,10 @@ inline, use object syntax:
 relations {
   inlines = [
     {
-      table      = "bot_signals"
-      fk_col     = "bot_id"          # explicit FK column (inferred if omitted)
-      label      = "Recent signals"  # section heading (defaults to the table label)
-      columns    = ["ts", "kind", "price"]
+      table      = "order_items"
+      fk_col     = "order_id"        # explicit FK column (inferred if omitted)
+      label      = "Line items"      # section heading (defaults to the table label)
+      columns    = ["product_id", "qty", "unit_price"]
       can_create = false             # allow creating child rows inline
       can_delete = true              # allow deleting child rows inline
     },

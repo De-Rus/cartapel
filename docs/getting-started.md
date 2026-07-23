@@ -17,7 +17,7 @@ cargo build --release
 ```
 
 ```bash [Docker]
-docker pull ghcr.io/your-org/steward:latest
+docker pull ghcr.io/de-rus/steward:latest
 ```
 
 ```bash [Binary release]
@@ -60,8 +60,13 @@ how many tables it found:
 
 ```
 INFO steward: introspected 41 tables from schemas ["public"]
-INFO steward: steward listening on http://127.0.0.1:8686/
+INFO steward: steward listening on http://127.0.0.1:8686/admin/
 ```
+
+The panel is served under **`/admin`** by default (so `http://…:8686/` redirects
+to `/admin`). Change the mount path with `--base-path` — e.g. `--base-path ''`
+to serve at the root, or `--base-path /panel` for a sub-path. It's applied at
+runtime, so one binary/image serves any prefix.
 
 ::: warning steward never writes to your database on its own
 Your Postgres is only ever written to when a panel user edits a row, runs a bulk

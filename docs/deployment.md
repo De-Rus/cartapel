@@ -27,7 +27,7 @@ docker run -d --name steward -p 8686:8686 \
   -e STEWARD_ADMIN_PASSWORD="change-me" \
   -v "$PWD/admin:/config:ro" \
   -v "steward-data:/data" \
-  ghcr.io/your-org/steward:latest \
+  ghcr.io/de-rus/steward:latest \
   serve --config /config --data /data --schema public --listen 0.0.0.0:8686
 ```
 
@@ -61,9 +61,9 @@ run it — swap in your own config and database as you go.
 
 Secrets are set with `fly secrets set` and **never** committed to `fly.toml`.
 The `[env]` block there carries only non-secrets (`STEWARD_CONFIG`,
-`STEWARD_LISTEN`, `STEWARD_SECURE_COOKIES`). To serve your **own** admin instead
-of the demo, point `STEWARD_CONFIG` at your bundle (bake it into the image or
-mount a volume) rather than `/demo/admin`.
+`STEWARD_BASE_PATH`, `STEWARD_LISTEN`, `STEWARD_SECURE_COOKIES`). To serve your
+**own** admin instead of the demo, point `STEWARD_CONFIG` at your bundle (bake it
+into the image or mount a volume) rather than `/demo/admin`.
 
 steward's SQLite state lives on the machine's ephemeral disk here; the admin user
 re-bootstraps from `STEWARD_ADMIN_*` on each fresh machine. Mount a Fly volume at
@@ -82,7 +82,7 @@ essentials:
 | `STEWARD_SECRET_KEY` | Cookie-signing secret. **Required.** |
 | `STEWARD_CONFIG` | Config directory. |
 | `STEWARD_DATA` | State directory. |
-| `STEWARD_BASE_PATH` | URL prefix (e.g. `/manage`). |
+| `STEWARD_BASE_PATH` | URL prefix the panel is served under. Defaults to `/admin`; set `''` (or `/`) for the domain root, or any prefix like `/panel`. |
 | `STEWARD_LISTEN` | Bind address. |
 | `STEWARD_SECURE_COOKIES` | `true` behind HTTPS (default); `false` for local HTTP. |
 | `STEWARD_WEBHOOK_SECRET` | Signs outbound webhook actions. |
@@ -107,20 +107,39 @@ A common pattern is a writable config volume with a **seed-if-empty** entrypoint
 copy a baked-in default bundle into the volume on first boot, then let admins
 evolve it live.
 
-## Reverse proxy & base path
+## Base path and mounting
 
-To serve steward under a sub-path (e.g. `https://app.example.com/manage`), set
-`--base-path /manage`. steward then serves everything — the SPA, the API under
-`{base}/api`, and static assets under `{base}/static` — beneath that prefix.
+The panel is served under **`/admin`** by default. The mount prefix is **injected
+into the SPA at runtime** (the server rewrites `index.html` at serve time), so a
+single build/image serves under any path — you never rebuild to change it:
 
-An nginx location, proxying to steward on `:8686`:
+```bash
+# same published image, three different mount points
+docker run … ghcr.io/de-rus/steward serve                     # → /admin (default)
+docker run … -e STEWARD_BASE_PATH="" ghcr.io/de-rus/steward serve       # → /  (root)
+docker run … -e STEWARD_BASE_PATH=/panel ghcr.io/de-rus/steward serve   # → /panel
+```
+
+That's what lets you pull `ghcr.io/de-rus/steward` and mount it wherever your
+setup wants — no fork, no custom build. `GET /` redirects to the mount path.
+
+### Behind a reverse proxy
+
+To serve steward under a sub-path (e.g. `https://app.example.com/panel`), set
+`STEWARD_BASE_PATH=/panel` and proxy that prefix. steward serves everything — the
+SPA, the API under `{base}/api`, and static assets under `{base}/static` —
+beneath it (plus the hashed bundle at `/assets/…` from the root). An nginx
+location proxying to steward on `:8686`:
 
 ```nginx
-location /manage/ {
+location /panel/ {
     proxy_pass         http://127.0.0.1:8686;
     proxy_set_header   Host              $host;
     proxy_set_header   X-Forwarded-For   $remote_addr;
     proxy_set_header   X-Forwarded-Proto $scheme;
+}
+location /assets/ {   # the hashed SPA bundle is served from the root
+    proxy_pass         http://127.0.0.1:8686;
 }
 ```
 

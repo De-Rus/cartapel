@@ -14,17 +14,17 @@ steward serve \
   --schema public \
   --config ./admin \
   --data ./steward-data \
-  --base-path /manage \
   --listen 0.0.0.0:8686
+# → panel on http://0.0.0.0:8686/admin  (the default mount path)
 ```
 
 | Flag | Env var | Default | Description |
 | --- | --- | --- | --- |
-| `--db` | `STEWARD_DB` | — | Postgres connection URL. Falls back to `[database].url` in config (which itself supports `env:NAME` / `${NAME}` interpolation). |
-| `--schema` | `STEWARD_SCHEMA` | `public` | Schema to introspect. Falls back to `[database].schema` / `[database].schemas` in config. |
+| `--db` | `STEWARD_DB` | — | Postgres connection URL. Falls back to the URL of the `primary` `source` in `config/steward.hcl` (which supports `env:NAME` / `${NAME}` interpolation). |
+| `--schema` | `STEWARD_SCHEMA` | `public` | Schema to introspect. Falls back to the primary source's `schemas` list. |
 | `--config` | `STEWARD_CONFIG` | — | Directory of HCL config files. Optional — without it, no tables are exposed. |
 | `--data` | `STEWARD_DATA` | `./steward-data` | Directory for steward's own SQLite state (users, sessions, audit, config history). |
-| `--base-path` | `STEWARD_BASE_PATH` | `""` | URL prefix the panel is served under (e.g. `/manage`). A trailing slash is trimmed. |
+| `--base-path` | `STEWARD_BASE_PATH` | `/admin` | URL prefix the panel is served under. Injected into the SPA at runtime, so one build serves any prefix. A trailing slash is trimmed; pass `''` (or `/`) to serve at the domain root. |
 | `--listen` | `STEWARD_LISTEN` | `127.0.0.1:8686` | Address and port to bind. |
 | `--secure-cookies` | `STEWARD_SECURE_COOKIES` | `true` | Sets the `Secure` attribute on session cookies. Keep on behind HTTPS; pass `--secure-cookies=false` for local plain-HTTP development. |
 

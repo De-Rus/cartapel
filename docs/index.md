@@ -67,7 +67,7 @@ docker run --rm -p 8686:8686 \
   -e STEWARD_ADMIN_EMAIL="you@example.com" \
   -e STEWARD_ADMIN_PASSWORD="change-me" \
   -v "$PWD/admin:/config:ro" \
-  ghcr.io/your-org/steward:latest \
+  ghcr.io/de-rus/steward:latest \
   serve --config /config --schema public
 ```
 
@@ -85,7 +85,7 @@ cargo run --release -- serve \
 
 :::
 
-Open <http://localhost:8686>, log in with the bootstrap admin, and you are in.
+Open <http://localhost:8686/admin>, log in with the bootstrap admin, and you are in.
 
 ::: tip The secret key is required
 steward **refuses to start** without a secret key — it signs your session

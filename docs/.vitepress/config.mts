@@ -70,7 +70,7 @@ export default defineConfig({
 
     search: { provider: 'local' },
 
-    socialLinks: [{ icon: 'github', link: 'https://github.com/' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/de-rus/steward' }],
 
     footer: {
       message: 'Released under the MIT License.',

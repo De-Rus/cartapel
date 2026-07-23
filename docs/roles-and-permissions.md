@@ -18,25 +18,23 @@ writable, even for an admin).
 Every role is a `role "<name>" { }` block:
 
 ```hcl
-role "ops" {
+role "staff" {
   tables = {
-    "*"              = "read"
-    "bots"           = "write"
-    "instruments"    = "write"
-    "logos"          = "write"
+    "*"          = "read"
+    "orders"     = "write"
+    "products"   = "write"
+    "customers"  = "write"
   }
 
   actions = [
-    "bots.pause",
-    "bots.alerts_only",
-    "instruments.activate",
-    "instruments.deactivate",
+    "orders.mark_shipped",
+    "orders.refund",
+    "products.activate",
+    "products.deactivate",
   ]
 
   masked = {
-    "subscriptions"       = ["wallet", "external_ref"]
-    "subscription_events" = ["tx_ref"]
-    "user_settings"       = ["value"]
+    "subscriptions" = ["api_token"]
   }
 }
 ```
@@ -61,8 +59,8 @@ The `"*"` wildcard sets a default for all tables; per-table entries override it:
 
 ```hcl
 tables = {
-  "*"    = "read"      # read everything by default
-  "bots" = "write"     # …but fully manage bots
+  "*"      = "read"      # read everything by default
+  "orders" = "write"     # …but fully manage orders
 }
 ```
 
@@ -74,9 +72,9 @@ of `view`, `create`, `update`, `delete` is optional: unset defers to the coarse
 
 ```hcl
 role "support" {
-  tables = { bots = "write" }
+  tables = { orders = "write" }
 
-  perm "bots" {
+  perm "orders" {
     view   = true
     update = true
     create = false      # can edit rows, but not add or remove them
@@ -104,8 +102,8 @@ path (update, create, bulk, import) — on top of the usual masked / readonly / 
 
 ```hcl
 role "support" {
-  tables   = { bots = "write" }
-  editable = { bots = ["mode", "status"] }   # may only change these two columns
+  tables   = { orders = "write" }
+  editable = { orders = ["status", "total"] }   # may only change these two columns
 }
 ```
 
@@ -120,8 +118,7 @@ cannot be used as a sort key.
 
 ```hcl
 masked = {
-  "subscriptions" = ["wallet", "external_ref"]
-  "user_settings" = ["value"]
+  "subscriptions" = ["api_token"]
 }
 ```
 
@@ -137,7 +134,7 @@ can never see or touch a row outside their filter.
 role "support" {
   tables     = { "*" = "read" }
   row_filter = {
-    "user_settings" = "t.key NOT ILIKE '%secret%' AND t.key NOT ILIKE '%token%' AND t.key NOT ILIKE '%password%'"
+    "customers" = "t.active AND t.plan <> 'free'"
   }
 }
 ```
@@ -147,7 +144,7 @@ signed-in user's email (safely escaped), so you can scope rows to their owner:
 
 ```hcl
 row_filter = {
-  "tickets" = "t.assignee_email = '{actor.email}'"
+  "orders" = "t.customer_id IN (SELECT id FROM customers WHERE email = '{actor.email}')"
 }
 ```
 
@@ -158,7 +155,7 @@ row_filter = {
 role can only run actions listed here.
 
 ```hcl
-actions = ["bots.pause", "bots.alerts_only", "instruments.deactivate"]
+actions = ["orders.mark_shipped", "orders.refund", "products.deactivate"]
 ```
 
 ## Managing roles & users at runtime

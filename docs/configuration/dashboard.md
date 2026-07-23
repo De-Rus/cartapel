@@ -10,12 +10,12 @@ columns = 4
 
 panel {
   type          = "stat"
-  label         = "Signals 24h"
-  category      = "Summary"
-  sql           = "SELECT count(*) AS v FROM markets.bot_signals WHERE created_at > now() - interval '24 hours'"
-  compare_sql   = "SELECT count(*) AS v FROM markets.bot_signals WHERE created_at BETWEEN now() - interval '48 hours' AND now() - interval '24 hours'"
-  compare_label = "prev 24h"
-  spark         = "SELECT count(*) AS v FROM markets.bot_signals WHERE created_at > now() - interval '24 hours' GROUP BY date_trunc('hour', created_at) ORDER BY date_trunc('hour', created_at)"
+  label         = "Orders 30d"
+  category      = "Sales"
+  sql           = "SELECT count(*) AS v FROM orders WHERE placed_at > now() - interval '30 days'"
+  compare_sql   = "SELECT count(*) AS v FROM orders WHERE placed_at BETWEEN now() - interval '60 days' AND now() - interval '30 days'"
+  compare_label = "prev 30d"
+  spark         = "SELECT count(*) AS v FROM orders WHERE placed_at > now() - interval '30 days' GROUP BY date_trunc('day', placed_at) ORDER BY date_trunc('day', placed_at)"
   good_when     = "up"
 }
 ```
@@ -42,12 +42,12 @@ sparkline.
 panel {
   type          = "stat"
   label         = "Revenue 14d"
-  category      = "Summary"
+  category      = "Revenue"
   format        = "money"
-  sql           = "SELECT coalesce(sum(amount),0) AS v FROM markets.subscription_events WHERE created_at > now() - interval '14 days'"
-  compare_sql   = "SELECT coalesce(sum(amount),0) AS v FROM markets.subscription_events WHERE created_at BETWEEN now() - interval '28 days' AND now() - interval '14 days'"
+  sql           = "SELECT coalesce(sum(total),0) AS v FROM orders WHERE placed_at > now() - interval '14 days'"
+  compare_sql   = "SELECT coalesce(sum(total),0) AS v FROM orders WHERE placed_at BETWEEN now() - interval '28 days' AND now() - interval '14 days'"
   compare_label = "prev 14d"
-  spark         = "SELECT coalesce(sum(amount),0) AS v FROM ... GROUP BY date_trunc('day', created_at) ORDER BY 1"
+  spark         = "SELECT coalesce(sum(total),0) AS v FROM ... GROUP BY date_trunc('day', placed_at) ORDER BY 1"
   good_when     = "up"
   alert_above   = 20
 }
@@ -72,7 +72,7 @@ panel {
   category = "Trends"
   format   = "money"
   chart    = "area"          # "line" | "bar" | "area"
-  sql      = "SELECT date_trunc('day', created_at) AS t, coalesce(sum(amount),0) AS v FROM markets.subscription_events WHERE created_at > now() - interval '30 days' GROUP BY 1 ORDER BY 1"
+  sql      = "SELECT date_trunc('day', placed_at) AS t, coalesce(sum(total),0) AS v FROM orders WHERE placed_at > now() - interval '30 days' GROUP BY 1 ORDER BY 1"
 }
 ```
 
@@ -87,11 +87,11 @@ panel {
 ```hcl
 panel {
   type     = "table"
-  label    = "Bots needing attention"
+  label    = "Past-due subscriptions"
   category = "Attention"
-  link     = "bots"          # rows deep-link into this table's records
-  roles    = ["ops"]
-  sql      = "SELECT id, name, status, last_error, last_eval_at FROM markets.bots WHERE status IN ('halted','error') ORDER BY last_eval_at NULLS FIRST LIMIT 10"
+  link     = "subscriptions"   # rows deep-link into this table's records
+  roles    = ["support"]
+  sql      = "SELECT id, customer_id, product_id, status, renews_at FROM subscriptions WHERE status = 'past_due' ORDER BY renews_at NULLS FIRST LIMIT 10"
 }
 ```
 

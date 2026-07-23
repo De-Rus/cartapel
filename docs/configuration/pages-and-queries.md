@@ -37,7 +37,7 @@ admin/
 label  = "Operations"
 icon   = "satellite"
 module = "ops.tsx"         # the co-located page module (.tsx / .ts / .js)
-roles  = ["ops"]           # omit → admin only
+roles  = ["support"]       # omit → admin only
 ```
 
 | Key | Description |
@@ -96,13 +96,13 @@ namespace; a name defined twice is a loud load error.
 ```hcl
 # admin/screens/overview/ops/queries.hcl
 query "ops_fleet" {
-  sql = "SELECT status, count(*) AS n FROM markets.bots GROUP BY status ORDER BY n DESC"
-  roles = ["ops"]           # omit → admin only
+  sql = "SELECT status, count(*) AS n FROM orders GROUP BY status ORDER BY n DESC"
+  roles = ["support"]       # omit → admin only
 }
 
 query "ops_revenue" {
-  sql = "SELECT date_trunc('day', created_at) AS t, coalesce(sum(amount),0) AS usd FROM markets.subscription_events WHERE created_at > now() - interval '14 days' GROUP BY 1 ORDER BY 1"
-  roles = ["ops"]
+  sql = "SELECT date_trunc('day', placed_at) AS t, coalesce(sum(total),0) AS usd FROM orders WHERE placed_at > now() - interval '14 days' GROUP BY 1 ORDER BY 1"
+  roles = ["support"]
 }
 ```
 
@@ -130,13 +130,13 @@ variable "window" {
   type    = "int"                 # text (default) | int | float | ident
   options = ["7", "30", "90"]     # …or `query = "SELECT DISTINCT …"` (value, [label])
   default = "30"
-  roles   = ["ops"]               # omit → admin only
+  roles   = ["support"]           # omit → admin only
 }
 ```
 
 ```hcl
-query "pulse_signals" {
-  sql = "SELECT date_trunc('day', created_at) AS t, count(*) AS n FROM markets.bot_signals WHERE created_at > now() - {{window}} * interval '1 day' GROUP BY 1 ORDER BY 1"
+query "pulse_orders" {
+  sql = "SELECT date_trunc('day', placed_at) AS t, count(*) AS n FROM orders WHERE placed_at > now() - {{window}} * interval '1 day' GROUP BY 1 ORDER BY 1"
 }
 ```
 
@@ -147,7 +147,7 @@ shareable by link. In a page module:
 ```js
 const { VarBar, useQuery, Chart } = sx;
 export default ({ api }) => {
-  const q = useQuery(api, "pulse_signals");   // v_* params are folded in automatically
+  const q = useQuery(api, "pulse_orders");   // v_* params are folded in automatically
   return html`<${Page} title="Pulse"><${VarBar} api=${api} />
     <${Chart} rows=${q.rows} x="t" y="n" kind="bar" /></>`;
 };
@@ -164,8 +164,8 @@ the bridge for mixing zero-config tables with bespoke UI on one screen:
 
 ```js
 const { AdminTable } = sx;
-// inside a page: same columns/formatting as the standalone Bots table
-html`<${AdminTable} api=${api} slug="bots" pp=${25} sort="-id" />`
+// inside a page: same columns/formatting as the standalone Orders table
+html`<${AdminTable} api=${api} slug="orders" pp=${25} sort="-id" />`
 ```
 
 ## Custom widgets
@@ -230,15 +230,15 @@ All three use the panel's CSS variables so they track the active theme
 automatically.
 
 ```hcl
-field "has_logo" {
-  label  = "Logo"
+field "has_subscription" {
+  label  = "Subscribed"
   widget = "custom:statuspill"
-  sql    = "EXISTS (SELECT 1 FROM markets.logos l WHERE l.symbol = t.symbol AND l.status = 'ok')"
+  sql    = "EXISTS (SELECT 1 FROM subscriptions s WHERE s.customer_id = t.id AND s.status = 'active')"
   params = {
-    field = "has_logo"
+    field = "has_subscription"
     map = {
-      "true"  = { label = "logo",    tone = "green" }
-      "false" = { label = "missing", tone = "gray"  }
+      "true"  = { label = "active", tone = "green" }
+      "false" = { label = "none",   tone = "gray"  }
     }
   }
 }

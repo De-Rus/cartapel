@@ -106,7 +106,22 @@ becomes a read-only viewer that hands you the HCL to commit yourself.
 Browser ──▶ {base}/api/*        JSON API (auth, meta, rows, config, dashboard, queries)
         ──▶ {base}/static/*     path-confined bundle assets (widget/page JS, logos)
         ──▶ {base}/*            the embedded SPA (client-side routing)
+        ──▶ /assets/*           the hashed SPA bundle (served from the root)
 ```
 
 Every API call carries the signed session cookie; every mutation additionally
 carries the `X-Steward` CSRF header. See [Security](/security).
+
+## Runtime mount path — one build, any prefix
+
+`{base}` above is the runtime `--base-path` / `STEWARD_BASE_PATH` (default
+`/admin`, `''` for the domain root). It is **not baked in at build time**: Vite
+builds with `base: '/'` (so the hashed bundle lives at `/assets/…`), and the
+server injects the live prefix into `index.html` at serve time — it replaces a
+placeholder so the SPA reads `window.__STEWARD_BASE__` and threads it through the
+router basename, the API base, and every link. The API and static routes are
+nested under the prefix; `GET /` redirects to it.
+
+The upshot: **one published image serves under any path with no rebuild** — pull
+`ghcr.io/de-rus/steward` and set `STEWARD_BASE_PATH` to `/admin`, `/panel`, or
+`''`. See [Deployment](/deployment#base-path-and-mounting).

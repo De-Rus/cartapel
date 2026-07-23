@@ -14,8 +14,8 @@ Only tables with a `screen.hcl` are exposed. See
 A complete table config is made of a handful of optional blocks:
 
 ```hcl
-label        = "instrument"        # singular label
-label_plural = "Instruments"       # plural label (nav + list heading)
+label        = "product"           # singular label
+label_plural = "Products"          # plural label (nav + list heading)
 
 list      { … }        # the list view: columns, search, filters, sort
 display   { … }         # the record title template
@@ -35,15 +35,15 @@ introspected default.
 
 ```hcl
 list {
-  columns = ["id", "symbol", "exchange", "asset_class", "active"]
-  search  = ["symbol", "name", "base"]
-  filters = ["source", "asset_class", "active"]
+  columns = ["id", "name", "sku", "price", "active"]
+  search  = ["name", "sku"]
+  filters = ["active"]
   sort    = "-id"
   per_page = 50
 
-  filter_def "no_logo" {
-    label = "Missing logo"
-    sql   = "NOT EXISTS (SELECT 1 FROM markets.logos l WHERE l.symbol = t.symbol AND l.status = 'ok')"
+  filter_def "never_ordered" {
+    label = "Never ordered"
+    sql   = "NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.product_id = t.id)"
   }
 }
 ```
@@ -65,7 +65,7 @@ from your config (never user input) and can reference the current table as `t`:
 ```hcl
 filter_def "needs_attention" {
   label = "Needs attention"
-  sql   = "t.mode <> 'off' AND (t.last_error IS NOT NULL OR t.last_eval_at < now() - interval '30 minutes')"
+  sql   = "t.status = 'past_due' OR (t.renews_at IS NOT NULL AND t.renews_at < now() + interval '7 days')"
 }
 ```
 
@@ -75,7 +75,7 @@ List `"needs_attention"` in `filters` to surface it as a toggle in the UI.
 
 ```hcl
 display {
-  title = "{symbol} · {exchange}"
+  title = "{name} · {country}"
 }
 ```
 
@@ -87,7 +87,7 @@ Omit it and steward falls back to the primary key.
 
 ```hcl
 edit {
-  readonly = ["id", "source", "symbol", "created_at"]
+  readonly = ["id", "customer_id", "placed_at"]
 }
 ```
 
@@ -127,11 +127,11 @@ detail {
   columns = 2
   section {
     title  = "Identity"
-    fields = ["id", "symbol", "name", "exchange"]
+    fields = ["id", "name", "email", "country"]
   }
   section {
     title  = "Status"
-    fields = ["active", "has_logo"]
+    fields = ["plan", "active"]
   }
 }
 ```
@@ -142,7 +142,7 @@ Also covered in [Detail views](/configuration/detail-views#inlines):
 
 ```hcl
 relations {
-  inlines = ["bot_signals", "bot_notifications"]
+  inlines = ["orders", "subscriptions"]
 }
 ```
 
@@ -153,9 +153,9 @@ computed SQL, and more. This is the heart of customization —
 [Fields & widgets](/configuration/fields-and-widgets) covers every option.
 
 ```hcl
-field "asset_class" {
+field "plan" {
   widget = "badge"
-  params = { colors = { crypto = "orange", stock = "blue", etf = "violet" } }
+  params = { colors = { free = "gray", pro = "blue", enterprise = "violet" } }
 }
 
 field "active" {
@@ -172,7 +172,7 @@ action "deactivate" {
   label   = "Deactivate"
   kind    = "update"                       # "update" | "delete" | "webhook"
   set     = { active = false }             # for kind = "update"
-  confirm = "Deactivate {count} instruments?"
+  confirm = "Deactivate {count} products?"
   danger  = false
 }
 ```
@@ -201,50 +201,50 @@ Which roles may invoke an action is controlled in `config/auth.hcl` via the role
 From the reference config, lightly abridged:
 
 ```hcl
-# screens/bots-live/bots/screen.hcl
-label        = "bot"
-label_plural = "Bots"
+# screens/sales/orders/screen.hcl
+label        = "order"
+label_plural = "Orders"
 
 list {
-  columns  = ["name", "user_id", "mode", "status", "signals_24h", "last_eval_at", "last_error"]
-  search   = ["name", "user_id", "strategy_name"]
-  filters  = ["mode", "status", "timeframe"]
-  sort     = "-created_at"
+  columns  = ["id", "customer_id", "status", "total", "item_count", "placed_at"]
+  search   = ["status"]
+  filters  = ["status"]
+  sort     = "-placed_at"
 
   filter_def "needs_attention" {
     label = "Needs attention"
-    sql   = "t.mode <> 'off' AND (t.last_error IS NOT NULL OR t.status IN ('error','halted') OR t.last_eval_at < now() - interval '30 minutes')"
+    sql   = "t.status = 'pending' AND t.placed_at < now() - interval '2 days'"
   }
 }
 
-display { title = "{name}" }
+display { title = "Order #{id}" }
 
 detail {
-  section { title = "Identity"  fields = ["name", "id", "user_id", "strategy_name"] }
-  section { title = "Runtime"   fields = ["mode", "status", "last_eval_at", "signals_24h", "last_error"] }
+  section { title = "Identity"  fields = ["id", "customer_id", "status"] }
+  section { title = "Amounts"   fields = ["total", "item_count", "placed_at"] }
 }
 
-edit        { readonly = ["id", "user_id", "created_at"] }
-relations   { inlines  = ["bot_signals", "bot_notifications"] }
+edit        { readonly = ["id", "customer_id", "placed_at"] }
+relations   { inlines  = ["order_items"] }
 permissions { create = false, delete = false }
 
-field "mode" {
+field "status" {
   widget = "badge"
-  params = { colors = { off = "gray", alerts_only = "blue", live = "green" } }
+  params = { colors = { pending = "gray", paid = "blue", shipped = "green", refunded = "orange", cancelled = "red" } }
 }
 
-field "signals_24h" {
-  label  = "Signals 24h"
+field "item_count" {
+  label  = "Items"
   widget = "custom:minibar"
-  sql    = "(SELECT count(*) FROM markets.bot_signals s WHERE s.bot_id = t.id AND s.created_at > now() - interval '24 hours')::int"
-  params = { field = "signals_24h", max = 50, warn_at = 40 }
+  sql    = "(SELECT count(*) FROM order_items oi WHERE oi.order_id = t.id)::int"
+  params = { field = "item_count", max = 10, warn_at = 8 }
 }
 
-action "pause" {
-  label   = "Pause (mode off)"
+action "refund" {
+  label   = "Refund"
   kind    = "update"
-  set     = { mode = "off" }
-  confirm = "Pause {count} bots? They stop evaluating immediately."
+  set     = { status = "refunded" }
+  confirm = "Refund {count} orders? This is a demo — no money moves."
   danger  = true
 }
 ```

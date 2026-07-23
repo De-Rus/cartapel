@@ -42,6 +42,7 @@ root) works too.
 
 ## Publishing
 
-A GitHub Pages deploy workflow will be added when steward is extracted into its
-own open-source repository. Until then the site is built and previewed locally
-from this folder.
+`.github/workflows/docs.yml` builds this site and deploys it to GitHub Pages on
+every push to `main` that touches `docs/**` — live at
+<https://de-rus.github.io/steward/>. The site is built with `base: '/steward/'`
+(overridable via the `DOCS_BASE` env var for a custom domain).

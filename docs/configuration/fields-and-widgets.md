@@ -41,10 +41,10 @@ exist in the table. steward selects it as `(<sql>) AS "<name>"`. The current row
 is aliased `t`, so you can aggregate related tables:
 
 ```hcl
-field "signals_24h" {
-  label  = "Signals 24h"
+field "orders_30d" {
+  label  = "Orders 30d"
   widget = "number"
-  sql    = "(SELECT count(*) FROM markets.bot_signals s WHERE s.bot_id = t.id AND s.created_at > now() - interval '24 hours')::int"
+  sql    = "(SELECT count(*) FROM orders o WHERE o.customer_id = t.id AND o.placed_at > now() - interval '30 days')::int"
 }
 
 field "age_days" {
@@ -60,16 +60,16 @@ By default a computed column is display-only. Make it **sortable** — like Djan
 `@admin.display(ordering=…)`:
 
 ```hcl
-field "pe_ratio" {
-  label    = "P/E"
-  sql      = "t.price / nullif(t.eps_diluted, 0)"
+field "line_total" {
+  label    = "Line total"
+  sql      = "t.qty * t.unit_price"
   sortable = true                 # list sort orders BY the expression
 }
 
-field "signals_24h" {
-  label   = "Signals 24h"
-  sql     = "(SELECT count(*) FROM markets.bot_signals s WHERE s.bot_id = t.id)::int"
-  sort_by = "last_eval_at"        # …or sort by another real column instead
+field "order_count" {
+  label   = "Orders"
+  sql     = "(SELECT count(*) FROM orders o WHERE o.customer_id = t.id)::int"
+  sort_by = "created_at"          # …or sort by another real column instead
 }
 ```
 
@@ -113,7 +113,7 @@ Both take a template with `{column}` placeholders filled from the row:
 
 ```hcl
 field "name" {
-  display = "{first_name} {last_name}"
+  display = "{name} ({country})"
   href    = "https://crm.example/u/{id}"
 }
 ```
@@ -174,10 +174,10 @@ load error.
 An `image { }` block turns a column into an uploadable, on-disk-resized image:
 
 ```hcl
-field "logo" {
+field "image" {
   image {
-    dir       = "logos"        # subdirectory under the config bundle
-    name_col  = "symbol"       # column supplying the stored filename
+    dir       = "products"     # subdirectory under the config bundle
+    name_col  = "sku"          # column supplying the stored filename
     max_px    = 256            # longest edge, default 256
     normalize = true           # re-encode/normalize on upload, default true
   }
@@ -235,7 +235,7 @@ The `colors` param maps values to one of `blue`, `green`, `orange`, `red`,
 ```hcl
 field "status" {
   widget = "badge"
-  params = { colors = { running = "green", halted = "red", idle = "gray" } }
+  params = { colors = { active = "green", past_due = "orange", cancelled = "gray" } }
 }
 ```
 
@@ -247,7 +247,7 @@ field "status" {
 | `relative_time` | "3 minutes ago", tinted when stale. | `warn_after` (seconds; older values warn) |
 
 ```hcl
-field "last_eval_at" {
+field "renews_at" {
   widget = "relative_time"
   params = { warn_after = 900 }
 }
