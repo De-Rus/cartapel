@@ -27,7 +27,7 @@ services:
       STEWARD_BASE_PATH: /admin
       STEWARD_SECRET_KEY: demo-secret-not-for-production
       STEWARD_SECURE_COOKIES: "false"
-      STEWARD_ADMIN_EMAIL: admin@acme.test
-      STEWARD_ADMIN_PASSWORD: acme-admin
+      STEWARD_ADMIN_EMAIL: admin
+      STEWARD_ADMIN_PASSWORD: admin
     ports:
       - "8686:8686"

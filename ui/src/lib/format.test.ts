@@ -96,7 +96,7 @@ describe('interpolateHref', () => {
     expect(interpolateHref('http://x.io', {})).toBe('http://x.io')
     expect(interpolateHref('mailto:{e}', { e: 'a@b.io' })).toBe('mailto:a%40b.io')
     expect(interpolateHref('tel:{p}', { p: '+34600' })).toBe('tel:%2B34600')
-    expect(interpolateHref('/rows/{id}', { id: 7 })).toBe('/rows/7')
+    expect(interpolateHref('/rows/{id}', { id: 7 })).toBe('/admin/rows/7')
   })
   it('blocks protocol-relative and bare hosts', () => {
     expect(interpolateHref('//evil.io', {})).toBe('#')

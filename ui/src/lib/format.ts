@@ -1,3 +1,4 @@
+import { BASE } from './base'
 const nf = new Intl.NumberFormat('es')
 const nf2 = new Intl.NumberFormat('es', { maximumFractionDigits: 2 })
 const nfCompact = new Intl.NumberFormat('es', { notation: 'compact', maximumFractionDigits: 1 })
@@ -208,6 +209,7 @@ export function interpolateHref(template: string, row: Record<string, unknown>):
   const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(raw)
   if (scheme) return HREF_SCHEMES.has(`${scheme[1].toLowerCase()}:`) ? raw : '#'
   if (raw.startsWith('//')) return '#'
-  if (raw.startsWith('/') || raw.startsWith('#') || raw.startsWith('?')) return raw
+  if (raw.startsWith('/')) return `${BASE}${raw}` // in-app absolute path → keep it inside the mount prefix
+  if (raw.startsWith('#') || raw.startsWith('?')) return raw
   return '#'
 }

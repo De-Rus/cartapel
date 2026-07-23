@@ -96,7 +96,7 @@ describe('hrefFor', () => {
     expect(hrefFor('bots/{id}', { id: 42 })).toBe('/admin/bots/42')
     expect(hrefFor('t/{sym}', { sym: 'BRK B' })).toBe('/admin/t/BRK%20B')
   })
-  it('accepts functions and absolute paths', () => {
-    expect(hrefFor((r) => `/admin/u/${r.id}`, { id: 7 })).toBe('/admin/u/7')
+  it('accepts functions and app-root paths (mount prefix added)', () => {
+    expect(hrefFor((r) => `/u/${r.id}`, { id: 7 })).toBe('/admin/u/7')
   })
 })

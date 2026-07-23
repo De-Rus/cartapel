@@ -32,12 +32,23 @@ pub async fn spa_handler(uri: Uri, base_path: axum::extract::State<String>) -> R
             )
                 .into_response();
         }
+        // A missing asset-looking path must 404, not fall through to index.html —
+        // returning HTML for a `.js`/`.css` request yields module-MIME errors and
+        // hides real 404s (e.g. a stale hashed-asset URL across a deploy).
+        let looks_like_asset =
+            rel.starts_with("assets/") || std::path::Path::new(rel).extension().is_some();
+        if looks_like_asset {
+            return (StatusCode::NOT_FOUND, "not found").into_response();
+        }
     }
 
     match Assets::get("index.html") {
         Some(index) => {
             // Inject the runtime mount prefix so one build serves under any path.
-            let html = String::from_utf8_lossy(&index.data).replace("%BASE_PATH%", &base);
+            // JSON-encode it (the placeholder sits in a JS string literal) so a
+            // value with a quote or `</script>` can't break out.
+            let base_json = serde_json::to_string(&base).unwrap_or_else(|_| "\"\"".to_string());
+            let html = String::from_utf8_lossy(&index.data).replace("'%BASE_PATH%'", &base_json);
             (
                 [
                     (header::CONTENT_TYPE, "text/html; charset=utf-8".to_string()),

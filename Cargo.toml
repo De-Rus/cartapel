@@ -5,8 +5,12 @@ name = "steward"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-description = "Point a single binary at your existing Postgres and get a Django-admin-quality panel: introspected CRUD, code-first TOML customization, auth, audit log, dashboards."
+description = "Point a single binary at your existing Postgres and get a Django-admin-quality panel: introspected CRUD, code-first HCL customization, auth, audit log, dashboards."
 repository = "https://github.com/De-Rus/steward"
+homepage = "https://de-rus.github.io/steward/"
+readme = "README.md"
+keywords = ["admin", "postgres", "crud", "dashboard", "database"]
+categories = ["database", "web-programming::http-server", "command-line-utilities"]
 publish = false
 
 [[bin]]

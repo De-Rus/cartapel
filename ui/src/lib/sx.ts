@@ -4,7 +4,7 @@
 import { h, render, Fragment, type ComponentType } from 'preact'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'preact/hooks'
 import htm from 'htm'
-import { BASE } from './base'
+import { withBase } from './base'
 import type { WidgetApi } from './widgets'
 
 export const html = htm.bind(h)
@@ -288,12 +288,12 @@ export function useParam(key: string, def = ''): [string, (v: string | null) => 
 
 export function hrefFor(link: string | ((row: any) => string), row: any): string {
   const path = typeof link === 'function' ? link(row) : link.replace(/\{([^}]+)\}/g, (_, k) => encodeURIComponent(String(row?.[k] ?? '')))
-  return path.startsWith('/') ? path : `${BASE}/${path}`
+  return withBase(path)
 }
 
 /** SPA-navigate to a steward path: `nav("bots/42")` opens that row's detail view. */
 export function nav(path: string) {
-  const to = path.startsWith('/') ? path : `${BASE}/${path}`
+  const to = withBase(path)
   window.history.pushState(null, '', to)
   window.dispatchEvent(new PopStateEvent('popstate'))
 }

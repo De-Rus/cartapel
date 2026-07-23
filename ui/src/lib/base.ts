@@ -12,3 +12,15 @@ declare global {
 
 const raw = typeof window !== 'undefined' ? window.__STEWARD_BASE__ : undefined
 export const BASE = raw && !raw.includes('%') ? raw.replace(/\/+$/, '') : ''
+
+/**
+ * Resolve an app path against the mount prefix. External URLs (scheme or
+ * protocol-relative) and in-page `#`/`?` fragments pass through untouched; an
+ * absolute (`/x`) or relative (`x`) app path is prefixed with BASE so it stays
+ * inside the router basename under a non-root mount.
+ */
+export function withBase(path: string): string {
+  if (/^[a-z][\w+.-]*:/i.test(path) || path.startsWith('//')) return path
+  if (path.startsWith('#') || path.startsWith('?')) return path
+  return path.startsWith('/') ? `${BASE}${path}` : `${BASE}/${path}`
+}

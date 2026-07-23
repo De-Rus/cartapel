@@ -1,5 +1,9 @@
 # steward
 
+[![CI](https://github.com/De-Rus/steward/actions/workflows/ci.yml/badge.svg)](https://github.com/De-Rus/steward/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/tag/De-Rus/steward?label=release&sort=semver)](https://github.com/De-Rus/steward/releases)
+
 Point a single binary at your existing Postgres and get a Django-admin-quality
 panel. No framework, no ORM, no Node runtime — your database schema is the
 source of truth, and customization is code you version, not a GUI you click.
@@ -37,8 +41,8 @@ your own database:
 docker compose up
 ```
 
-Then open **http://localhost:8686** and log in with
-`admin@acme.test` / `acme-admin`. The stack is `db` (Postgres, auto-seeded from
+Then open **http://localhost:8686/admin** and log in with `admin` / `admin`.
+The stack is `db` (Postgres, auto-seeded from
 [`demo/seed.sql`](demo/seed.sql)) + `steward` (built from this repo, config in
 [`demo/admin/`](demo/admin/)). Nothing is written to your machine outside the
 containers; `docker compose down -v` removes everything.
@@ -66,9 +70,11 @@ steward serve \
 ```
 
 `--db postgres://…` / `STEWARD_DB` overrides the primary source's URL, so the
-same config runs against staging or prod by swapping one env var. To serve the
-panel under a sub-path (e.g. behind a reverse proxy at `/admin`), add
-`--base-path /admin`.
+same config runs against staging or prod by swapping one env var. The panel is
+served under **`/admin`** by default — change it with `--base-path /other`, or
+`--base-path ''` (or `/`) to serve at the domain root. The mount prefix is
+injected into the SPA at runtime, so the **same binary/image serves any path**
+with no rebuild.
 
 `--config` points at a directory of HCL files:
 
