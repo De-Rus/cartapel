@@ -1,0 +1,27 @@
+name: demo-reset
+
+# Re-seeds the hosted demo database daily. The public demo is read-only so there
+# is normally nothing to reset — this is belt-and-suspenders. Set a `DEMO_DB`
+# repo secret (the demo Postgres connection string, e.g. the Supabase session
+# pooler on port 5432) to enable it; without the secret it's a no-op.
+on:
+  schedule:
+    - cron: "0 4 * * *" # daily at 04:00 UTC
+  workflow_dispatch:
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Re-seed demo data
+        env:
+          DEMO_DB: ${{ secrets.DEMO_DB }}
+        run: |
+          if [ -z "$DEMO_DB" ]; then
+            echo "DEMO_DB secret not set — skipping."
+            exit 0
+          fi
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+          cd demo
+          psql "$DEMO_DB" -v ON_ERROR_STOP=1 -f reset.sql
