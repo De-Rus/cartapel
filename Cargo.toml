@@ -2,7 +2,7 @@
 
 [package]
 name = "steward"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT"
 description = "Point a single binary at your existing Postgres and get a Django-admin-quality panel: introspected CRUD, code-first HCL customization, auth, audit log, dashboards."
