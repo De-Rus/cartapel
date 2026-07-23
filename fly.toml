@@ -19,6 +19,9 @@ primary_region = "cdg"
   STEWARD_BASE_PATH = "/admin"
   STEWARD_LISTEN = "0.0.0.0:8686"
   STEWARD_SECURE_COOKIES = "true"
+  # Public demo logs in as a read-mostly `demo` role, never admin.
+  # (STEWARD_ADMIN_EMAIL/PASSWORD are set as fly secrets to demo/demo.)
+  STEWARD_ADMIN_ROLE = "demo"
 
 [http_service]
   internal_port = 8686

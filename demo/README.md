@@ -22,4 +22,4 @@ worked reference for how a config directory is laid out.
       `module = "summary.tsx"` + the `summary.tsx` module) built on the `sx` SDK.
 
 Run it from the repo root with `docker compose up`, then open
-http://localhost:8686 (`admin@acme.test` / `acme-admin`).
+http://localhost:8686 (`demo` / `demo`).

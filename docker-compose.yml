@@ -27,7 +27,9 @@ services:
       STEWARD_BASE_PATH: /admin
       STEWARD_SECRET_KEY: demo-secret-not-for-production
       STEWARD_SECURE_COOKIES: "false"
-      STEWARD_ADMIN_EMAIL: admin
-      STEWARD_ADMIN_PASSWORD: admin
+      # Public read-mostly demo user (view everything + safe curated actions).
+      STEWARD_ADMIN_EMAIL: demo
+      STEWARD_ADMIN_PASSWORD: demo
+      STEWARD_ADMIN_ROLE: demo
     ports:
       - "8686:8686"

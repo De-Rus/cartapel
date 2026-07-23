@@ -222,11 +222,17 @@ async fn serve(
             Ok(p) if !p.is_empty() => (p, false),
             _ => (gen_password(), true),
         };
-        store.add_user(&email.to_lowercase(), &password, "admin").expect("bootstrap admin");
+        // The bootstrap user is an `admin` by default; a public demo can bootstrap
+        // a restricted role instead (e.g. a read-mostly `demo` role from auth.hcl).
+        let role = std::env::var("STEWARD_ADMIN_ROLE")
+            .ok()
+            .filter(|r| !r.is_empty())
+            .unwrap_or_else(|| "admin".into());
+        store.add_user(&email.to_lowercase(), &password, &role).expect("bootstrap user");
         if generated {
-            tracing::warn!("bootstrapped admin user {email} with password: {password}");
+            tracing::warn!("bootstrapped {role} user {email} with password: {password}");
         } else {
-            tracing::info!("bootstrapped admin user {email}");
+            tracing::info!("bootstrapped {role} user {email}");
         }
     }
 
