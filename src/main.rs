@@ -406,11 +406,21 @@ async fn serve(
         .fallback(assets::spa_handler)
         .with_state(base_path.clone());
 
-    let app = Router::new()
+    let mut app = Router::new()
         .nest(&format!("{base_path}/api"), api)
         .nest(&format!("{base_path}/static"), static_assets)
-        .merge(spa)
-        .layer(tower_http::trace::TraceLayer::new_for_http());
+        .merge(spa);
+    if !base_path.is_empty() {
+        let to = format!("{base_path}/");
+        app = app.route(
+            "/",
+            get(move || {
+                let to = to.clone();
+                async move { axum::response::Redirect::temporary(&to) }
+            }),
+        );
+    }
+    let app = app.layer(tower_http::trace::TraceLayer::new_for_http());
 
     let listener = tokio::net::TcpListener::bind(&listen).await.expect("bind");
     tracing::info!("steward listening on http://{listen}{}/", base_path);
