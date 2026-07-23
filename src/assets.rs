@@ -35,14 +35,18 @@ pub async fn spa_handler(uri: Uri, base_path: axum::extract::State<String>) -> R
     }
 
     match Assets::get("index.html") {
-        Some(index) => (
-            [
-                (header::CONTENT_TYPE, "text/html; charset=utf-8".to_string()),
-                (header::CACHE_CONTROL, "no-cache".to_string()),
-            ],
-            index.data,
-        )
-            .into_response(),
+        Some(index) => {
+            // Inject the runtime mount prefix so one build serves under any path.
+            let html = String::from_utf8_lossy(&index.data).replace("%BASE_PATH%", &base);
+            (
+                [
+                    (header::CONTENT_TYPE, "text/html; charset=utf-8".to_string()),
+                    (header::CACHE_CONTROL, "no-cache".to_string()),
+                ],
+                html,
+            )
+                .into_response()
+        }
         None => (StatusCode::NOT_FOUND, "UI not built").into_response(),
     }
 }

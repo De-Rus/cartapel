@@ -1,7 +1,14 @@
-// The URL prefix the panel is mounted under, as a single source of truth.
+// The URL prefix the panel is mounted under — a single, RUNTIME source of truth.
 //
-// It is derived from Vite's `base` (`import.meta.env.BASE_URL`, e.g. "/admin/").
-// To serve the panel under a different prefix, change `base` in vite.config.ts
-// AND pass the server the matching `--base-path` / `STEWARD_BASE_PATH`. An empty
-// string means the panel is served at the root.
-export const BASE = import.meta.env.BASE_URL.replace(/\/+$/, '')
+// The server injects the live `--base-path` / `STEWARD_BASE_PATH` into the page
+// as `window.__STEWARD_BASE__` (see index.html + the server's SPA handler), so a
+// single build/image serves under any prefix — no rebuild to change it. In dev
+// and tests the placeholder is never substituted, so it falls back to the root.
+declare global {
+  interface Window {
+    __STEWARD_BASE__?: string
+  }
+}
+
+const raw = typeof window !== 'undefined' ? window.__STEWARD_BASE__ : undefined
+export const BASE = raw && !raw.includes('%') ? raw.replace(/\/+$/, '') : ''
