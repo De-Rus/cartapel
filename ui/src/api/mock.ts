@@ -579,7 +579,7 @@ const MARK_LOGO =
 
 const META: Meta = {
   brand: 'Acme Admin',
-  base_path: '/manage',
+  base_path: '/admin',
   tables: TABLES,
   nav: NAV,
   user: CURRENT_USER,

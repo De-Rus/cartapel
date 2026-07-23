@@ -1,6 +1,6 @@
 import { ApiError, MOCK } from '../api/client'
 
-const BASE = '/manage'
+import { BASE } from './base'
 const API_BASE = `${BASE}/api`
 
 export interface WidgetApi {

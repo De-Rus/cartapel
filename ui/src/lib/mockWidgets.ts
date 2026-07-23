@@ -69,7 +69,7 @@ function definePage(elementName: string) {
       this.innerHTML =
         `<div style="padding:2rem;color:var(--sec)">` +
         `<h2 style="font-size:18px;color:var(--ink);font-weight:600;margin-bottom:.5rem">Custom page (mock)</h2>` +
-        `<p>This full-screen module is served from <code>/manage/static/</code> in production. ` +
+        `<p>This full-screen module is served from <code>/admin/static/</code> in production. ` +
         `It mounts <code>&lt;${elementName}&gt;</code> with the <code>api</code> prop.</p></div>`
     }
   }

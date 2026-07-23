@@ -1,6 +1,6 @@
 import type { Meta } from '../api/types'
 
-const BASE = '/manage'
+import { BASE } from './base'
 
 export function resolveBrandLogo(logo: string | null | undefined): string | null {
   if (!logo) return null

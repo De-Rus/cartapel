@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ApiError } from './api/client'
+import { BASE } from './lib/base'
 import { ToastProvider } from './components/Toast'
 import Shell from './components/Shell'
 import { useMeta } from './lib/meta'
@@ -36,7 +37,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <BrowserRouter basename="/manage">
+        <BrowserRouter basename={BASE || '/'}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route element={<Shell />}>

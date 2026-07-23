@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { BASE } from './lib/base'
 import { initChromePrefs } from './lib/theme'
 import * as sx from './lib/sx'
 import './styles.css'
@@ -14,7 +15,7 @@ initChromePrefs()
 {
   const s = document.createElement('script')
   s.type = 'module'
-  s.src = '/manage/static/config/widgets/components.js'
+  s.src = `${BASE}/static/config/widgets/components.js`
   s.onerror = () => {}
   document.head.appendChild(s)
 }

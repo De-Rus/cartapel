@@ -56,9 +56,9 @@ describe('mock API contract', () => {
 
   it('builds image URLs per the contract (real mode)', () => {
     expect(imageUrl('instruments', 'logo', '7', 'abc')).toBe(
-      '/manage/api/t/instruments/image/logo/7?v=abc',
+      '/admin/api/t/instruments/image/logo/7?v=abc',
     )
-    expect(imageUrl('bots', 'avatar', 'a b')).toBe('/manage/api/t/bots/image/avatar/a%20b')
+    expect(imageUrl('bots', 'avatar', 'a b')).toBe('/admin/api/t/bots/image/avatar/a%20b')
   })
 
   it('lists with search, filter, sort and pagination', async () => {

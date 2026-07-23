@@ -93,10 +93,10 @@ describe('param codec', () => {
 
 describe('hrefFor', () => {
   it('fills templates with encoded row values', () => {
-    expect(hrefFor('bots/{id}', { id: 42 })).toBe('/manage/bots/42')
-    expect(hrefFor('t/{sym}', { sym: 'BRK B' })).toBe('/manage/t/BRK%20B')
+    expect(hrefFor('bots/{id}', { id: 42 })).toBe('/admin/bots/42')
+    expect(hrefFor('t/{sym}', { sym: 'BRK B' })).toBe('/admin/t/BRK%20B')
   })
   it('accepts functions and absolute paths', () => {
-    expect(hrefFor((r) => `/manage/u/${r.id}`, { id: 7 })).toBe('/manage/u/7')
+    expect(hrefFor((r) => `/admin/u/${r.id}`, { id: 7 })).toBe('/admin/u/7')
   })
 })

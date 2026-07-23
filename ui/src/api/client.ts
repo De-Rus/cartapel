@@ -35,8 +35,9 @@ import type {
   User,
   WidgetConfigData,
 } from './types'
+import { BASE } from '../lib/base'
 
-const API_BASE = '/manage/api'
+const API_BASE = `${BASE}/api`
 export const MOCK = !!import.meta.env.VITE_MOCK
 
 export class ApiError extends Error {
@@ -92,7 +93,7 @@ export async function uploadImage(
     body: fd,
   })
   if (res.status === 401) {
-    if (!window.location.pathname.endsWith('/login')) window.location.assign('/manage/login')
+    if (!window.location.pathname.endsWith('/login')) window.location.assign(`${BASE}/login`)
     throw new ApiError(401, 'sesión expirada')
   }
   let data: unknown = null
@@ -127,7 +128,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   })
   if (res.status === 401 && !path.startsWith('/auth/')) {
     if (!window.location.pathname.endsWith('/login')) {
-      window.location.assign('/manage/login')
+      window.location.assign(`${BASE}/login`)
     }
     throw new ApiError(401, 'sesión expirada')
   }

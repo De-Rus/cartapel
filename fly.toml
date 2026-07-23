@@ -16,6 +16,7 @@ primary_region = "cdg"
 
 [env]
   STEWARD_CONFIG = "/demo/admin"
+  STEWARD_BASE_PATH = "/admin"
   STEWARD_LISTEN = "0.0.0.0:8686"
   STEWARD_SECURE_COOKIES = "true"
 

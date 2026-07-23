@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { api } from '../api/client'
 import type { Meta } from '../api/types'
+import { BASE } from '../lib/base'
 import { fuzzyRank, highlightParts } from '../lib/fuzzy'
 import { useDebounced } from '../lib/hooks'
 import { useT } from '../lib/i18n'
@@ -225,7 +226,7 @@ export function CommandPalette({
       pushRecent({ label: item.primary, sub: item.secondary, to: item.to })
     }
     if (newTab) {
-      window.open(`/manage${item.to}`, '_blank')
+      window.open(`${BASE}${item.to}`, '_blank')
     } else {
       navigate(item.to)
     }
