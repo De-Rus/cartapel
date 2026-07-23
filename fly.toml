@@ -8,7 +8,7 @@
 # STEWARD_DB / STEWARD_SECRET_KEY / STEWARD_ADMIN_EMAIL / STEWARD_ADMIN_PASSWORD
 # are SECRETS — never put them here. Set them with `fly secrets set`.
 
-app = "steward-demo"
+app = "steward-demo-derus"
 primary_region = "cdg"
 
 [build]
