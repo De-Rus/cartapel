@@ -4,9 +4,11 @@ Point a single binary at your existing Postgres and get a Django-admin-quality
 panel. No framework, no ORM, no Node runtime — your database schema is the
 source of truth, and customization is code you version, not a GUI you click.
 
+**[▶ Live demo](https://steward-demo-derus.fly.dev)** (log in with `admin` / `admin`) · **[📖 Docs](https://de-rus.github.io/steward/)**
+
 ```bash
 git clone … && cd steward
-docker compose up            # → populated demo on http://localhost:8686
+docker compose up            # → populated demo on http://localhost:8686/admin
 ```
 
 - **Opt-in tables**: the admin exposes only the tables you register with a
