@@ -1,11 +1,10 @@
 brand = "Acme Admin"
 per_page = 50
 
-# Public demo: pre-fill the read-only `demo` login so visitors enter in one click.
-demo_login {
-  user     = "demo"
-  password = "demo"
-}
+# Public demo: the login is a full admin (so visitors see the real thing), but
+# harden the two capabilities that would make an open admin weaponizable.
+disable_sql_preview = true
+disable_webhooks    = true
 
 source "main" {
   type    = "postgres"

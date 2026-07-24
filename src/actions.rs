@@ -90,6 +90,9 @@ pub async fn action_handler(
             .await?
         }
         ActionKind::Webhook => {
+            if state.cfg().steward.disable_webhooks {
+                return Err(AppError::forbidden("webhook actions are disabled"));
+            }
             let url = action
                 .url
                 .as_ref()

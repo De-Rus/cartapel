@@ -26,9 +26,17 @@ http://localhost:8686/admin (`demo` / `demo`).
 
 ## Hosting a public demo safely
 
-The `demo` login is **read-only** (view everything; no create/edit/delete,
-actions, dashboard-SQL, config edits, or user management — those are all
-admin-only), so an "anyone can log in" demo can't be defaced or used to run
-arbitrary SQL. The hosted demo bootstraps it via `STEWARD_ADMIN_ROLE=demo`.
-[`reset.sql`](reset.sql) re-seeds the data on demand (optional — schedule it via
-`pg_cron` or an hourly cron if you also expose an admin login).
+The `demo` login is a **full admin** — visitors see the real thing (create/edit/
+delete rows, run actions, browse the config builder). Two general hardening
+toggles in `config/steward.hcl` disable the only capabilities that would make an
+open admin dangerous:
+
+- `disable_sql_preview = true` — no ad-hoc SQL runner in the dashboard builder
+  (blocks arbitrary read-SQL / data exfiltration).
+- `disable_webhooks = true` — no outbound webhook actions (blocks SSRF).
+
+These are generic steward options — useful on any sensitive instance, not just a
+demo. Defacement of the demo *data* is undone by [`reset.sql`](reset.sql), which
+the [`demo-reset`](../.github/workflows/demo-reset.yml) workflow runs daily; the
+config lives on the container's ephemeral disk, so config edits reset on restart
+too. Point steward at a **throwaway database** for a public demo regardless.

@@ -100,6 +100,8 @@ Top-level `[steward]` keys:
 | `secret_key` | string | Session-signing root. Supports `env:`/`${}`. Overridden by `STEWARD_SECRET_KEY`. **Required** somewhere. |
 | `theme { }` | block | Theme preset, accent, per-mode CSS token overrides, logos. |
 | `source "…" { }` | block | A named data source. The `primary` postgres one is the database steward introspects. |
+| `disable_sql_preview` | bool | Hardening: disable the dashboard builder's ad-hoc SQL preview (admin-supplied `SELECT`s). Blocks arbitrary read-SQL even for admins. Default `false`. |
+| `disable_webhooks` | bool | Hardening: disable outbound webhook actions (an SSRF surface). Default `false`. |
 
 ### `theme { }`
 

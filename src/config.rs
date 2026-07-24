@@ -78,22 +78,15 @@ pub struct StewardConfig {
         serialize_with = "hcl::ser::labeled_block"
     )]
     pub sources: BTreeMap<String, NamedSource>,
-    /// When set, the login page pre-fills these credentials and shows a "public
-    /// demo" hint — one-click entry for a hosted (read-only) demo. Enable it ONLY
-    /// for a demo: it exposes the credentials on the unauthenticated /public API.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "ser_opt_block"
-    )]
-    pub demo_login: Option<DemoLogin>,
-}
-
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct DemoLogin {
-    pub user: String,
-    pub password: String,
+    /// Hardening: disable the dashboard builder's ad-hoc SQL preview (which runs
+    /// admin-supplied `SELECT`s). Set on a sensitive or public instance so even an
+    /// admin can't run arbitrary read-SQL against the database.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub disable_sql_preview: bool,
+    /// Hardening: disable outbound webhook actions (an admin-defined server-side
+    /// HTTP call — an SSRF surface). Set on a sensitive or public instance.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub disable_webhooks: bool,
 }
 
 
