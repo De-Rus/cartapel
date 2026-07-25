@@ -184,9 +184,38 @@ impl AppState {
     }
 
     /// Resolve a role's effective definition from config (`config/auth.hcl`), the
-    /// single authoritative source. Returns a clone so callers hold no lock.
+    /// single authoritative source, flattening its `extends` chain: the root
+    /// ancestor applies first, each descendant overrides per key (`actions`
+    /// union). Cycles are load errors; the seen-guard here is belt and braces.
     pub fn resolve_role(&self, name: &str) -> Option<RoleConfig> {
-        self.cfg().auth.roles.get(name).cloned()
+        let cfg = self.cfg();
+        let mut chain: Vec<&RoleConfig> = Vec::new();
+        let mut seen: Vec<&str> = vec![name];
+        let mut cur = cfg.auth.roles.get(name)?;
+        chain.push(cur);
+        while let Some(parent) = cur.extends.as_deref() {
+            if seen.contains(&parent) {
+                break;
+            }
+            let Some(p) = cfg.auth.roles.get(parent) else { break };
+            seen.push(parent);
+            chain.push(p);
+            cur = p;
+        }
+        let mut out = RoleConfig::default();
+        for role in chain.iter().rev() {
+            out.tables.extend(role.tables.clone());
+            out.perms.extend(role.perms.clone());
+            out.editable.extend(role.editable.clone());
+            out.masked.extend(role.masked.clone());
+            out.row_filter.extend(role.row_filter.clone());
+            for a in &role.actions {
+                if !out.actions.contains(a) {
+                    out.actions.push(a.clone());
+                }
+            }
+        }
+        Some(out)
     }
 
     /// Every role name a user may be assigned: the hardcoded `admin` plus every

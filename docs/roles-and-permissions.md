@@ -42,12 +42,37 @@ role "staff" {
 
 | Key | Type | Description |
 | --- | --- | --- |
+| `extends` | string | Parent role to inherit from — see [Role inheritance](#role-inheritance). |
 | `tables` | map | The coarse access level per table: `"read"` or `"write"`. `"*"` sets a default for every table. |
 | `perm "<table>" { }` | block | Fine-grained per-capability override (view/create/update/delete). |
 | `editable` | map | Per-table whitelist of columns this role may edit. |
 | `actions` | list | Bulk actions this role may invoke, as `"<table>.<action>"`. |
 | `masked` | map | Per-table columns whose values are hidden from this role. |
 | `row_filter` | map | Per-table SQL predicate scoping which rows this role sees. |
+
+## Role inheritance
+
+A role can extend another with `extends` — the parent resolves first, then the
+child's own entries override it key by key:
+
+```hcl
+role "viewer" {
+  tables = { "*" = "read" }
+}
+
+role "support" {
+  extends = "viewer"
+  tables  = { "orders" = "write" }   # everything else stays read from viewer
+}
+```
+
+- `tables`, `perm`, `editable`, `masked` and `row_filter` merge **per key**: a
+  child entry for a table replaces the parent's entry for that table wholesale.
+- `actions` is the **union** of parent and child.
+- Chains are allowed (`a` → `b` → `c`). An `extends` naming an unknown role or
+  forming a cycle is a startup/config error, and the runtime editors reject it
+  with a 400 — a broken hierarchy never loads silently.
+- The runtime Roles editor exposes this as the **Inherits from** selector.
 
 ## Coarse table access
 

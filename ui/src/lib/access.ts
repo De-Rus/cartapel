@@ -29,6 +29,7 @@ export interface MatrixModel {
   rows: MatrixRow[]
   actions: string[]
   carry: RoleCarry
+  extends?: string
 }
 
 const EMPTY_DEF: RoleDefinition = { tables: {}, actions: [], masked: {}, row_filter: {} }
@@ -79,6 +80,7 @@ export function definitionToMatrix(
     wildcard: levelOf(def, WILDCARD),
     rows,
     actions: [...(def.actions ?? [])],
+    ...(def.extends ? { extends: def.extends } : {}),
     carry: {
       tables: carryTables,
       masked: carried(def.masked, vocab),
@@ -126,6 +128,7 @@ export function matrixToDefinition(model: MatrixModel): RoleDefinition {
   }
   if (Object.keys(perms).length > 0) definition.perms = perms
   if (Object.keys(editable).length > 0) definition.editable = editable
+  if (model.extends) definition.extends = model.extends
   return definition
 }
 

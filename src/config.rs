@@ -917,6 +917,11 @@ pub struct AuthConfig {
 #[derive(Debug, Clone, Default, Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RoleConfig {
+    /// Parent role this one inherits from: the parent resolves first, then this
+    /// role's own entries override per key (`actions` union). Chains are allowed;
+    /// cycles and unknown parents are load errors.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extends: Option<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub tables: BTreeMap<String, String>,
     /// Granular per-table CRUD that REFINES the coarse `tables` level. An entry
@@ -1469,7 +1474,29 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
             }
         }
     }
+    validate_role_inheritance(&cfg.auth.roles)?;
     Ok(cfg)
+}
+
+/// Every `extends` must name an existing config role and the chains must be
+/// acyclic — a broken hierarchy silently granting nothing is worse than a
+/// startup error.
+pub fn validate_role_inheritance(roles: &BTreeMap<String, RoleConfig>) -> Result<(), String> {
+    for (name, role) in roles {
+        let mut seen = vec![name.as_str()];
+        let mut cur = role;
+        while let Some(parent) = cur.extends.as_deref() {
+            if !roles.contains_key(parent) {
+                return Err(format!("role \"{name}\": extends unknown role \"{parent}\""));
+            }
+            if seen.contains(&parent) {
+                return Err(format!("role \"{name}\": inheritance cycle through \"{parent}\""));
+            }
+            seen.push(parent);
+            cur = &roles[parent];
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

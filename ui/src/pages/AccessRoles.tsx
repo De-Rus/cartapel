@@ -122,6 +122,26 @@ function RoleEditor({
           </div>
         )}
 
+        <label className="block">
+          <span className="mb-1 block text-[13px] text-sec">{t('role_extends')}</span>
+          <select
+            className="input-sm w-full"
+            value={model.extends ?? ''}
+            disabled={!(editable || isNew)}
+            onChange={(e) => setModel({ ...model, extends: e.target.value || undefined })}
+          >
+            <option value="">{t('role_extends_none')}</option>
+            {vocab.roles
+              .filter((r) => r.source === 'config' && r.name !== role.name)
+              .map((r) => (
+                <option key={r.name} value={r.name}>
+                  {r.name}
+                </option>
+              ))}
+          </select>
+          <span className="text-xxs text-muted">{t('role_extends_hint')}</span>
+        </label>
+
         <PermissionMatrix
           model={model}
           actions={vocab.actions}

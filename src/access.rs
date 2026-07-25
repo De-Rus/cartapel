@@ -188,6 +188,17 @@ fn table_configured(state: &AppState, table: &str) -> bool {
     state.resolve_table(table).is_some() && state.cfg().tables.contains_key(table)
 }
 
+/// The full hierarchy re-checked with this definition in place, so a bad
+/// `extends` 400s cleanly instead of failing the config swap.
+fn validate_extends(state: &AppState, name: &str, def: &RoleConfig) -> Result<(), AppError> {
+    if def.extends.is_none() {
+        return Ok(());
+    }
+    let mut roles = state.cfg().auth.roles.clone();
+    roles.insert(name.to_string(), def.clone());
+    crate::config::validate_role_inheritance(&roles).map_err(AppError::bad)
+}
+
 /// Validate a role definition against the live schema + configured actions.
 /// Fails closed: any reference to an unknown OR unconfigured table / level /
 /// action is rejected. Unconfigured tables are not part of the admin, so a
@@ -340,6 +351,7 @@ pub async fn roles_create(
         return Err(AppError(StatusCode::CONFLICT, format!("role '{name}' already exists")));
     }
     validate_definition(&state, &body.definition)?;
+    validate_extends(&state, &name, &body.definition)?;
     let def = body.definition;
     let (ok, out) = write_auth(&state, &user, |auth| {
         auth.roles.insert(name.clone(), def.clone());
@@ -377,6 +389,7 @@ pub async fn roles_update(
         return Err(AppError::not_found(format!("role '{name}' not found")));
     }
     validate_definition(&state, &body.definition)?;
+    validate_extends(&state, &name, &body.definition)?;
     let def = body.definition;
     let (ok, out) = write_auth(&state, &user, |auth| {
         auth.roles.insert(name.clone(), def.clone());
@@ -1152,5 +1165,80 @@ mod tests {
             state.store.audit_list(Some("roles"), 1, 10).unwrap()["total"].as_i64().unwrap();
         assert_eq!(before, after, "no audit row for a write that never applied");
         assert!(!state.cfg().auth.roles.contains_key("support"), "role never went live");
+    }
+
+    #[tokio::test]
+    async fn role_extends_merges_parent_then_overrides() {
+        let state = test_state();
+        let mut viewer = RoleConfig::default();
+        viewer.tables.insert("bots".into(), "read".into());
+        viewer.tables.insert("locked".into(), "read".into());
+        viewer.actions.push("export".into());
+        let mut support = RoleConfig::default();
+        support.extends = Some("viewer".into());
+        support.tables.insert("bots".into(), "write".into());
+        support.actions.push("notify".into());
+        {
+            let mut cfg = (*state.cfg()).clone();
+            cfg.auth.roles.insert("viewer".into(), viewer);
+            cfg.auth.roles.insert("support".into(), support);
+            state.cfg.store(Arc::new(cfg));
+        }
+        let r = state.resolve_role("support").unwrap();
+        assert_eq!(r.tables.get("bots").map(String::as_str), Some("write"));
+        assert_eq!(r.tables.get("locked").map(String::as_str), Some("read"));
+        assert!(r.actions.contains(&"export".to_string()) && r.actions.contains(&"notify".to_string()));
+        assert!(r.extends.is_none(), "resolution flattens the chain");
+    }
+
+    #[tokio::test]
+    async fn role_extends_unknown_parent_is_400() {
+        let (state, dir) = writable_state();
+        let mut def = RoleConfig::default();
+        def.extends = Some("ghost".into());
+        let r = roles_create(
+            State(state.clone()),
+            admin(),
+            Json(CreateRole { name: "support".into(), definition: def }),
+        )
+        .await;
+        let e = r.err().expect("unknown parent must be rejected");
+        assert!(e.1.contains("unknown role"), "{}", e.1);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn role_extends_cycle_is_400() {
+        let (state, dir) = writable_state();
+        let mut a = RoleConfig::default();
+        a.tables.insert("bots".into(), "read".into());
+        roles_create(
+            State(state.clone()),
+            admin(),
+            Json(CreateRole { name: "a".into(), definition: a }),
+        )
+        .await
+        .unwrap();
+        let mut b = RoleConfig::default();
+        b.extends = Some("a".into());
+        roles_create(
+            State(state.clone()),
+            admin(),
+            Json(CreateRole { name: "b".into(), definition: b }),
+        )
+        .await
+        .unwrap();
+        let mut a2 = RoleConfig::default();
+        a2.extends = Some("b".into());
+        let r = roles_update(
+            State(state.clone()),
+            admin(),
+            Path("a".into()),
+            Json(UpdateRole { definition: a2 }),
+        )
+        .await;
+        let e = r.err().expect("cycle must be rejected");
+        assert!(e.1.contains("cycle"), "{}", e.1);
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

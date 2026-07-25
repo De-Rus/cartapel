@@ -213,6 +213,7 @@ export interface RolePerm {
 }
 
 export interface RoleDefinition {
+  extends?: string
   tables: Record<string, RoleLevel>
   actions: string[]
   masked: Record<string, string[]>
