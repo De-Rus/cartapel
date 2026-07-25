@@ -58,7 +58,7 @@ export default function RowCreate() {
             return (
               <div key={col.name} className={clsx(wide && 'md:col-span-2')}>
                 <div className="mb-1 text-xxs font-semibold uppercase tracking-wide text-muted">
-                  {col.name}
+                  {col.label ?? col.name}
                   {!col.nullable && <span className="ml-0.5 text-serious">*</span>}
                 </div>
                 <FieldInput

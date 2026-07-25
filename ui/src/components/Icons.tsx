@@ -203,6 +203,13 @@ export const IconMenu = (p: IconProps) => (
   </Svg>
 )
 
+export const IconRows = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="18" height="7" rx="1" />
+    <rect x="3" y="13" width="18" height="7" rx="1" />
+  </Svg>
+)
+
 export const IconChevronsLeft = (p: IconProps) => (
   <Svg {...p}>
     <path d="m11 7-5 5 5 5M18 7l-5 5 5 5" />

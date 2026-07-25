@@ -13,7 +13,7 @@ import { AppIcon } from '../lib/icon'
 import { useMediaQuery } from '../lib/hooks'
 import { useGlobalKeys } from '../lib/keys'
 import { useTablePrefetch } from '../lib/prefetch'
-import { applyBrandAccent, applyDensity, useIsDark, useTheme } from '../lib/theme'
+import { applyBrandAccent, useDensity, useIsDark, useTheme } from '../lib/theme'
 import { applyThemeConfig } from '../lib/themes'
 import { Breadcrumbs } from './Breadcrumbs'
 import { CommandPalette, type PaletteMode } from './CommandPalette'
@@ -603,9 +603,7 @@ function ShellChrome({ meta }: { meta: Meta }) {
   const logo = pickBrandLogo(meta, isDark)
 
   const [theme, , cycleTheme] = useTheme()
-  useEffect(() => {
-    applyDensity('comfortable')
-  }, [])
+  const [density, toggleDensity] = useDensity()
 
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === '1')
   const [navFilter, setNavFilter] = useState('')
@@ -751,6 +749,8 @@ function ShellChrome({ meta }: { meta: Meta }) {
             onClose={() => setUserMenuOpen(false)}
             theme={theme}
             onCycleTheme={cycleTheme}
+            density={density}
+            onToggleDensity={toggleDensity}
             onHelp={() => {
               setUserMenuOpen(false)
               setHelpOpen(true)

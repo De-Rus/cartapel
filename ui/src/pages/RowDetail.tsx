@@ -549,6 +549,7 @@ export function DetailBody({
       toast(t('deleted'))
       onDeleted?.()
     },
+    onError: (e) => toast(e instanceof Error ? e.message : String(e), 'error'),
   })
 
   const doSave = () => {

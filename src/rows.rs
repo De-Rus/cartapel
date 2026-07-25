@@ -88,8 +88,13 @@ fn build_list_query(
                 continue;
             }
         }
-        if !cfg.list.filters.contains(&name.to_string()) {
+        // Defaults-first: with no configured filter list, any real column filters;
+        // a declared list is an allowlist.
+        if !cfg.list.filters.is_empty() && !cfg.list.filters.contains(&name.to_string()) {
             return Err(AppError::bad(format!("filter {name} is not enabled")));
+        }
+        if cfg.list.filters.is_empty() && dbt.column(name).is_none() {
+            return Err(AppError::bad(format!("unknown filter {name}")));
         }
         if masked.contains(&name.to_string()) {
             return Err(AppError::forbidden(format!("cannot filter on {name}")));

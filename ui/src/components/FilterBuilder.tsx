@@ -72,7 +72,19 @@ export function FilterBuilder({
 }) {
   const [open, setOpen] = useState(false)
   const ref = useClickOutside(() => setOpen(false))
-  const filters = table.list.filters
+  // Defaults-first: with no configured filters, every introspected column is a
+  // filter candidate — a fresh (wizard-written) table must still be filterable.
+  const filters: FilterMeta[] = table.list.filters.length
+    ? table.list.filters
+    : table.columns
+        .filter((c) => !['json', 'binary'].includes(c.kind))
+        .map((c) => ({
+          name: c.name,
+          label: c.label ?? c.name,
+          type: c.kind === 'bool' ? ('bool' as const) : ('custom' as const),
+          options: [],
+          kind: c.kind,
+        }))
 
   const [conds, setConds] = useState<Condition[]>([])
 

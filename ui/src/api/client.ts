@@ -50,6 +50,12 @@ export class ApiError extends Error {
   }
 }
 
+// FK widgets stash display labels as `<col>__label` in row drafts; they are
+// presentation-only and must never reach the server.
+function stripMeta(set: Row): Row {
+  return Object.fromEntries(Object.entries(set).filter(([k]) => !k.endsWith('__label')))
+}
+
 const MOCK_IMG_COLORS = ['#3987e5', '#199e70', '#c98500', '#008300', '#9085e9', '#e66767', '#d55181', '#d95926']
 
 function mockImageUrl(table: string, col: string, pk: string, label?: string): string {
@@ -170,8 +176,8 @@ export const api = {
       `/t/${table}/r/${encodeURIComponent(pk)}/inline/${child}?page=${page}`,
     ),
   patch: (table: string, pk: string, set: Row) =>
-    request<{ row: Row }>('PATCH', `/t/${table}/r/${encodeURIComponent(pk)}`, { set }),
-  create: (table: string, set: Row) => request<{ row: Row }>('POST', `/t/${table}`, { set }),
+    request<{ row: Row }>('PATCH', `/t/${table}/r/${encodeURIComponent(pk)}`, { set: stripMeta(set) }),
+  create: (table: string, set: Row) => request<{ row: Row }>('POST', `/t/${table}`, { set: stripMeta(set) }),
   remove: (table: string, pk: string) =>
     request<Record<string, never>>('DELETE', `/t/${table}/r/${encodeURIComponent(pk)}`),
   options: (table: string, col: string, q: string) =>

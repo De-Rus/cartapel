@@ -3,9 +3,9 @@ import type { User } from '../api/types'
 import { useClickOutside } from '../lib/hooks'
 import { useT } from '../lib/i18n'
 import { useMeta } from '../lib/meta'
-import { type ThemeMode } from '../lib/theme'
+import { type Density, type ThemeMode } from '../lib/theme'
 import { setViewAsRole, viewAsRole } from '../lib/viewAs'
-import { IconEye, IconLogout, IconMonitor, IconMoon, IconSun } from './Icons'
+import { IconEye, IconLogout, IconMonitor, IconMoon, IconRows, IconSun } from './Icons'
 
 function initials(email: string): string {
   return email.slice(0, 2).toUpperCase()
@@ -18,6 +18,8 @@ export function UserMenu({
   onClose,
   theme,
   onCycleTheme,
+  density,
+  onToggleDensity,
   onHelp,
   onLogout,
   collapsed,
@@ -28,6 +30,8 @@ export function UserMenu({
   onClose: () => void
   theme: ThemeMode
   onCycleTheme: () => void
+  density: Density
+  onToggleDensity: () => void
   onHelp: () => void
   onLogout: () => void
   collapsed: boolean
@@ -68,12 +72,17 @@ export function UserMenu({
           <div className="my-1 border-t" />
           <MenuRow onClick={onCycleTheme}>
             <ThemeIcon size={14} className="text-muted" />
-            <span className="flex-1">Theme</span>
+            <span className="flex-1">{t('menu_theme')}</span>
             <span className="text-xxs capitalize text-muted">{theme}</span>
+          </MenuRow>
+          <MenuRow onClick={onToggleDensity}>
+            <IconRows size={14} className="text-muted" />
+            <span className="flex-1">{t('menu_density')}</span>
+            <span className="text-xxs capitalize text-muted">{t(density === 'compact' ? 'density_compact' : 'density_comfortable')}</span>
           </MenuRow>
           <MenuRow onClick={onHelp}>
             <span className="kbd">?</span>
-            <span className="flex-1">Keyboard shortcuts</span>
+            <span className="flex-1">{t('menu_shortcuts')}</span>
           </MenuRow>
           {asRole ? (
             <MenuRow onClick={() => setViewAsRole(null)}>
