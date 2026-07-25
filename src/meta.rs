@@ -54,6 +54,21 @@ pub fn default_widget(col: &DbColumn) -> &'static str {
     }
 }
 
+/// Default record title: a name-ish text column ("Ada Lovelace", never "1")
+/// when one exists; otherwise the pk — a random first text column (status,
+/// country…) makes a worse title than the id.
+fn default_display_title(dbt: &DbTable) -> String {
+    for pref in ["name", "title", "full_name", "display_name", "subject", "symbol", "email", "username", "slug", "label"] {
+        if dbt.columns.iter().any(|c| c.name == pref && c.kind == Kind::Text) {
+            return format!("{{{pref}}}");
+        }
+    }
+    match &dbt.pk {
+        Some(pk) => format!("{{{pk}}}"),
+        None => format!("{{{}}}", dbt.columns[0].name),
+    }
+}
+
 pub fn fk_label_col(child: &DbTable) -> String {
     for pref in ["name", "title", "symbol", "email", "label"] {
         if child.columns.iter().any(|c| c.name == pref && c.kind == Kind::Text) {
@@ -557,7 +572,7 @@ pub async fn table_meta(state: &AppState, user: &CurrentUser, table: &str) -> Op
             "default_sort": default_sort(dbt, cfg),
             "per_page": cfg.list.per_page.or(state.cfg().steward.per_page).unwrap_or(100),
         },
-        "display_title": cfg.display.title.clone().or_else(|| dbt.pk.as_ref().map(|p| format!("{{{p}}}"))),
+        "display_title": cfg.display.title.clone().unwrap_or_else(|| default_display_title(dbt)),
         "detail": {
             "mode": cfg.detail.mode,
             "columns": cfg.detail.columns,

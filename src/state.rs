@@ -46,6 +46,13 @@ pub struct AppState {
     pub config_write_lock: Mutex<()>,
 }
 
+fn secret_shaped(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    ["token", "secret", "password", "passwd", "api_key", "apikey", "private_key"]
+        .iter()
+        .any(|k| n.contains(k))
+}
+
 #[derive(Debug)]
 pub struct AppError(pub StatusCode, pub String);
 
@@ -263,21 +270,32 @@ impl AppState {
     }
 
     pub fn masked_columns(&self, user: &CurrentUser, table: &str) -> Vec<String> {
-        if user.is_admin() {
-            return Vec::new();
-        }
+        // Secret-shaped columns mask by default for EVERYONE (admins included) —
+        // an admin panel must never show tokens in cleartext by accident. Any
+        // `field` block on the column hands control back to the author.
+        let cfg = self.cfg();
+        let fields = cfg.tables.get(table).map(|t| &t.fields);
         let mut out: Vec<String> = self
-            .cfg()
-            .tables
-            .get(table)
-            .map(|t| {
-                t.fields
+            .resolve_table(table)
+            .map(|dbt| {
+                dbt.columns
                     .iter()
-                    .filter(|(_, f)| f.masked)
-                    .map(|(k, _)| k.clone())
+                    .filter(|c| secret_shaped(&c.name))
+                    .filter(|c| !fields.is_some_and(|f| f.contains_key(&c.name)))
+                    .map(|c| c.name.clone())
                     .collect()
             })
             .unwrap_or_default();
+        if user.is_admin() {
+            return out;
+        }
+        if let Some(f) = fields {
+            for (k, fc) in f {
+                if fc.masked && !out.contains(k) {
+                    out.push(k.clone());
+                }
+            }
+        }
         if let Some(role) = self.resolve_role(&user.role) {
             if let Some(extra) = role.masked.get(table) {
                 for c in extra {
