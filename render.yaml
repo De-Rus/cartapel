@@ -14,7 +14,7 @@ services:
     name: cartapel
     runtime: image
     image:
-      url: ghcr.io/de-rus/cartapel:0.7.0
+      url: ghcr.io/de-rus/cartapel:0.7.1
     plan: free
     healthCheckPath: /admin/api/health
     dockerCommand: >-
