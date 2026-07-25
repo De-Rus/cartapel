@@ -36,6 +36,7 @@ import type {
   WidgetConfigData,
 } from './types'
 import { BASE } from '../lib/base'
+import { viewAsRole } from '../lib/viewAs'
 
 const API_BASE = `${BASE}/api`
 export const MOCK = !!import.meta.env.VITE_MOCK
@@ -120,6 +121,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const headers: Record<string, string> = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (method !== 'GET') headers['X-Steward'] = '1'
+  const asRole = viewAsRole()
+  if (asRole && !path.startsWith('/auth/')) headers['X-Steward-As-Role'] = asRole
   const res = await fetch(API_BASE + path, {
     method,
     credentials: 'include',

@@ -2,8 +2,10 @@ import clsx from 'clsx'
 import type { User } from '../api/types'
 import { useClickOutside } from '../lib/hooks'
 import { useT } from '../lib/i18n'
+import { useMeta } from '../lib/meta'
 import { type ThemeMode } from '../lib/theme'
-import { IconLogout, IconMonitor, IconMoon, IconSun } from './Icons'
+import { setViewAsRole, viewAsRole } from '../lib/viewAs'
+import { IconEye, IconLogout, IconMonitor, IconMoon, IconSun } from './Icons'
 
 function initials(email: string): string {
   return email.slice(0, 2).toUpperCase()
@@ -31,7 +33,10 @@ export function UserMenu({
   collapsed: boolean
 }) {
   const t = useT()
+  const meta = useMeta()
   const ref = useClickOutside(onClose)
+  const asRole = viewAsRole()
+  const otherRoles = (meta.roles ?? []).filter((r) => r !== 'admin')
 
   const ThemeIcon = theme === 'light' ? IconSun : theme === 'dark' ? IconMoon : IconMonitor
 
@@ -70,6 +75,22 @@ export function UserMenu({
             <span className="kbd">?</span>
             <span className="flex-1">Keyboard shortcuts</span>
           </MenuRow>
+          {asRole ? (
+            <MenuRow onClick={() => setViewAsRole(null)}>
+              <IconEye size={14} className="text-muted" />
+              <span className="flex-1">{t('view_as_exit')}</span>
+              <span className="text-xxs text-muted">{asRole}</span>
+            </MenuRow>
+          ) : (
+            user.role === 'admin' &&
+            otherRoles.map((r) => (
+              <MenuRow key={r} onClick={() => setViewAsRole(r)}>
+                <IconEye size={14} className="text-muted" />
+                <span className="flex-1">{t('view_as')}</span>
+                <span className="text-xxs text-muted">{r}</span>
+              </MenuRow>
+            ))
+          )}
           <div className="my-1 border-t" />
           <MenuRow onClick={onLogout} danger>
             <IconLogout size={14} />

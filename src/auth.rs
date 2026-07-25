@@ -36,6 +36,23 @@ impl FromRequestParts<Arc<AppState>> for CurrentUser {
             .store
             .session_user(token)
             .ok_or_else(AppError::unauthorized)?;
+        // View-as: admins may impersonate a lesser role to verify what it sees.
+        // Never escalates — only admins are honored, and `admin` itself is a no-op.
+        if role == "admin" {
+            if let Some(as_role) = parts
+                .headers
+                .get("x-steward-as-role")
+                .and_then(|v| v.to_str().ok())
+                .filter(|r| !r.is_empty() && *r != "admin")
+            {
+                if state.cfg().auth.roles.contains_key(as_role) {
+                    if !matches!(parts.method, Method::GET | Method::HEAD) {
+                        return Err(AppError::forbidden("read-only while viewing as another role"));
+                    }
+                    return Ok(CurrentUser { email, role: as_role.to_string() });
+                }
+            }
+        }
         Ok(CurrentUser { email, role })
     }
 }

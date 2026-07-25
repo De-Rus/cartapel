@@ -498,7 +498,7 @@ function DashboardView({ widgets, columns = DEFAULT_COLS }: { widgets: Widget[];
 export default function Dashboard() {
   const meta = useMeta()
   const vq = useVarQuery()
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['dashboard', vq],
     queryFn: () => api.dashboard(vq),
     enabled: meta.has_dashboard,
@@ -513,7 +513,11 @@ export default function Dashboard() {
   return (
     <div className="space-y-4">
       <VarBar />
-      <DashboardView widgets={data?.widgets ?? []} columns={data?.columns ?? DEFAULT_COLS} />
+      {error ? (
+        <div className="card p-4 text-[13px] text-critical">{String(error)}</div>
+      ) : (
+        <DashboardView widgets={data?.widgets ?? []} columns={data?.columns ?? DEFAULT_COLS} />
+      )}
     </div>
   )
 }

@@ -19,6 +19,7 @@ import { Breadcrumbs } from './Breadcrumbs'
 import { CommandPalette, type PaletteMode } from './CommandPalette'
 import { KeyboardHelp } from './KeyboardHelp'
 import { UserMenu } from './UserMenu'
+import { setViewAsRole, viewAsRole } from '../lib/viewAs'
 import {
   IconAudit,
   IconChevronDown,
@@ -107,6 +108,33 @@ function SidebarGroups({
     <>
       {groups.map(([group, items]) => {
         const isCollapsed = collapsed.has(group)
+        const solo = items.length === 1 && items[0].label.toLowerCase() === group.toLowerCase()
+        if (solo) {
+          const e = items[0]
+          return (
+            <div key={group} className="mt-4">
+              <NavLink
+                to={e.to}
+                title={rail ? e.label : undefined}
+                className={({ isActive }) => clsx(navCls(isActive), rail && 'justify-center')}
+              >
+                {e.kind === 'page' && e.icon ? (
+                  <AppIcon
+                    icon={e.icon}
+                    size={15}
+                    className={clsx('w-[15px] shrink-0 text-center leading-none', rail ? 'block' : 'hidden wide:block')}
+                  />
+                ) : (
+                  <IconTable size={15} className={clsx('shrink-0 text-muted', rail ? 'block' : 'hidden wide:block')} />
+                )}
+                {!rail && <span className="hidden truncate wide:block">{e.label}</span>}
+                {rail && !(e.kind === 'page' && e.icon) && (
+                  <span className="text-xxs font-semibold uppercase">{initials(e.label)}</span>
+                )}
+              </NavLink>
+            </div>
+          )
+        }
         return (
           <div key={group} className="mt-4">
             {!rail && (
@@ -734,6 +762,14 @@ function ShellChrome({ meta }: { meta: Meta }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        {viewAsRole() && (
+          <div className="flex items-center justify-center gap-2 bg-[color:var(--warning)] px-3 py-1 text-center text-xxs font-medium text-[color:var(--band)]">
+            {t('view_as_banner', { role: viewAsRole()! })}
+            <button type="button" className="underline" onClick={() => setViewAsRole(null)}>
+              {t('view_as_exit')}
+            </button>
+          </div>
+        )}
         <header className="flex h-12 shrink-0 items-center gap-3 border-b px-4" role="banner">
           {isMobile && (
             <button
