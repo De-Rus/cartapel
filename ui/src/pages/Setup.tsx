@@ -9,11 +9,17 @@ import { AppIcon } from '../lib/icon'
 import { useToast } from '../components/Toast'
 import { Skeleton } from '../components/Skeleton'
 
-interface PlanGroup {
+interface GroupDef {
   slug: string
   label: string
   icon: string
-  tables: DiscoverTable[]
+}
+
+function slugify(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 export default function Setup() {
@@ -23,22 +29,40 @@ export default function Setup() {
   const navigate = useNavigate()
   const { data, isLoading } = useQuery({ queryKey: ['discover'], queryFn: api.discover })
   const [checked, setChecked] = useState<Set<string> | null>(null)
+  const [assign, setAssign] = useState<Record<string, string>>({})
+  const [labels, setLabels] = useState<Record<string, string>>({})
+  const [extra, setExtra] = useState<GroupDef[]>([])
   const [files, setFiles] = useState<Record<string, string> | null>(null)
 
-  const groups: PlanGroup[] = useMemo(() => {
-    const m = new Map<string, PlanGroup>()
-    for (const tb of data?.tables ?? []) {
-      const g = tb.suggested_group ?? { slug: 'tables', label: 'Tables', icon: 'layers' }
-      const e = m.get(g.slug) ?? { ...g, tables: [] }
-      e.tables.push(tb)
-      m.set(g.slug, e)
-    }
-    return [...m.values()].sort((a, b) => a.label.localeCompare(b.label))
-  }, [data])
+  const tables = useMemo(() => data?.tables ?? [], [data])
 
-  const sel =
-    checked ??
-    new Set((data?.tables ?? []).filter((tb) => !tb.noise && tb.pk).map((tb) => tb.name))
+  const groupDefs: GroupDef[] = useMemo(() => {
+    const m = new Map<string, GroupDef>()
+    for (const tb of tables) {
+      const g = tb.suggested_group ?? { slug: 'tables', label: 'Tables', icon: 'layers' }
+      if (!m.has(g.slug)) m.set(g.slug, g)
+    }
+    for (const g of extra) if (!m.has(g.slug)) m.set(g.slug, g)
+    return [...m.values()]
+  }, [tables, extra])
+
+  const slugOf = (tb: DiscoverTable) => assign[tb.name] ?? tb.suggested_group?.slug ?? 'tables'
+  const labelOf = (g: GroupDef) => labels[g.slug] ?? g.label
+
+  const grouped = useMemo(() => {
+    const m = new Map<string, DiscoverTable[]>()
+    for (const tb of tables) {
+      const s = slugOf(tb)
+      m.set(s, [...(m.get(s) ?? []), tb])
+    }
+    return groupDefs
+      .map((g) => ({ ...g, tables: m.get(g.slug) ?? [] }))
+      .filter((g) => g.tables.length > 0)
+      .sort((a, b) => labelOf(a).localeCompare(labelOf(b)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tables, groupDefs, assign, labels])
+
+  const sel = checked ?? new Set(tables.filter((tb) => !tb.noise && tb.pk).map((tb) => tb.name))
 
   const toggle = (name: string) => {
     const n = new Set(sel)
@@ -47,13 +71,26 @@ export default function Setup() {
     setChecked(n)
   }
 
+  const moveTo = (tb: DiscoverTable, slug: string) => {
+    if (slug === '__new__') {
+      const label = window.prompt(t('setup_new_group'))?.trim()
+      if (!label) return
+      const s = slugify(label) || 'group'
+      setExtra((e) => (e.some((g) => g.slug === s) ? e : [...e, { slug: s, label, icon: 'layers' }]))
+      setLabels((l) => ({ ...l, [s]: label }))
+      setAssign((a) => ({ ...a, [tb.name]: s }))
+    } else {
+      setAssign((a) => ({ ...a, [tb.name]: slug }))
+    }
+  }
+
   const apply = useMutation({
     mutationFn: () =>
       api.applySetup(
-        groups
+        grouped
           .map((g) => ({
             slug: g.slug,
-            label: g.label,
+            label: labelOf(g),
             icon: g.icon,
             tables: g.tables.filter((tb) => sel.has(tb.name)).map((tb) => tb.name),
           }))
@@ -105,24 +142,29 @@ export default function Setup() {
     )
   }
 
-  const total = (data?.tables ?? []).length
   return (
     <div className="mx-auto max-w-2xl space-y-5 py-8">
       <div>
         <h1 className="text-lg font-semibold text-ink">{t('setup_title')}</h1>
-        <p className="mt-1 text-[13px] text-muted">{t('setup_sub', { n: String(total) })}</p>
+        <p className="mt-1 text-[13px] text-muted">{t('setup_sub', { n: String(tables.length) })}</p>
       </div>
 
-      {groups.map((g) => (
+      {grouped.map((g) => (
         <div key={g.slug} className="card">
           <div className="flex items-center gap-2 border-b px-3 py-2">
             <AppIcon icon={g.icon} size={14} className="text-muted" />
-            <span className="text-[13px] font-medium text-ink">{g.label}</span>
-            <span className="text-xxs text-muted">{g.tables.filter((tb) => sel.has(tb.name)).length}/{g.tables.length}</span>
+            <input
+              className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-ink outline-none"
+              value={labelOf(g)}
+              onChange={(e) => setLabels((l) => ({ ...l, [g.slug]: e.target.value }))}
+            />
+            <span className="text-xxs text-muted">
+              {g.tables.filter((tb) => sel.has(tb.name)).length}/{g.tables.length}
+            </span>
           </div>
           <div className="divide-y divide-[color:var(--border)]">
             {g.tables.map((tb) => (
-              <label key={tb.name} className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 hover:bg-hover">
+              <div key={tb.name} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-hover">
                 <input
                   type="checkbox"
                   checked={sel.has(tb.name)}
@@ -136,7 +178,19 @@ export default function Setup() {
                 {tb.approx_rows != null && (
                   <span className="text-xxs tabular-nums text-muted">{fmtCompact(tb.approx_rows)}</span>
                 )}
-              </label>
+                <select
+                  className="h-6 rounded-ctl border bg-page px-1 text-xxs text-sec"
+                  value={slugOf(tb)}
+                  onChange={(e) => moveTo(tb, e.target.value)}
+                >
+                  {groupDefs.map((gd) => (
+                    <option key={gd.slug} value={gd.slug}>
+                      {labelOf(gd)}
+                    </option>
+                  ))}
+                  <option value="__new__">{t('setup_new_group_opt')}</option>
+                </select>
+              </div>
             ))}
           </div>
         </div>
