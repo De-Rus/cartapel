@@ -254,10 +254,10 @@ textarea {
     @apply rounded-ctl border bg-page px-2.5 py-1.5 text-sm text-ink;
   }
   .input-sm {
-    @apply rounded-ctl border bg-page px-2 py-1 text-[13px] text-ink;
+    @apply h-8 rounded-ctl border bg-page px-2 py-0 text-[13px] text-ink;
   }
   .btn {
-    @apply inline-flex items-center gap-1.5 rounded-ctl border bg-surface px-3 py-1.5 text-[13px] font-medium text-sec hover:text-ink disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-8 items-center gap-1.5 rounded-ctl border bg-surface px-3 text-[13px] font-medium text-sec hover:text-ink disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn:active:not(:disabled) {
     background: var(--press);

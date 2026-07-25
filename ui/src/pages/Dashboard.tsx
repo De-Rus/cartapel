@@ -505,6 +505,9 @@ export default function Dashboard() {
     placeholderData: (prev) => prev,
   })
 
+  if (meta.tables.length === 0 && meta.can_manage_access) {
+    return <Navigate to="/_setup" replace />
+  }
   if (!meta.has_dashboard) {
     const first = meta.tables[0]
     return <Navigate to={first ? `/${first.name}` : '/audit'} replace />

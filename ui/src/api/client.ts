@@ -237,6 +237,8 @@ export const api = {
     request<ConfigPublishResult>('POST', `/config/dashboard/versions/${id}/publish`),
 
   discover: () => request<DiscoverResponse>('GET', '/config/discover'),
+  applySetup: (groups: Array<{ slug: string; label: string; icon?: string; tables: string[] }>) =>
+    request<{ ok: boolean; writable?: boolean; tables?: number; files?: Record<string, string> }>('POST', '/config/setup', { groups }),
 
   roles: () => request<RolesResponse>('GET', '/roles'),
   createRole: (b: { name: string; definition: RoleDefinition }) =>

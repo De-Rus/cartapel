@@ -4,6 +4,7 @@ use axum::extract::{Path, State};
 use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::Arc;
 
@@ -286,29 +287,209 @@ async fn create_in_group(
 /// Introspected tables that have no config yet — the "add a table" candidates for
 /// the config editor. `db.tables` minus everything already configured minus the
 /// reserved framework stems.
+const NOISE_TABLES: [&str; 8] = [
+    "schema_migrations",
+    "_prisma_migrations",
+    "django_migrations",
+    "flyway_schema_history",
+    "alembic_version",
+    "ar_internal_metadata",
+    "knex_migrations",
+    "knex_migrations_lock",
+];
+
+fn group_icon(slug: &str) -> &'static str {
+    let s = slug.to_ascii_lowercase();
+    for (kw, icon) in [
+        ("user", "users"),
+        ("customer", "users"),
+        ("account", "users"),
+        ("order", "shopping-bag"),
+        ("sale", "shopping-bag"),
+        ("cart", "shopping-bag"),
+        ("product", "package"),
+        ("catalog", "package"),
+        ("item", "package"),
+        ("billing", "credit-card"),
+        ("subscription", "credit-card"),
+        ("payment", "credit-card"),
+        ("invoice", "credit-card"),
+        ("log", "file-text"),
+        ("audit", "file-text"),
+        ("event", "file-text"),
+        ("message", "mail"),
+        ("mail", "mail"),
+        ("job", "clock"),
+        ("task", "clock"),
+    ] {
+        if s.contains(kw) {
+            return icon;
+        }
+    }
+    "layers"
+}
+
 pub async fn discover(
     State(state): State<Arc<AppState>>,
     user: CurrentUser,
 ) -> Result<Json<Value>, AppError> {
     admin_only(&user)?;
     let cfg = state.cfg();
-    let tables: Vec<Value> = state
+    let unconfigured: Vec<&crate::introspect::DbTable> = state
         .db
         .tables
         .values()
         .filter(|t| !cfg.tables.contains_key(&t.name))
         .filter(|t| !RESERVED_STEMS.iter().any(|r| r.eq_ignore_ascii_case(&t.name)))
+        .collect();
+
+    let schemas: std::collections::HashSet<&str> =
+        unconfigured.iter().map(|t| t.schema.as_str()).collect();
+    let multi_schema = schemas.len() > 1;
+    let prefix_of = |name: &str| {
+        name.split('_')
+            .next()
+            .filter(|p| p.len() > 2)
+            .map(|p| p.trim_end_matches('s').to_string())
+    };
+    let mut prefix_counts: HashMap<String, usize> = HashMap::new();
+    for t in &unconfigured {
+        if let Some(p) = prefix_of(&t.name) {
+            *prefix_counts.entry(p).or_default() += 1;
+        }
+    }
+
+    let rows: HashMap<String, i64> = sqlx::query_as::<_, (String, String, i64)>(
+        "SELECT n.nspname, c.relname, c.reltuples::bigint FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r','v','m')",
+    )
+    .fetch_all(&state.pg)
+    .await
+    .map(|rs| rs.into_iter().filter(|(_, _, r)| *r >= 0).map(|(s, n, r)| (format!("{s}.{n}"), r)).collect())
+    .unwrap_or_default();
+
+    let tables: Vec<Value> = unconfigured
+        .iter()
         .map(|t| {
+            let group = if multi_schema {
+                t.schema.clone()
+            } else {
+                match prefix_of(&t.name) {
+                    Some(p) if prefix_counts.get(&p).copied().unwrap_or(0) >= 2 => p,
+                    _ => "tables".to_string(),
+                }
+            };
             json!({
                 "name": t.name,
                 "schema": t.schema,
                 "is_view": t.is_view,
                 "pk": t.pk,
                 "column_count": t.columns.len(),
+                "approx_rows": rows.get(&format!("{}.{}", t.schema, t.name)),
+                "noise": NOISE_TABLES.iter().any(|n| t.name.eq_ignore_ascii_case(n)),
+                "suggested_group": {
+                    "slug": group,
+                    "label": crate::meta::capitalize(&crate::meta::humanize(&group)),
+                    "icon": group_icon(&group),
+                },
             })
         })
         .collect();
     Ok(Json(json!({ "tables": tables })))
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SetupGroup {
+    pub slug: String,
+    pub label: String,
+    #[serde(default)]
+    pub icon: Option<String>,
+    pub tables: Vec<String>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SetupPlan {
+    pub groups: Vec<SetupGroup>,
+}
+
+/// One-shot first-run setup: write every picked table (empty config = runtime
+/// defaults) grouped into `_group.hcl` folders, as ONE atomic batch. Read-only
+/// config dirs get the would-be files back instead of a write.
+pub async fn apply_setup(
+    State(state): State<Arc<AppState>>,
+    user: CurrentUser,
+    Json(plan): Json<SetupPlan>,
+) -> Result<Json<Value>, AppError> {
+    admin_only(&user)?;
+    if plan.groups.iter().all(|g| g.tables.is_empty()) {
+        return Err(AppError::bad("nothing selected"));
+    }
+    let cfg = state.cfg();
+    let mut ops: Vec<FsOp> = Vec::new();
+    let mut files: serde_json::Map<String, Value> = serde_json::Map::new();
+    let mut versions: Vec<(String, String)> = Vec::new();
+    let mut count = 0usize;
+    let dir_opt = state.config_dir.clone();
+    let writable = dir_opt.as_deref().map(dir_writable).unwrap_or(false);
+    let base = dir_opt.clone().unwrap_or_default();
+
+    for (i, g) in plan.groups.iter().enumerate() {
+        let slug = safe_stem(&g.slug)?.to_string();
+        if g.tables.is_empty() {
+            continue;
+        }
+        for t in &g.tables {
+            let stem = safe_stem(t)?;
+            if cfg.tables.contains_key(stem) {
+                return Err(AppError::conflict(format!("'{stem}' is already configured")));
+            }
+            if state.db.find(None, stem).is_none() {
+                return Err(AppError::bad(format!("unknown table '{stem}'")));
+            }
+        }
+        let group_cfg = crate::config::GroupConfig {
+            label: g.label.clone(),
+            icon: g.icon.clone(),
+            order: (i + 1) as i64,
+            table_order: g.tables.clone(),
+            nav: None,
+        };
+        let group_hcl = hcl::to_string(&group_cfg)
+            .map_err(|e| AppError::internal(format!("serialize group: {e}")))?;
+        ops.push(FsOp::Mkdir { path: base.join(&slug) });
+        ops.push(FsOp::Write { path: base.join(&slug).join("_group.hcl"), contents: group_hcl.clone() });
+        files.insert(format!("{slug}/_group.hcl"), json!(group_hcl));
+        versions.push((format!("_group/{slug}"), group_hcl));
+        for t in &g.tables {
+            let stem = safe_stem(t)?.to_string();
+            ops.push(FsOp::Write { path: base.join(&slug).join(format!("{stem}.hcl")), contents: String::new() });
+            files.insert(format!("{slug}/{stem}.hcl"), json!(""));
+            versions.push((stem, String::new()));
+            count += 1;
+        }
+    }
+    drop(cfg);
+
+    let Some(dir) = dir_opt.filter(|_| writable) else {
+        return Ok(Json(json!({ "ok": false, "writable": false, "files": files })));
+    };
+    {
+        let _guard = state.config_write_lock.lock().unwrap();
+        commit_batch_and_reload(&state, &dir, ops)?;
+        for (key, hcl) in &versions {
+            state.store.config_version_add(key, hcl, &user.email, None)?;
+        }
+    }
+    state.store.audit(
+        &user.email,
+        "config",
+        None,
+        "setup:apply",
+        Some(&json!({ "groups": plan.groups.len(), "tables": count })),
+    );
+    Ok(Json(json!({ "ok": true, "reloaded": true, "tables": count })))
 }
 
 /// Resolve `{table}.hcl` and atomically commit + hot-reload it.

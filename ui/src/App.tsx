@@ -12,6 +12,7 @@ import ConfigGroups from './pages/ConfigGroups'
 import Dashboard from './pages/Dashboard'
 import DashboardConfig from './pages/DashboardConfig'
 import DiscoverTables from './pages/DiscoverTables'
+import Setup from './pages/Setup'
 import Login from './pages/Login'
 import RowCreate from './pages/RowCreate'
 import RowDetail from './pages/RowDetail'
@@ -48,6 +49,7 @@ export default function App() {
               <Route path="_config/groups" element={<AccessGate><ConfigGroups /></AccessGate>} />
               <Route path="_config/dashboard" element={<AccessGate><DashboardConfig /></AccessGate>} />
               <Route path="_config/discover" element={<AccessGate><DiscoverTables /></AccessGate>} />
+              <Route path="_setup" element={<AccessGate><Setup /></AccessGate>} />
               <Route path="p/*" element={<SlugRoute />} />
               <Route path=":table" element={<TableList />} />
               <Route path=":table/new" element={<RowCreate />} />

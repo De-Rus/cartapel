@@ -485,6 +485,9 @@ export interface DiscoverTable {
   is_view: boolean
   pk: string | null
   column_count: number
+  approx_rows?: number | null
+  noise?: boolean
+  suggested_group?: { slug: string; label: string; icon: string }
 }
 
 export interface DiscoverResponse {

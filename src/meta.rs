@@ -30,7 +30,7 @@ pub fn humanize(name: &str) -> String {
     name.replace('_', " ")
 }
 
-fn capitalize(s: &str) -> String {
+pub fn capitalize(s: &str) -> String {
     let mut c = s.chars();
     match c.next() {
         Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),

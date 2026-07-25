@@ -366,6 +366,7 @@ async fn serve(
         )
         .route("/t/:table/action/:name", post(actions::action_handler))
         .route("/config/discover", get(configedit::discover))
+        .route("/config/setup", post(configedit::apply_setup))
         .route(
             "/config/groups",
             get(groupsedit::list_groups).post(groupsedit::create_group),
