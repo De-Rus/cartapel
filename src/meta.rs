@@ -304,7 +304,13 @@ async fn filter_meta(
             return None;
         }
         let col = dbt.column(name)?;
-        let label = capitalize(&humanize(name));
+        let fc = cfg.fields.get(name);
+        let label = localize(
+            state,
+            fc.map(|f| &f.labels).unwrap_or(&Default::default()),
+            fc.and_then(|f| f.label.clone())
+                .unwrap_or_else(|| capitalize(&humanize(name))),
+        );
         let ops = filter_ops(col.kind);
         match col.kind {
             Kind::Bool => Some(Either::Left(std::future::ready(Some(
@@ -1273,6 +1279,7 @@ pub async fn meta_handler(
         "has_dashboard": !cfg.dashboard.widgets.is_empty(),
         "roles": state.effective_role_names(),
         "can_manage_access": user.is_admin(),
+        "can_customize": state.can_customize(&user),
     })))
 }
 

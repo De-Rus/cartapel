@@ -11,7 +11,7 @@ import { useClickOutside } from '../lib/hooks'
 import { useT } from '../lib/i18n'
 import { IconPlus, IconX } from './Icons'
 
-function filterOps(f: FilterMeta) {
+export function filterOps(f: FilterMeta) {
   if (f.ops && f.ops.length) return f.ops
   if (f.type === 'bool') return ['eq'] as const
   return opsForKind(f.kind)
@@ -19,7 +19,7 @@ function filterOps(f: FilterMeta) {
 
 // Configured filters come first (curated: enum options, filter_defs); every
 // remaining real column is filterable too — the server accepts any column.
-function candidates(table: TableMeta): FilterMeta[] {
+export function candidates(table: TableMeta): FilterMeta[] {
   const declared = new Set(table.list.filters.map((f) => f.name))
   const rest = table.columns
     .filter((c) => !declared.has(c.name) && !['json', 'binary'].includes(c.kind))
@@ -155,7 +155,7 @@ function ChipEditor({
   )
 }
 
-function AddFilter({
+export function AddFilter({
   options,
   onPick,
   onClose,
@@ -207,15 +207,19 @@ export function FilterBar({
   table,
   entries,
   onApply,
+  draft,
+  onDraft,
 }: {
   table: TableMeta
   entries: Array<[string, string]>
   onApply: (conditions: Condition[]) => void
+  draft: Condition | null
+  onDraft: (c: Condition | null) => void
 }) {
   const t = useT()
   const filters = candidates(table)
   const applied = conditionsFromParams(entries)
-  const [draft, setDraft] = useState<Condition | null>(null)
+  const setDraft = onDraft
   const [editing, setEditing] = useState<number | null>(null)
   const [adding, setAdding] = useState(false)
   const appliedKey = entries.map(([k, v]) => `${k}=${v}`).join('&')
@@ -238,6 +242,8 @@ export function FilterBar({
     setEditing(null)
     onApply(applied.filter((_, idx) => idx !== i))
   }
+
+  if (applied.length === 0 && !draft) return null
 
   const fm = (col: string) => filters.find((f) => f.name === col)
   // A raw-SQL filter_def is an on/off toggle — no operator, no value editor.

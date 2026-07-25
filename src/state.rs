@@ -237,6 +237,7 @@ impl AppState {
         }
         let mut out = RoleConfig::default();
         for role in chain.iter().rev() {
+            out.customize |= role.customize;
             out.tables.extend(role.tables.clone());
             out.perms.extend(role.perms.clone());
             out.editable.extend(role.editable.clone());
@@ -307,6 +308,10 @@ impl AppState {
     /// the coarse probe the permission tests pin; production decisions go
     /// through [`AppState::table_perms`].
     #[cfg_attr(not(test), allow(dead_code))]
+    pub fn can_customize(&self, user: &CurrentUser) -> bool {
+        user.is_admin() || self.user_roles(user).iter().any(|r| r.customize)
+    }
+
     pub fn role_level(&self, user: &CurrentUser, table: &str) -> Level {
         if user.is_admin() {
             return Level::Write;

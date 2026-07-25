@@ -193,6 +193,7 @@ export interface Meta {
   theme?: ThemeConfig | null
   roles?: string[]
   can_manage_access?: boolean
+  can_customize?: boolean
 }
 
 export interface AccessUser {
@@ -213,6 +214,7 @@ export interface RolePerm {
 }
 
 export interface RoleDefinition {
+  customize?: boolean
   extends?: string
   tables: Record<string, RoleLevel>
   actions: string[]

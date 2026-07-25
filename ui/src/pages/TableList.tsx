@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { api, ApiError } from '../api/client'
 import type { ActionMeta, ColumnMeta, ListResponse, Row, TableMeta } from '../api/types'
-import { type Condition, encodeCondition } from '../lib/filters'
+import { type Condition, encodeCondition, conditionsFromParams } from '../lib/filters'
 import { fmtInt } from '../lib/format'
 import { useDebounced, useMediaQuery } from '../lib/hooks'
 import { isEditableTarget } from '../lib/keys'
@@ -26,7 +26,7 @@ import { BulkEditModal } from '../components/BulkEditModal'
 import { ColumnMenu } from '../components/ColumnMenu'
 import { DataTable } from '../components/DataTable'
 import { ExportButton } from '../components/ExportButton'
-import { FilterBar } from '../components/FilterBar'
+import { AddFilter, candidates as filterCandidates, FilterBar, filterOps } from '../components/FilterBar'
 import { ImportDrawer } from '../components/ImportDrawer'
 import { SavedViews } from '../components/SavedViews'
 import { EmptyState } from '../components/EmptyState'
@@ -34,7 +34,7 @@ import { RecordPeek } from '../components/RecordPeek'
 import { Sheet } from '../components/Sheet'
 import { Modal } from '../components/Modal'
 import { DetailBody } from './RowDetail'
-import { IconDownload, IconFilterOff, IconInbox, IconPlus, IconSearch, IconSliders } from '../components/Icons'
+import { IconDownload, IconFilter, IconFilterOff, IconInbox, IconPlus, IconSearch, IconSliders } from '../components/Icons'
 import { useToast } from '../components/Toast'
 import { ConfigBuilder } from '../components/ConfigBuilder'
 import { GroupTabs } from '../components/GroupTabs'
@@ -114,6 +114,8 @@ function ListInner({ table }: { table: TableMeta }) {
   const [bulkOpen, setBulkOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [configOpen, setConfigOpen] = useState(false)
+  const [filterAddOpen, setFilterAddOpen] = useState(false)
+  const [filterDraft, setFilterDraft] = useState<Condition | null>(null)
   const meta = useMeta()
 
   const [colState, setColState] = useState<ColumnState>(() => loadColumnState(table.name))
@@ -361,6 +363,35 @@ function ListInner({ table }: { table: TableMeta }) {
             onChange={(e) => setQInput(e.target.value)}
           />
         </div>
+        <div className="relative">
+          <button
+            type="button"
+            className={clsx('btn', activeFilters.length > 0 && 'text-ink')}
+            onClick={() => setFilterAddOpen(!filterAddOpen)}
+            aria-expanded={filterAddOpen}
+          >
+            <IconFilter size={13} /> {t('flt_toolbar')}
+            {activeFilters.length > 0 && (
+              <span className="ml-0.5 rounded-full bg-selected px-1.5 text-xxs tabular-nums text-accent">
+                {activeFilters.length}
+              </span>
+            )}
+          </button>
+          {filterAddOpen && (
+            <AddFilter
+              options={filterCandidates(table)}
+              onPick={(f) => {
+                setFilterAddOpen(false)
+                if (f.type === 'custom' && !f.kind) {
+                  applyConditions([...conditionsFromParams(activeFilters), { col: f.name, op: 'eq', value: '1' }])
+                  return
+                }
+                setFilterDraft({ col: f.name, op: filterOps(f)[0], value: '' })
+              }}
+              onClose={() => setFilterAddOpen(false)}
+            />
+          )}
+        </div>
         <ColumnMenu
           table={table}
           state={colState}
@@ -373,7 +404,7 @@ function ListInner({ table }: { table: TableMeta }) {
             <IconDownload size={13} className="rotate-180" /> {t('import')}
           </button>
         )}
-        {meta.can_manage_access && (
+        {meta.can_customize && (
           <button type="button" className="btn" onClick={() => setConfigOpen(true)}>
             <IconSliders size={13} /> {t('cfg_customize')}
           </button>
@@ -387,7 +418,7 @@ function ListInner({ table }: { table: TableMeta }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <FilterBar table={table} entries={activeFilters} onApply={applyConditions} />
+        <FilterBar table={table} entries={activeFilters} onApply={applyConditions} draft={filterDraft} onDraft={setFilterDraft} />
         <div className="min-w-4 flex-1" />
         <SavedViews
           table={table.name}

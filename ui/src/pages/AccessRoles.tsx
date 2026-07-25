@@ -130,6 +130,17 @@ function RoleEditor({
           </div>
         )}
 
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={model.customize ?? false}
+            disabled={!(editable || isNew)}
+            onChange={(e) => setModel({ ...model, customize: e.target.checked || undefined })}
+          />
+          <span className="text-[13px] text-sec">{t('role_customize')}</span>
+          <span className="text-xxs text-muted">{t('role_customize_hint')}</span>
+        </label>
+
         <label className="block">
           <span className="mb-1 block text-[13px] text-sec">{t('role_extends')}</span>
           <select

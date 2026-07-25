@@ -45,6 +45,7 @@ role "staff" {
 | Key | Type | Description |
 | --- | --- | --- |
 | `extends` | string | Parent role to inherit from — see [Role inheritance](#role-inheritance). |
+| `customize` | bool | May open Personalizar and edit **table configs** (visual + raw HCL + version history). Config authorship — grant to trusted power users only; groups, dashboard, discover and access screens stay admin-only. Inherits through `extends` and unions across multiple roles. |
 | `tables` | map | The coarse access level per table: `"read"` or `"write"`. `"*"` sets a default for every table. |
 | `perm "<table>" { }` | block | Fine-grained per-capability override (view/create/update/delete). |
 | `editable` | map | Per-table whitelist of columns this role may edit. |

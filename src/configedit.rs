@@ -8,6 +8,16 @@ use std::collections::HashMap;
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::Arc;
 
+fn customize_only(state: &AppState, user: &CurrentUser) -> Result<(), AppError> {
+    if state.can_customize(user) {
+        Ok(())
+    } else {
+        Err(AppError::forbidden(
+            "config editing requires the customize permission",
+        ))
+    }
+}
+
 pub(crate) fn admin_only(user: &CurrentUser) -> Result<(), AppError> {
     if user.is_admin() {
         Ok(())
@@ -100,7 +110,7 @@ pub async fn get_config(
     user: CurrentUser,
     Path(table): Path<String>,
 ) -> Result<Json<Value>, AppError> {
-    admin_only(&user)?;
+    customize_only(&state, &user)?;
     if state.resolve_table(&table).is_none() {
         return Err(AppError::not_found(format!("unknown table {table}")));
     }
@@ -159,7 +169,7 @@ pub async fn put_config(
     Path(table): Path<String>,
     Json(body): Json<PutConfig>,
 ) -> Result<Json<Value>, AppError> {
-    admin_only(&user)?;
+    customize_only(&state, &user)?;
     if state.resolve_table(&table).is_none() {
         return Err(AppError::not_found(format!("unknown table {table}")));
     }
@@ -995,7 +1005,7 @@ pub async fn list_config_versions(
     user: CurrentUser,
     Path(table): Path<String>,
 ) -> Result<Json<Value>, AppError> {
-    admin_only(&user)?;
+    customize_only(&state, &user)?;
     known_table(&state, &table)?;
     Ok(Json(state.store.config_versions_list(&table)?))
 }
@@ -1005,7 +1015,7 @@ pub async fn get_config_version(
     user: CurrentUser,
     Path((table, id)): Path<(String, i64)>,
 ) -> Result<Json<Value>, AppError> {
-    admin_only(&user)?;
+    customize_only(&state, &user)?;
     known_table(&state, &table)?;
     match state.store.config_version_get(&table, id) {
         Some(hcl) => Ok(Json(json!({ "hcl": hcl }))),
@@ -1018,7 +1028,7 @@ pub async fn publish_config_version(
     user: CurrentUser,
     Path((table, id)): Path<(String, i64)>,
 ) -> Result<Json<Value>, AppError> {
-    admin_only(&user)?;
+    customize_only(&state, &user)?;
     known_table(&state, &table)?;
 
     let hcl_text = state
