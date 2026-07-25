@@ -145,8 +145,16 @@ pub struct CurrentUser {
 }
 
 impl CurrentUser {
+    /// A user may carry several roles, comma-separated ("support,billing").
+    pub fn roles(&self) -> impl Iterator<Item = &str> {
+        self.role
+            .split(',')
+            .map(str::trim)
+            .filter(|r| !r.is_empty())
+    }
+
     pub fn is_admin(&self) -> bool {
-        self.role == "admin"
+        self.roles().any(|r| r == "admin")
     }
 }
 
@@ -255,13 +263,13 @@ impl AppState {
         out
     }
 
-    pub fn role_level(&self, user: &CurrentUser, table: &str) -> Level {
-        if user.is_admin() {
-            return Level::Write;
-        }
-        let Some(role) = self.resolve_role(&user.role) else {
-            return Level::None;
-        };
+    /// Every role the user carries, resolved (extends flattened). Unknown names
+    /// are skipped — a stale assignment must fail closed, not 500.
+    fn user_roles(&self, user: &CurrentUser) -> Vec<RoleConfig> {
+        user.roles().filter_map(|n| self.resolve_role(n)).collect()
+    }
+
+    fn coarse_level(role: &RoleConfig, table: &str) -> Level {
         let raw = role
             .tables
             .get(table)
@@ -275,22 +283,48 @@ impl AppState {
         }
     }
 
-    pub fn table_perms(&self, user: &CurrentUser, table: &str) -> TablePerms {
-        let level = self.role_level(user, table);
-        let coarse_view = level >= Level::Read;
-        let coarse_write = level >= Level::Write;
-        let (mut view, mut create, mut update, mut delete) =
-            (coarse_view, coarse_write, coarse_write, coarse_write);
-        if !user.is_admin() {
-            if let Some(role) = self.resolve_role(&user.role) {
-                if let Some(tp) = role.perms.get(table) {
-                    view = tp.view.unwrap_or(view);
-                    create = tp.create.unwrap_or(create);
-                    update = tp.update.unwrap_or(update);
-                    delete = tp.delete.unwrap_or(delete);
-                }
-            }
+    /// One role's effective (view, create, update, delete) on a table: its
+    /// coarse level refined by its own `perm` block. Union across roles happens
+    /// per capability — privileges add up, Django-groups style.
+    fn role_caps(role: &RoleConfig, table: &str) -> (bool, bool, bool, bool) {
+        let lvl = Self::coarse_level(role, table);
+        let (mut v, mut c, mut u, mut d) = (
+            lvl >= Level::Read,
+            lvl >= Level::Write,
+            lvl >= Level::Write,
+            lvl >= Level::Write,
+        );
+        if let Some(tp) = role.perms.get(table) {
+            v = tp.view.unwrap_or(v);
+            c = tp.create.unwrap_or(c);
+            u = tp.update.unwrap_or(u);
+            d = tp.delete.unwrap_or(d);
         }
+        (v, c, u, d)
+    }
+
+    pub fn role_level(&self, user: &CurrentUser, table: &str) -> Level {
+        if user.is_admin() {
+            return Level::Write;
+        }
+        self.user_roles(user)
+            .iter()
+            .map(|r| Self::coarse_level(r, table))
+            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or(Level::None)
+    }
+
+    pub fn table_perms(&self, user: &CurrentUser, table: &str) -> TablePerms {
+        let (view, create, update, delete) = if user.is_admin() {
+            (true, true, true, true)
+        } else {
+            let mut acc = (false, false, false, false);
+            for role in &self.user_roles(user) {
+                let (v, c, u, d) = Self::role_caps(role, table);
+                acc = (acc.0 || v, acc.1 || c, acc.2 || u, acc.3 || d);
+            }
+            acc
+        };
         let cfg = self.cfg();
         let caps = cfg
             .tables
@@ -319,7 +353,28 @@ impl AppState {
         if user.is_admin() {
             return None;
         }
-        self.resolve_role(&user.role)?.editable.get(table).cloned()
+        // A restriction only holds if EVERY role granting update imposes one;
+        // one unrestricted write-granting role lifts it (union of privilege).
+        let mut union: Vec<String> = Vec::new();
+        let mut any_writer = false;
+        for role in &self.user_roles(user) {
+            let (_, c, u, _) = Self::role_caps(role, table);
+            if !(c || u) {
+                continue;
+            }
+            any_writer = true;
+            match role.editable.get(table) {
+                None => return None,
+                Some(cols) => {
+                    for col in cols {
+                        if !union.contains(col) {
+                            union.push(col.clone());
+                        }
+                    }
+                }
+            }
+        }
+        any_writer.then_some(union)
     }
 
     pub fn allowed_actions(&self, user: &CurrentUser, table: &str) -> Vec<String> {
@@ -331,11 +386,13 @@ impl AppState {
         if user.is_admin() {
             return names.collect();
         }
-        let Some(role) = self.resolve_role(&user.role) else {
-            return vec![];
-        };
+        let roles = self.user_roles(user);
         names
-            .filter(|n| role.actions.iter().any(|a| a == &format!("{table}.{n}")))
+            .filter(|n| {
+                roles
+                    .iter()
+                    .any(|r| r.actions.iter().any(|a| a == &format!("{table}.{n}")))
+            })
             .collect()
     }
 
@@ -369,12 +426,31 @@ impl AppState {
         if user.is_admin() {
             return out;
         }
-        if let Some(role) = self.resolve_role(&user.role) {
-            if let Some(extra) = role.masked.get(table) {
-                for c in extra {
-                    if !out.contains(c) {
-                        out.push(c.clone());
-                    }
+        // Role masking is a restriction: with several roles it holds only when
+        // EVERY view-granting role masks the column (a role without an entry
+        // masks nothing). Union of privilege, intersection of restriction.
+        let roles = self.user_roles(user);
+        let viewing: Vec<&RoleConfig> = roles
+            .iter()
+            .filter(|r| Self::role_caps(r, table).0)
+            .collect();
+        if let Some(first) = viewing.first() {
+            let extra: Vec<&String> = first
+                .masked
+                .get(table)
+                .map(|cols| {
+                    cols.iter()
+                        .filter(|c| {
+                            viewing
+                                .iter()
+                                .all(|r| r.masked.get(table).is_some_and(|m| m.contains(c)))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            for c in extra {
+                if !out.contains(c) {
+                    out.push(c.clone());
                 }
             }
         }
@@ -385,10 +461,45 @@ impl AppState {
         if user.is_admin() {
             return None;
         }
-        let role = self.resolve_role(&user.role)?;
-        let raw = role.row_filter.get(table)?;
+        // A row is visible if ANY role shows it: filters OR together, and one
+        // view-granting role without a filter lifts the restriction entirely.
+        let roles = self.user_roles(user);
+        let viewing: Vec<&RoleConfig> = roles
+            .iter()
+            .filter(|r| Self::role_caps(r, table).0)
+            .collect();
+        // No view-granting role: access is denied upstream; fail closed with the
+        // AND of whatever filters exist (defense in depth for stray callers).
+        if viewing.is_empty() {
+            let parts: Vec<String> = roles
+                .iter()
+                .filter_map(|r| r.row_filter.get(table))
+                .map(|raw| format!("({})", self.fill_actor(user, raw)))
+                .collect();
+            return (!parts.is_empty()).then(|| parts.join(" AND "));
+        }
+        let mut parts: Vec<String> = Vec::new();
+        for role in &viewing {
+            match role.row_filter.get(table) {
+                None => return None,
+                Some(raw) => parts.push(self.fill_actor(user, raw)),
+            }
+        }
+        if parts.len() == 1 {
+            return parts.pop();
+        }
+        Some(
+            parts
+                .into_iter()
+                .map(|p| format!("({p})"))
+                .collect::<Vec<_>>()
+                .join(" OR "),
+        )
+    }
+
+    fn fill_actor(&self, user: &CurrentUser, raw: &str) -> String {
         let email_escaped = user.email.replace('\'', "''");
-        Some(raw.replace("{actor.email}", &format!("'{email_escaped}'")))
+        raw.replace("{actor.email}", &format!("'{email_escaped}'"))
     }
 
     /// Every configured-and-introspected table the user may view. A table is part

@@ -195,7 +195,9 @@ export function validateUserPayload(
   if (opts.requirePassword && !passwordGiven) errors.password = 'password_required'
   else if (passwordGiven && password.length < 8) errors.password = 'password_too_short'
 
-  if (!role || !roles.includes(role)) errors.role = 'role_invalid'
+  // The role field may carry several comma-separated roles (union semantics).
+  const parts = role.split(',').map((r) => r.trim()).filter(Boolean)
+  if (parts.length === 0 || parts.some((p) => !roles.includes(p))) errors.role = 'role_invalid'
 
   return { ok: Object.keys(errors).length === 0, errors, value: { email, password, role } }
 }

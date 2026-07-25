@@ -211,12 +211,14 @@ impl Store {
         let Some(current) = current else {
             return Ok(AdminGuard::NotFound);
         };
-        let losing_admin = current == "admin" && new_role != Some("admin");
+        let has_admin = |r: &str| r.split(',').map(str::trim).any(|p| p == "admin");
+        let losing_admin = has_admin(&current) && !new_role.is_some_and(has_admin);
         if losing_admin {
-            let admins: i64 =
-                conn.query_row("SELECT count(*) FROM users WHERE role = 'admin'", [], |r| {
-                    r.get(0)
-                })?;
+            let admins: i64 = conn.query_row(
+                "SELECT count(*) FROM users WHERE ',' || replace(role, ' ', '') || ',' LIKE '%,admin,%'",
+                [],
+                |r| r.get(0),
+            )?;
             if admins <= 1 {
                 return Ok(AdminGuard::LastAdmin);
             }
@@ -250,7 +252,7 @@ impl Store {
     #[allow(dead_code)]
     pub fn count_admins(&self) -> rusqlite::Result<i64> {
         self.conn.lock().unwrap().query_row(
-            "SELECT count(*) FROM users WHERE role = 'admin'",
+            "SELECT count(*) FROM users WHERE ',' || replace(role, ' ', '') || ',' LIKE '%,admin,%'",
             [],
             |r| r.get(0),
         )
@@ -329,7 +331,11 @@ impl Store {
         let mut out = HashMap::new();
         while let Ok(Some(r)) = q.next() {
             if let (Ok(role), Ok(n)) = (r.get::<_, String>(0), r.get::<_, i64>(1)) {
-                out.insert(role, n);
+                // A user's field may hold several comma-separated roles — each
+                // counts toward every role it names (delete-guard correctness).
+                for part in role.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+                    *out.entry(part.to_string()).or_insert(0) += n;
+                }
             }
         }
         out

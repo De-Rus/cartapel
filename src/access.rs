@@ -19,6 +19,26 @@ fn admin_only(user: &CurrentUser) -> Result<(), AppError> {
     }
 }
 
+/// A user's role field may carry several comma-separated roles; every part must
+/// name a known role and the field can't be empty.
+fn ensure_roles(state: &AppState, roles: &str) -> Result<(), AppError> {
+    let known = state.effective_role_names();
+    let parts: Vec<&str> = roles
+        .split(',')
+        .map(str::trim)
+        .filter(|r| !r.is_empty())
+        .collect();
+    if parts.is_empty() {
+        return Err(AppError::bad("at least one role is required"));
+    }
+    for p in &parts {
+        if !known.iter().any(|k| k == p) {
+            return Err(AppError::bad(format!("unknown role {p}")));
+        }
+    }
+    Ok(())
+}
+
 fn normalize_email(raw: &str) -> String {
     raw.trim().to_lowercase()
 }
@@ -53,9 +73,7 @@ pub async fn users_create(
             "password must be at least {MIN_PASSWORD_LEN} characters"
         )));
     }
-    if !state.effective_role_names().contains(&body.role) {
-        return Err(AppError::bad(format!("unknown role {}", body.role)));
-    }
+    ensure_roles(&state, &body.role)?;
     let id = match state.store.create_user(&email, &body.password, &body.role) {
         Ok(id) => id,
         Err(UserCreateError::Duplicate) => {
@@ -102,9 +120,7 @@ pub async fn users_update(
     let mut changes = serde_json::Map::new();
 
     if let Some(new_role) = &body.role {
-        if !state.effective_role_names().contains(new_role) {
-            return Err(AppError::bad(format!("unknown role {new_role}")));
-        }
+        ensure_roles(&state, new_role)?;
         if new_role != &current_role {
             match state.store.guarded_admin_mutation(id, Some(new_role))? {
                 crate::store::AdminGuard::LastAdmin => {
@@ -1481,5 +1497,98 @@ mod tests {
         let e = r.expect_err("cycle must be rejected");
         assert!(e.1.contains("cycle"), "{}", e.1);
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn multi_role_unions_privileges() {
+        let state = test_state();
+        let mut a = RoleConfig::default();
+        a.tables.insert("bots".into(), "read".into());
+        a.actions.push("bots.halt".into());
+        a.masked.insert("bots".into(), vec!["notes".into()]);
+        a.row_filter
+            .insert("bots".into(), "owner = {actor.email}".into());
+        let mut b = RoleConfig::default();
+        b.tables.insert("bots".into(), "write".into());
+        {
+            let mut cfg = (*state.cfg()).clone();
+            cfg.auth.roles.insert("a".into(), a);
+            cfg.auth.roles.insert("b".into(), b);
+            state.cfg.store(Arc::new(cfg));
+        }
+        let user = CurrentUser {
+            email: "u@x.io".into(),
+            role: "a,b".into(),
+        };
+        assert!(matches!(
+            state.role_level(&user, "bots"),
+            crate::state::Level::Write
+        ));
+        let p = state.table_perms(&user, "bots");
+        assert!(p.view && p.update, "privileges union across roles");
+        // b grants view without masking or filtering → restrictions lift.
+        assert!(!state
+            .masked_columns(&user, "bots")
+            .contains(&"notes".to_string()));
+        assert_eq!(state.row_filter(&user, "bots"), None);
+        assert_eq!(
+            state.allowed_actions(&user, "bots"),
+            vec!["halt".to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn multi_role_intersects_restrictions() {
+        let state = test_state();
+        let mut a = RoleConfig::default();
+        a.tables.insert("bots".into(), "read".into());
+        a.masked
+            .insert("bots".into(), vec!["notes".into(), "name".into()]);
+        a.row_filter.insert("bots".into(), "kind = 'x'".into());
+        let mut b = RoleConfig::default();
+        b.tables.insert("bots".into(), "read".into());
+        b.masked.insert("bots".into(), vec!["notes".into()]);
+        b.row_filter.insert("bots".into(), "kind = 'y'".into());
+        {
+            let mut cfg = (*state.cfg()).clone();
+            cfg.auth.roles.insert("a".into(), a);
+            cfg.auth.roles.insert("b".into(), b);
+            state.cfg.store(Arc::new(cfg));
+        }
+        let user = CurrentUser {
+            email: "u@x.io".into(),
+            role: "a,b".into(),
+        };
+        let masked = state.masked_columns(&user, "bots");
+        assert!(
+            masked.contains(&"notes".to_string()),
+            "masked by BOTH roles stays masked"
+        );
+        assert!(
+            !masked.contains(&"name".to_string()),
+            "masked by only one role lifts"
+        );
+        assert_eq!(
+            state.row_filter(&user, "bots").as_deref(),
+            Some("(kind = 'x') OR (kind = 'y')"),
+        );
+    }
+
+    #[tokio::test]
+    async fn multi_role_admin_membership_and_csv_validation() {
+        let state = test_state();
+        let user = CurrentUser {
+            email: "u@x.io".into(),
+            role: "support, admin".into(),
+        };
+        assert!(user.is_admin());
+        let e = ensure_roles(&state, "ghost")
+            .err()
+            .expect("unknown role rejected");
+        assert!(e.1.contains("unknown role"), "{}", e.1);
+        assert!(
+            ensure_roles(&state, " ,").is_err(),
+            "empty role list rejected"
+        );
     }
 }

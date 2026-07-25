@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import clsx from 'clsx'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '../api/client'
 import type { AccessUser } from '../api/types'
@@ -93,17 +94,33 @@ function UserModal({
           {errors.password && <p className="mt-1 text-xxs text-critical">{fieldError(t, errors.password)}</p>}
         </label>
 
-        <label className="block">
+        <div>
           <span className="mb-1 block text-[13px] text-sec">{t('col_role')}</span>
-          <select className="input w-full" value={role} onChange={(e) => setRole(e.target.value)}>
-            {roles.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-wrap gap-1.5">
+            {roles.map((r) => {
+              const parts = role.split(',').map((x) => x.trim()).filter(Boolean)
+              const on = parts.includes(r)
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  className={clsx(
+                    'rounded-full border px-2.5 py-1 text-xxs',
+                    on ? 'border-accent bg-selected text-ink' : 'text-sec hover:text-ink',
+                  )}
+                  onClick={() => {
+                    const next = on ? parts.filter((x) => x !== r) : [...parts, r]
+                    setRole(next.join(','))
+                  }}
+                >
+                  {r}
+                </button>
+              )
+            })}
+          </div>
+          <span className="mt-1 block text-xxs text-muted">{t('user_roles_hint')}</span>
           {errors.role && <p className="mt-1 text-xxs text-critical">{fieldError(t, errors.role)}</p>}
-        </label>
+        </div>
 
         {serverError && <p className="text-[13px] text-critical">{serverError}</p>}
       </div>

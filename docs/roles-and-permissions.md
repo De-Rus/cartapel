@@ -74,6 +74,20 @@ role "support" {
   with a 400 — a broken hierarchy never loads silently.
 - The runtime Roles editor exposes this as the **Inherits from** selector.
 
+## Multiple roles per user
+
+A user may carry several roles (comma-separated in the Users editor — chips in
+the UI). Permissions are the **union**, Django-groups style:
+
+- **Privileges add up**: table levels take the highest (`read` + `write` =
+  `write`), granular `perm` capabilities OR together, `actions` union.
+- **Restrictions hold only when every view-granting role imposes them**: a
+  column stays masked only if masked in ALL roles that can see the table;
+  `row_filter`s OR together (a role with no filter lifts the restriction);
+  an `editable` whitelist applies only if every write-granting role has one
+  (then the union of the lists).
+- `admin` anywhere in the list makes the user an admin.
+
 ## Coarse table access
 
 `tables` is the baseline. Two levels:
