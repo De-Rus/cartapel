@@ -86,6 +86,21 @@ Conventions for a page module:
   `--border`, `--surface`, `--surface-3`, `--sec`, …). Dark-first — never
   hard-code a light background.
 
+### Editor autocompletion — `sx.d.ts`
+
+Every instance serves type declarations for the global `sx` SDK at
+**`{base}/sx.d.ts`** (e.g. `https://your-host/admin/sx.d.ts`). Download it next
+to your modules and reference it for full autocompletion while authoring:
+
+```bash
+curl -o admin/screens/sx.d.ts https://your-host/admin/sx.d.ts
+```
+
+```ts
+/// <reference path="../sx.d.ts" />
+const { definePage, html, useQuery, Page, Stat } = sx
+```
+
 ## Named queries
 
 A `queries.hcl` file declares read-only SQL that pages and widgets can call. It

@@ -17,7 +17,12 @@ pub async fn spa_handler(uri: Uri, base_path: axum::extract::State<String>) -> R
 
     if !rel.is_empty() {
         if let Some(file) = Assets::get(rel) {
-            let mime = mime_guess::from_path(rel).first_or_octet_stream();
+            // mime_guess maps `.ts` to MPEG transport stream — ours are TypeScript.
+            let mime = if rel.ends_with(".ts") || rel.ends_with(".tsx") {
+                "text/plain; charset=utf-8".to_string()
+            } else {
+                mime_guess::from_path(rel).first_or_octet_stream().as_ref().to_string()
+            };
             let cache = if rel.starts_with("assets/") {
                 "public, max-age=31536000, immutable"
             } else {
@@ -25,7 +30,7 @@ pub async fn spa_handler(uri: Uri, base_path: axum::extract::State<String>) -> R
             };
             return (
                 [
-                    (header::CONTENT_TYPE, mime.as_ref().to_string()),
+                    (header::CONTENT_TYPE, mime),
                     (header::CACHE_CONTROL, cache.to_string()),
                 ],
                 file.data,
