@@ -27,7 +27,7 @@ pub(crate) fn admin_only(user: &CurrentUser) -> Result<(), AppError> {
 /// on reload. `groups`, `dashboard`, `discover`, and `versions` are literal `/config`
 /// route segments — a real table with one of those names would be shadowed by the
 /// route rather than reaching `/config/:table`, so it is reserved out entirely.
-pub(crate) const RESERVED_STEMS: [&str; 8] = [
+pub(crate) const RESERVED_STEMS: [&str; 9] = [
     crate::config::RESERVED_DIR,
     "_group",
     "page",
@@ -36,6 +36,7 @@ pub(crate) const RESERVED_STEMS: [&str; 8] = [
     "dashboard",
     "discover",
     "versions",
+    "screens",
 ];
 
 pub(crate) fn safe_stem(table: &str) -> Result<&str, AppError> {

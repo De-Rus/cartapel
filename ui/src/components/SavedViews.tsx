@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { api } from '../api/client'
 import { viewMatchesParams } from '../lib/viewState'
+import { useT } from '../lib/i18n'
 import { useToast } from './Toast'
 import { IconPlus, IconX } from './Icons'
 
@@ -19,6 +20,7 @@ export function SavedViews({
   onApply: (query: string) => void
   onClear: () => void
 }) {
+  const t = useT()
   const qc = useQueryClient()
   const toast = useToast()
   const [naming, setNaming] = useState(false)
@@ -37,7 +39,7 @@ export function SavedViews({
       setNaming(false)
       setName('')
       void qc.invalidateQueries({ queryKey: ['views', table] })
-      toast('View saved')
+      toast(t('sv_saved'))
     },
   })
 
@@ -68,7 +70,7 @@ export function SavedViews({
           !anyActive ? 'bg-surface3 text-ink' : 'text-sec hover:text-ink',
         )}
       >
-        All
+        {t('sv_all')}
       </button>
       {views.map((v) => {
         const active = v.id === activeView?.id
@@ -82,14 +84,14 @@ export function SavedViews({
           >
             <button type="button" onClick={() => onApply(v.query)}>
               {v.name}
-              {v.shared && <span className="ml-1 text-muted">· shared</span>}
+              {v.shared && <span className="ml-1 text-muted">· {t('sv_shared')}</span>}
             </button>
             {v.own && (
               <button
                 type="button"
                 className="text-muted opacity-0 hover:text-critical group-hover:opacity-100"
                 onClick={() => deleteMut.mutate(v.id)}
-                aria-label={`Delete view ${v.name}`}
+                aria-label={t('sv_delete', { name: v.name })}
               >
                 <IconX size={10} />
               </button>
@@ -102,7 +104,7 @@ export function SavedViews({
           <input
             autoFocus
             className="input-sm w-28"
-            placeholder="View name…"
+            placeholder={t('sv_name_ph')}
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
@@ -111,7 +113,7 @@ export function SavedViews({
             }}
           />
           <button type="button" className="btn !px-2 !py-1 text-xxs" onClick={save} disabled={!name.trim()}>
-            Save
+            {t('sv_save')}
           </button>
         </span>
       ) : (
@@ -121,7 +123,7 @@ export function SavedViews({
             onClick={() => setNaming(true)}
             className="flex items-center gap-1 rounded-full px-2 py-1 text-xxs text-muted hover:text-ink"
           >
-            <IconPlus size={10} /> New
+            <IconPlus size={10} /> {t('sv_new')}
           </button>
         )
       )}

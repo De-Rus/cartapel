@@ -112,7 +112,8 @@ impl From<sqlx::Error> for AppError {
 
 impl From<rusqlite::Error> for AppError {
     fn from(e: rusqlite::Error) -> Self {
-        AppError::internal(e.to_string())
+        tracing::warn!("store error: {e}");
+        AppError::internal("internal error")
     }
 }
 

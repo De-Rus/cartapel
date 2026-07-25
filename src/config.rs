@@ -1419,7 +1419,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                     .is_some_and(|c| c.as_os_str() == "screens");
                 if under_screens {
                     return Err(format!(
-                        "{}: unexpected file under screens/ — a table is a folder with a screen.hcl; valid stems are screen, _group, queries, variables, sources",
+                        "{}: unexpected file under screens/ — a table is a folder with a screen.hcl; valid stems are screen, page, _group, queries, variables, sources",
                         path.display()
                     ));
                 }
