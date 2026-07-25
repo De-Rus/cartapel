@@ -5,7 +5,7 @@ import { api } from '../api/client'
 import { viewMatchesParams } from '../lib/viewState'
 import { useT } from '../lib/i18n'
 import { useToast } from './Toast'
-import { IconFilterOff, IconPlus, IconX } from './Icons'
+import { IconFilterOff, IconLink, IconPlus, IconX } from './Icons'
 
 export function SavedViews({
   table,
@@ -25,6 +25,7 @@ export function SavedViews({
   const toast = useToast()
   const [naming, setNaming] = useState(false)
   const [name, setName] = useState('')
+  const [shared, setShared] = useState(false)
 
   const { data } = useQuery({
     queryKey: ['views', table],
@@ -34,10 +35,11 @@ export function SavedViews({
 
   const createMut = useMutation({
     mutationFn: (query: string) =>
-      api.createView({ table, name: name.trim(), query, shared: false }),
+      api.createView({ table, name: name.trim(), query, shared }),
     onSuccess: () => {
       setNaming(false)
       setName('')
+      setShared(false)
       void qc.invalidateQueries({ queryKey: ['views', table] })
       toast(t('sv_saved'))
     },
@@ -102,6 +104,17 @@ export function SavedViews({
               if (e.key === 'Escape') setNaming(false)
             }}
           />
+          <button
+            type="button"
+            className={clsx(
+              'rounded-full border px-2 py-1 text-xxs',
+              shared ? 'border-accent text-ink' : 'text-muted hover:text-ink',
+            )}
+            onClick={() => setShared(!shared)}
+            title={t('sv_shared_hint')}
+          >
+            {t('sv_shared_toggle')}
+          </button>
           <button type="button" className="btn !px-2 !py-1 text-xxs" onClick={save} disabled={!name.trim()}>
             {t('sv_save')}
           </button>
@@ -116,6 +129,20 @@ export function SavedViews({
             <IconPlus size={10} /> {t('sv_save_view')}
           </button>
         )
+      )}
+      {anyActive && (
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard?.writeText(window.location.href)
+            toast(t('sv_link_copied'))
+          }}
+          title={t('sv_link')}
+          aria-label={t('sv_link')}
+          className="flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-surface2 hover:text-ink"
+        >
+          <IconLink size={12} />
+        </button>
       )}
       {anyActive && (
         <button

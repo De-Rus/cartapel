@@ -372,6 +372,10 @@ const es: Dict = {
   sv_save: 'Guardar',
   sv_new: 'Nueva',
   sv_save_view: 'Guardar vista',
+  sv_shared_toggle: 'compartida',
+  sv_shared_hint: 'Visible para todo el equipo, no solo para ti',
+  sv_link: 'Copiar enlace',
+  sv_link_copied: 'Enlace copiado — la URL contiene los filtros',
 
   cfg_detail_hint: 'Agrupa los campos en secciones con título en la ficha.',
   cfg_detail_add_section: 'Añadir sección',
@@ -914,6 +918,10 @@ const en: Dict = {
   sv_save: 'Save',
   sv_new: 'New',
   sv_save_view: 'Save view',
+  sv_shared_toggle: 'shared',
+  sv_shared_hint: 'Visible to the whole team, not just you',
+  sv_link: 'Copy link',
+  sv_link_copied: 'Link copied — the URL carries the filters',
 
   cfg_detail_hint: 'Group fields into titled sections on the record page.',
   cfg_detail_add_section: 'Add section',
