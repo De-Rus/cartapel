@@ -1410,6 +1410,19 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                 }
             }
             _ => {
+                // Under screens/ the file set is closed (screen/_group/queries/
+                // variables/sources) — a stray stem there is a typo, not a table.
+                let under_screens = path
+                    .strip_prefix(dir)
+                    .ok()
+                    .and_then(|rel| rel.components().next())
+                    .is_some_and(|c| c.as_os_str() == "screens");
+                if under_screens {
+                    return Err(format!(
+                        "{}: unexpected file under screens/ — a table is a folder with a screen.hcl; valid stems are screen, _group, queries, variables, sources",
+                        path.display()
+                    ));
+                }
                 if let Some(prev) = cfg.table_sources.get(&stem) {
                     return Err(format!(
                         "duplicate table config for \"{stem}\": {} and {}",
