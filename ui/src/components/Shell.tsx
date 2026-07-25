@@ -269,7 +269,7 @@ function BrandMark({
   size: 'sidebar' | 'login'
   onBand?: boolean
 }) {
-  const brand = (name ?? '').trim() || 'steward'
+  const brand = (name ?? '').trim() || 'cartapel'
   const inkCls = onBand ? 'text-[color:var(--band-ink)]' : 'text-ink'
   if (logo) {
     const h = size === 'sidebar' ? 'h-5' : 'h-7'
@@ -293,7 +293,7 @@ function BrandMark({
 
 export { BrandMark }
 
-const NAV_EXPANDED_KEY = 'steward.navExpanded'
+const NAV_EXPANDED_KEY = 'cartapel.navExpanded'
 
 // Groups are collapsed by default; the persisted set holds the ones the user
 // has opened. The active group is auto-expanded regardless.
@@ -592,7 +592,7 @@ function MobileDrawer({
   )
 }
 
-const SIDEBAR_KEY = 'steward.sidebar'
+const SIDEBAR_KEY = 'cartapel.sidebar'
 
 function ShellChrome({ meta }: { meta: Meta }) {
   const navigate = useNavigate()

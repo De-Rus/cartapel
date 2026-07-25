@@ -10,7 +10,7 @@ export interface WidgetApi {
 
 async function apiFetch(method: string, path: string, body?: unknown): Promise<unknown> {
   const clean = path.replace(/^\/+/, '')
-  const headers: Record<string, string> = { 'X-Steward': '1' }
+  const headers: Record<string, string> = { 'X-Cartapel': '1' }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   const res = await fetch(`${API_BASE}/${clean}`, {
     method,

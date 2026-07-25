@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://de-rus.github.io/steward/sitemap.xml
+Sitemap: https://de-rus.github.io/cartapel/sitemap.xml

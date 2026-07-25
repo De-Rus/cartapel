@@ -2,17 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { PRESETS, presetOf, resolveTheme, themeCss } from './themes'
 
 describe('theme presets', () => {
-  it('ships the steward + django presets', () => {
-    expect(Object.keys(PRESETS)).toEqual(['steward', 'django'])
+  it('ships the cartapel + django presets', () => {
+    expect(Object.keys(PRESETS)).toEqual(['cartapel', 'django'])
     expect(PRESETS.django.light.accent).toBe('#417690')
     expect(PRESETS.django.light.band).toBe('#417690')
-    expect(PRESETS.steward.dark.accent).toBe('#3987e5')
-    expect(PRESETS.steward.dark.page).toBe('#0d0d0d')
-    expect(PRESETS.steward.light.page).toBe('#f9f9f7')
+    expect(PRESETS.cartapel.dark.accent).toBe('#3987e5')
+    expect(PRESETS.cartapel.dark.page).toBe('#0d0d0d')
+    expect(PRESETS.cartapel.light.page).toBe('#f9f9f7')
   })
 
   it('keeps zero brand colors in the lib (no amber, no chrome tokens)', () => {
-    for (const mode of [PRESETS.steward.light, PRESETS.steward.dark]) {
+    for (const mode of [PRESETS.cartapel.light, PRESETS.cartapel.dark]) {
       const serialized = JSON.stringify(mode).toLowerCase()
       expect(serialized).not.toContain('ff8c00')
       expect(serialized).not.toContain('hsl(33')
@@ -22,11 +22,11 @@ describe('theme presets', () => {
     }
   })
 
-  it('maps unknown / legacy preset names to the steward base', () => {
-    expect(presetOf('legacy')).toBe('steward')
+  it('maps unknown / legacy preset names to the cartapel base', () => {
+    expect(presetOf('legacy')).toBe('cartapel')
     expect(presetOf('django')).toBe('django')
-    expect(presetOf(null)).toBe('steward')
-    expect(presetOf('anything')).toBe('steward')
+    expect(presetOf(null)).toBe('cartapel')
+    expect(presetOf('anything')).toBe('cartapel')
   })
 
   it('applies accent / accent_btn shorthand to both modes', () => {
@@ -39,7 +39,7 @@ describe('theme presets', () => {
 
   it('paints brand chrome tokens purely from config overrides', () => {
     const cfg = {
-      preset: 'steward',
+      preset: 'cartapel',
       light: { band: 'hsl(220 30% 7%)', 'accent-btn-ink': 'hsl(220 30% 7%)' },
       dark: { band: 'hsl(220 38% 4%)', 'accent-btn-ink': 'hsl(220 30% 7%)' },
     }

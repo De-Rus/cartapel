@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-pub const COOKIE: &str = "steward_session";
+pub const COOKIE: &str = "cartapel_session";
 const LOGIN_WINDOW: Duration = Duration::from_secs(900);
 const LOGIN_MAX_FAILS: u32 = 10;
 
@@ -42,7 +42,7 @@ impl FromRequestParts<Arc<AppState>> for CurrentUser {
         if is_admin {
             if let Some(as_role) = parts
                 .headers
-                .get("x-steward-as-role")
+                .get("x-cartapel-as-role")
                 .and_then(|v| v.to_str().ok())
                 .filter(|r| !r.is_empty() && *r != "admin")
             {
@@ -68,10 +68,10 @@ pub async fn csrf_guard(req: Request, next: Next) -> Result<Response, AppError> 
         *req.method(),
         Method::POST | Method::PATCH | Method::PUT | Method::DELETE
     );
-    if mutating && !req.headers().contains_key("x-steward") {
+    if mutating && !req.headers().contains_key("x-cartapel") {
         return Err(AppError(
             StatusCode::FORBIDDEN,
-            "missing X-Steward header".into(),
+            "missing X-Cartapel header".into(),
         ));
     }
     Ok(next.run(req).await)

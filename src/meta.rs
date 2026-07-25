@@ -36,7 +36,7 @@ pub fn localize(
 ) -> String {
     state
         .cfg()
-        .steward
+        .cartapel
         .locale
         .as_deref()
         .and_then(|l| labels.get(l).cloned())
@@ -674,7 +674,7 @@ pub async fn table_meta(state: &AppState, user: &CurrentUser, table: &str) -> Op
             "search": search_columns(dbt, cfg),
             "filters": filter_meta(state, user, table, dbt, cfg).await,
             "default_sort": default_sort(dbt, cfg),
-            "per_page": cfg.list.per_page.or(state.cfg().steward.per_page).unwrap_or(100),
+            "per_page": cfg.list.per_page.or(state.cfg().cartapel.per_page).unwrap_or(100),
         },
         "display_title": cfg.display.title.clone().unwrap_or_else(|| default_display_title(dbt, &label)),
         "detail": {
@@ -1237,10 +1237,10 @@ pub async fn public_branding_handler(State(state): State<Arc<AppState>>) -> Json
     let cfg = state.cfg();
     Json(json!({
         "brand": state.brand,
-        "brand_logo": cfg.steward.brand_logo,
-        "theme": cfg.steward.theme,
-        "locale": cfg.steward.locale,
-        "strings": cfg.steward.strings,
+        "brand_logo": cfg.cartapel.brand_logo,
+        "theme": cfg.cartapel.theme,
+        "locale": cfg.cartapel.locale,
+        "strings": cfg.cartapel.strings,
         "base_path": state.base_path,
     }))
 }
@@ -1265,14 +1265,14 @@ pub async fn meta_handler(
     let variables = variables_meta(&state, &user).await;
     Ok(Json(json!({
         "brand": state.brand,
-        "brand_logo": cfg.steward.brand_logo,
-        "theme": cfg.steward.theme,
-        "locale": cfg.steward.locale,
-        "strings": cfg.steward.strings,
+        "brand_logo": cfg.cartapel.brand_logo,
+        "theme": cfg.cartapel.theme,
+        "locale": cfg.cartapel.locale,
+        "strings": cfg.cartapel.strings,
         "base_path": state.base_path,
         "tables": tables,
         "nav": nav,
-        "group_nav": cfg.steward.group_nav,
+        "group_nav": cfg.cartapel.group_nav,
         "pages": pages,
         "variables": variables,
         "user": { "email": user.email, "role": user.role },

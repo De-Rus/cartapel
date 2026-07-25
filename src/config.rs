@@ -43,7 +43,7 @@ where
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct StewardConfig {
+pub struct CartapelConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub brand: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -61,7 +61,7 @@ pub struct StewardConfig {
     pub group_nav: Option<String>,
     /// App-level signing root for session cookies. REQUIRED. Supports env
     /// interpolation (`env:NAME` / `${NAME}`); overridden by the
-    /// `STEWARD_SECRET_KEY` env var. When absent everywhere, steward refuses to
+    /// `CARTAPEL_SECRET_KEY` env var. When absent everywhere, cartapel refuses to
     /// start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secret_key: Option<String>,
@@ -103,7 +103,7 @@ pub fn resolve_env(raw: &str) -> Option<String> {
 #[derive(Debug, Clone, Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ThemeConfig {
-    /// Named base theme the frontend ships: "steward" (default) | "django".
+    /// Named base theme the frontend ships: "cartapel" (default) | "django".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preset: Option<String>,
     /// Shorthand accent override (wins over the preset's accent).
@@ -112,7 +112,7 @@ pub struct ThemeConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accent_btn: Option<String>,
     /// Per-mode CSS custom-property overrides (token name → value), applied
-    /// on top of the preset. Keys are steward token names without the `--`
+    /// on top of the preset. Keys are cartapel token names without the `--`
     /// prefix (e.g. `page`, `surface`, `ink`, `accent`).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub light: BTreeMap<String, String>,
@@ -138,7 +138,7 @@ pub struct ThemeConfig {
 pub struct GroupConfig {
     pub label: String,
     /// Per-locale label overrides, e.g. `labels = { es = "Cliente" }` — the
-    /// deployment's `[steward].locale` picks one, `label` is the fallback.
+    /// deployment's `[cartapel].locale` picks one, `label` is the fallback.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub labels: BTreeMap<String, String>,
 
@@ -150,7 +150,7 @@ pub struct GroupConfig {
     pub table_order: Vec<String>,
     /// Sidebar mode for this group: `page` = one nav entry that opens the group's
     /// primary table with its sibling tables as tabs; `expanded` = list every
-    /// table as its own entry. Falls back to `[steward].group_nav`, then `expanded`.
+    /// table as its own entry. Falls back to `[cartapel].group_nav`, then `expanded`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nav: Option<String>,
 }
@@ -268,7 +268,7 @@ pub struct QueriesFile {
 /// `{{name}}`. Its option set is a static `options` list or a read-only `query`
 /// (first column = value, optional second = label). Values reach SQL as bound
 /// parameters (see [`crate::interp`]); an `ident`-typed value names a column/table
-/// and is regex-validated + inlined. See `.claude/plans/steward-grafana-customization.md`.
+/// and is regex-validated + inlined. See `.claude/plans/cartapel-grafana-customization.md`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Variable {
@@ -371,7 +371,7 @@ pub struct VariablesFile {
     pub variables: BTreeMap<String, Variable>,
 }
 
-/// A named external data source. Today only `type = "http"`: steward proxies a
+/// A named external data source. Today only `type = "http"`: cartapel proxies a
 /// server-side GET to `url` (optionally `url/<rest>`), attaching a secret read
 /// from `token_env` under `header` (default `x-admin-token`), and streams the
 /// JSON body back to the page. The secret never reaches the browser.
@@ -454,7 +454,7 @@ pub struct TableConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_plural: Option<String>,
     /// Per-locale label overrides, e.g. `labels = { es = "Cliente" }` — the
-    /// deployment's `[steward].locale` picks one, `label` is the fallback.
+    /// deployment's `[cartapel].locale` picks one, `label` is the fallback.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub labels: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -627,7 +627,7 @@ pub struct FieldConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     /// Per-locale label overrides, e.g. `labels = { es = "Cliente" }` — the
-    /// deployment's `[steward].locale` picks one, `label` is the fallback.
+    /// deployment's `[cartapel].locale` picks one, `label` is the fallback.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub labels: BTreeMap<String, String>,
 
@@ -975,7 +975,7 @@ fn is_true(b: &bool) -> bool {
 pub struct ActionConfig {
     pub label: String,
     /// Per-locale label overrides, e.g. `labels = { es = "Cliente" }` — the
-    /// deployment's `[steward].locale` picks one, `label` is the fallback.
+    /// deployment's `[cartapel].locale` picks one, `label` is the fallback.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub labels: BTreeMap<String, String>,
 
@@ -1171,7 +1171,7 @@ pub enum PanelKind {
 
 #[derive(Debug, Clone, Default)]
 pub struct ConfigDir {
-    pub steward: StewardConfig,
+    pub cartapel: CartapelConfig,
     pub auth: AuthConfig,
     pub dashboard: DashboardConfig,
     pub tables: BTreeMap<String, TableConfig>,
@@ -1197,7 +1197,7 @@ impl ConfigDir {
     /// The presentation label of a folder-group, by its folder slug.
     pub fn group_label(&self, slug: &str) -> Option<String> {
         self.groups.iter().find(|g| g.slug == slug).map(|g| {
-            self.steward
+            self.cartapel
                 .locale
                 .as_deref()
                 .and_then(|l| g.labels.get(l).cloned())
@@ -1315,7 +1315,7 @@ pub(crate) fn validate_panel_fields(widgets: &[PanelConfig]) -> Result<(), Strin
     Ok(())
 }
 
-/// The reserved top-level folder holding the globals (`steward.hcl`, `auth.hcl`,
+/// The reserved top-level folder holding the globals (`cartapel.hcl`, `auth.hcl`,
 /// `dashboard.hcl`) and shared `widgets/` assets — never a screen/group.
 pub const RESERVED_DIR: &str = "config";
 
@@ -1352,7 +1352,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
         let in_base = under_base && parent.file_name().is_some_and(|n| n == RESERVED_DIR);
         if under_base {
             match stem.as_str() {
-                "steward" if in_base => cfg.steward = hcl::from_str(&raw).map_err(ctx)?,
+                "cartapel" if in_base => cfg.cartapel = hcl::from_str(&raw).map_err(ctx)?,
                 "auth" if in_base => cfg.auth = hcl::from_str(&raw).map_err(ctx)?,
                 "dashboard" if in_base => {
                     let dc: DashboardConfig = hcl::from_str(&raw).map_err(ctx)?;
@@ -1362,7 +1362,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                 }
                 _ => {
                     return Err(format!(
-                        "misplaced config in reserved config folder: {} — config holds only steward.hcl, auth.hcl, dashboard.hcl and the widgets/ assets",
+                        "misplaced config in reserved config folder: {} — config holds only cartapel.hcl, auth.hcl, dashboard.hcl and the widgets/ assets",
                         path.display()
                     ));
                 }
@@ -1620,11 +1620,11 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
             }
         }
     }
-    // steward.hcl's central `source` blocks join the registry (dup-checked vs sources.hcl).
-    for (name, s) in cfg.steward.sources.clone() {
+    // cartapel.hcl's central `source` blocks join the registry (dup-checked vs sources.hcl).
+    for (name, s) in cfg.cartapel.sources.clone() {
         if let Some(prev) = source_files.get(&name) {
             return Err(format!(
-                "duplicate source \"{name}\": {} and steward.hcl",
+                "duplicate source \"{name}\": {} and cartapel.hcl",
                 prev.display()
             ));
         }
@@ -2032,35 +2032,35 @@ panel {
     }
 
     #[test]
-    fn steward_globals_round_trip() {
-        let sc: StewardConfig = hcl::from_str(
+    fn cartapel_globals_round_trip() {
+        let sc: CartapelConfig = hcl::from_str(
             r#"
 brand = "acme"
 per_page = 100
 
 theme {
-  preset = "steward"
+  preset = "cartapel"
   light  = { page = "hsl(1)" }
 }
 
 source "main" {
   type    = "postgres"
-  url     = "env:STEWARD_DB"
+  url     = "env:CARTAPEL_DB"
   schemas = ["markets", "marketplace"]
   primary = true
 }
 "#,
         )
-        .expect("parse steward");
+        .expect("parse cartapel");
         let src = sc.sources.get("main").expect("main source");
         assert!(src.primary && src.is_postgres());
         assert_eq!(src.schemas, vec!["markets", "marketplace"]);
         let out = hcl::to_string(&sc).unwrap();
-        let sc2: StewardConfig = hcl::from_str(&out).unwrap();
+        let sc2: CartapelConfig = hcl::from_str(&out).unwrap();
         assert_eq!(
             serde_json::to_value(&sc).unwrap(),
             serde_json::to_value(&sc2).unwrap(),
-            "steward globals round-trip",
+            "cartapel globals round-trip",
         );
     }
 
@@ -2325,7 +2325,7 @@ panel {
             groups, 10,
             "one _group.hcl per folder (9 groups + Overview)"
         );
-        for g in ["steward", "auth", "dashboard"] {
+        for g in ["cartapel", "auth", "dashboard"] {
             assert!(
                 files.iter().any(|p| p.file_stem().unwrap() == g
                     && p.parent().unwrap().file_name().unwrap() == "config"),
@@ -2443,7 +2443,7 @@ panel {
     /// folder is a group (has `_group.hcl`), else the page is ungrouped.
     #[test]
     fn page_slug_and_group_are_folder_derived() {
-        let root = std::env::temp_dir().join(format!("steward-page-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("cartapel-page-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let grouped = root.join("foo");
         std::fs::create_dir_all(grouped.join("bar")).unwrap();
@@ -2557,7 +2557,7 @@ panel {
         use std::sync::atomic::{AtomicU32, Ordering};
         static SEQ: AtomicU32 = AtomicU32::new(0);
         let n = SEQ.fetch_add(1, Ordering::SeqCst);
-        let root = std::env::temp_dir().join(format!("steward-{tag}-{}-{n}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("cartapel-{tag}-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         root
@@ -2592,7 +2592,7 @@ panel {
             let root = fresh_root(tag);
             std::fs::create_dir_all(root.join("config")).unwrap();
             std::fs::write(
-                root.join("config").join("steward.hcl"),
+                root.join("config").join("cartapel.hcl"),
                 "source \"main\" {\n  type = \"postgres\"\n  url = \"env:X\"\n  primary = true\n}\nsource \"metrics\" {\n  type = \"http\"\n  url = \"http://x\"\n}\n",
             )
             .unwrap();
@@ -2636,7 +2636,7 @@ panel {
         let root = fresh_root("base-folder");
         let base = root.join("config");
         std::fs::create_dir_all(base.join("widgets")).unwrap();
-        std::fs::write(base.join("steward.hcl"), "brand = \"Acme\"\n").unwrap();
+        std::fs::write(base.join("cartapel.hcl"), "brand = \"Acme\"\n").unwrap();
         std::fs::write(base.join("auth.hcl"), "role \"ops\" {}\n").unwrap();
         std::fs::write(
             base.join("dashboard.hcl"),
@@ -2650,11 +2650,11 @@ panel {
         .unwrap();
 
         let cfg = load(Some(&root)).expect("globals load from config");
-        assert_eq!(cfg.steward.brand.as_deref(), Some("Acme"));
+        assert_eq!(cfg.cartapel.brand.as_deref(), Some("Acme"));
         assert!(cfg.auth.roles.contains_key("ops"));
         assert_eq!(cfg.dashboard.widgets.len(), 1);
         assert!(
-            !cfg.tables.contains_key("steward"),
+            !cfg.tables.contains_key("cartapel"),
             "config globals are never tables"
         );
         assert!(cfg.groups.is_empty(), "config is never a sidebar group");
@@ -2922,7 +2922,7 @@ panel {
     }
 
     // ---- one-shot TOML -> HCL converter (run explicitly) --------------------
-    // `cargo test -p steward convert_admin_toml_to_hcl -- --ignored --nocapture`
+    // `cargo test -p cartapel convert_admin_toml_to_hcl -- --ignored --nocapture`
     // Parses each admin/*.toml, renames the container keys HCL spells differently,
     // emits pretty labeled-block HCL, and PROVES equivalence by reparsing the HCL,
     // inverse-renaming, and comparing (number/default-normalized) to the original
@@ -2954,7 +2954,7 @@ panel {
         // (hcl_singular, toml_plural)
         fn pairs(stem: &str) -> Vec<(&'static str, &'static str)> {
             match stem {
-                "steward" => vec![("page", "pages"), ("query", "queries"), ("group", "groups")],
+                "cartapel" => vec![("page", "pages"), ("query", "queries"), ("group", "groups")],
                 "auth" => vec![("role", "roles")],
                 "dashboard" => vec![("widget", "widgets")],
                 _ => vec![
@@ -3007,7 +3007,7 @@ panel {
         }
         fn to_hcl(stem: &str, v: &Value) -> String {
             match stem {
-                "steward" => hcl::to_string(&de::<StewardConfig>(v)),
+                "cartapel" => hcl::to_string(&de::<CartapelConfig>(v)),
                 "auth" => hcl::to_string(&de::<AuthConfig>(v)),
                 "dashboard" => hcl::to_string(&de::<DashboardConfig>(v)),
                 _ => hcl::to_string(&de::<TableConfig>(v)),
@@ -3016,8 +3016,8 @@ panel {
         }
         fn reparse(stem: &str, text: &str) -> Value {
             match stem {
-                "steward" => {
-                    serde_json::to_value(hcl::from_str::<StewardConfig>(text).unwrap()).unwrap()
+                "cartapel" => {
+                    serde_json::to_value(hcl::from_str::<CartapelConfig>(text).unwrap()).unwrap()
                 }
                 "auth" => serde_json::to_value(hcl::from_str::<AuthConfig>(text).unwrap()).unwrap(),
                 "dashboard" => {

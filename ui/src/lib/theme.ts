@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 export type ThemeMode = 'system' | 'light' | 'dark'
 export type Density = 'comfortable' | 'compact'
 
-const THEME_KEY = 'steward.theme'
-const DENSITY_KEY = 'steward.density'
+const THEME_KEY = 'cartapel.theme'
+const DENSITY_KEY = 'cartapel.density'
 
 function readTheme(): ThemeMode {
   const v = localStorage.getItem(THEME_KEY)

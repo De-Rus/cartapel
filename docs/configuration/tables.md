@@ -22,7 +22,7 @@ label        = "product"           # singular label
 label_plural = "Products"          # plural label (nav + list heading)
 
 labels        = { es = "producto" }   # per-locale overrides; the instance
-labels_plural = { es = "Productos" }  #   [steward] `locale` picks one
+labels_plural = { es = "Productos" }  #   [cartapel] `locale` picks one
 
 from {                             # serve from another postgres source/schema
   source = "replica"               #   (an unknown or non-postgres source is
@@ -41,7 +41,7 @@ field  "col" { … }      # per-column widget & presentation (repeatable)
 action "name" { … }     # bulk actions (repeatable)
 ```
 
-Everything below is optional; leave a block out and steward uses a sensible
+Everything below is optional; leave a block out and cartapel uses a sensible
 introspected default.
 
 ## `list { }` — the list view
@@ -94,7 +94,7 @@ display {
 
 `title` is a template with `{column}` placeholders, used wherever a single
 record needs a human label (detail heading, breadcrumbs, inline row labels).
-Omit it and steward picks a name-ish text column (`name`, `title`, `email`, `username`, …) when one exists; otherwise the title is `Label #pk` ("Subscription #8"), never a bare id.
+Omit it and cartapel picks a name-ish text column (`name`, `title`, `email`, `username`, …) when one exists; otherwise the title is `Label #pk` ("Subscription #8"), never a bare id.
 
 ## `edit { }` — read-only columns
 
@@ -203,8 +203,8 @@ action "deactivate" {
 - **`update`** runs a single parameterized `UPDATE … SET … WHERE pk IN (…)`.
 - **`delete`** deletes the selected rows.
 - **`webhook`** POSTs the selected primary keys to `url` — an escape hatch into
-  your real backend. Signed with `X-Steward-Signature` (HMAC-SHA256) when
-  `STEWARD_WEBHOOK_SECRET` is set. See [Security](/security#webhook-actions).
+  your real backend. Signed with `X-Cartapel-Signature` (HMAC-SHA256) when
+  `CARTAPEL_WEBHOOK_SECRET` is set. See [Security](/security#webhook-actions).
 
 Which roles may invoke an action is controlled in `config/auth.hcl` via the role's
 `actions` list, entries of the form `"<table>.<action>"`.

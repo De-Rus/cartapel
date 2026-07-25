@@ -1,6 +1,6 @@
-# Contributing to steward
+# Contributing to cartapel
 
-Thanks for your interest! steward is a single Rust binary (axum + sqlx) that
+Thanks for your interest! cartapel is a single Rust binary (axum + sqlx) that
 embeds a React/Vite SPA and serves a Postgres admin panel.
 
 ## Project layout
@@ -18,7 +18,7 @@ The SPA is compiled once and embedded, so you build the UI first:
 
 ```bash
 cd ui && pnpm install && pnpm build && cd ..   # produces ui/dist/, required to compile
-cargo build --release                           # → target/release/steward
+cargo build --release                           # → target/release/cartapel
 ```
 
 Fastest way to see it running with data:
@@ -48,7 +48,7 @@ cd ui && pnpm test           # vitest
   with minimal comments** — add a comment only for a genuinely non-obvious *why*
   (an invariant, a race, a workaround), not to restate what the code does.
 - When you touch behavior, add or update a test.
-- If a change affects how steward is configured or run, update `docs/` in the
+- If a change affects how cartapel is configured or run, update `docs/` in the
   same PR.
 
 ## Reporting bugs / requesting features

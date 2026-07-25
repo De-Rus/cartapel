@@ -1,9 +1,9 @@
 {
-  "name": "steward-docs",
+  "name": "cartapel-docs",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Documentation site for steward",
+  "description": "Documentation site for cartapel",
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",

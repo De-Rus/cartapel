@@ -5,9 +5,9 @@ export interface ThemePreset {
   dark: ThemeTokens
 }
 
-export type PresetName = 'steward' | 'django'
+export type PresetName = 'cartapel' | 'django'
 
-const steward: ThemePreset = {
+const cartapel: ThemePreset = {
   dark: {
     page: '#0d0d0d',
     surface: '#1a1a19',
@@ -167,10 +167,10 @@ const django: ThemePreset = {
   },
 }
 
-export const PRESETS: Record<PresetName, ThemePreset> = { steward, django }
+export const PRESETS: Record<PresetName, ThemePreset> = { cartapel, django }
 
 export function presetOf(name: string | null | undefined): PresetName {
-  return name === 'django' ? 'django' : 'steward'
+  return name === 'django' ? 'django' : 'cartapel'
 }
 
 export function resolveTheme(cfg: ThemeConfig): ThemePreset {
@@ -211,7 +211,7 @@ export function themeCss(cfg: ThemeConfig): string {
   ].join('')
 }
 
-const STYLE_ID = 'steward-theme-vars'
+const STYLE_ID = 'cartapel-theme-vars'
 
 export function applyThemeConfig(cfg?: ThemeConfig | null): void {
   if (!cfg) return

@@ -1,17 +1,17 @@
-# steward
+# cartapel
 
-[![CI](https://github.com/De-Rus/steward/actions/workflows/ci.yml/badge.svg)](https://github.com/De-Rus/steward/actions/workflows/ci.yml)
+[![CI](https://github.com/De-Rus/cartapel/actions/workflows/ci.yml/badge.svg)](https://github.com/De-Rus/cartapel/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/tag/De-Rus/steward?label=release&sort=semver)](https://github.com/De-Rus/steward/releases)
+[![Release](https://img.shields.io/github/v/tag/De-Rus/cartapel?label=release&sort=semver)](https://github.com/De-Rus/cartapel/releases)
 
 Point a single binary at your existing Postgres and get a Django-admin-quality
 panel. No framework, no ORM, no Node runtime — your database schema is the
 source of truth, and customization is code you version, not a GUI you click.
 
-**[▶ Live demo](https://steward-demo-derus.fly.dev)** (log in with `demo` / `demo`) · **[📖 Docs](https://de-rus.github.io/steward/)** · **[🚀 Deploy to Render](https://render.com/deploy?repo=https://github.com/De-Rus/steward)**
+**[▶ Live demo](https://cartapel-demo-derus.fly.dev)** (log in with `demo` / `demo`) · **[📖 Docs](https://de-rus.github.io/cartapel/)** · **[🚀 Deploy to Render](https://render.com/deploy?repo=https://github.com/De-Rus/cartapel)**
 
 ```bash
-git clone https://github.com/De-Rus/steward && cd steward
+git clone https://github.com/De-Rus/cartapel && cd cartapel
 docker compose up            # → populated demo on http://localhost:8686/admin
 ```
 
@@ -26,7 +26,7 @@ docker compose up            # → populated demo on http://localhost:8686/admin
   curates), field widgets,
   readonly/masked fields, inline child tables, bulk actions (declarative
   `UPDATE`s or HMAC-signed webhooks into your real backend).
-- **Auth, roles, audit**: built-in users/sessions (stored in steward's own
+- **Auth, roles, audit**: built-in users/sessions (stored in cartapel's own
   SQLite file — your database is never written to unless you edit a row),
   per-table/per-field/row-level permissions, and an audit log of every write
   with before/after diffs — **audited field edits revert in one click**
@@ -48,7 +48,7 @@ docker compose up            # → populated demo on http://localhost:8686/admin
 ## Try the demo
 
 A self-contained "Acme" dataset (customers, products, orders, subscriptions)
-with a ready-made config, so you can click around before pointing steward at
+with a ready-made config, so you can click around before pointing cartapel at
 your own database:
 
 ```bash
@@ -57,33 +57,33 @@ docker compose up
 
 Then open **http://localhost:8686/admin** and log in with `demo` / `demo`.
 The stack is `db` (Postgres, auto-seeded from
-[`demo/seed.sql`](demo/seed.sql)) + `steward` (built from this repo, config in
+[`demo/seed.sql`](demo/seed.sql)) + `cartapel` (built from this repo, config in
 [`demo/admin/`](demo/admin/)). Nothing is written to your machine outside the
 containers; `docker compose down -v` removes everything.
 
 ## Point it at your own database
 
-steward is config-first: a table appears only once you give it a `.hcl` file,
-and the database it reads is declared as a `source`. A minimal `config/steward.hcl`:
+cartapel is config-first: a table appears only once you give it a `.hcl` file,
+and the database it reads is declared as a `source`. A minimal `config/cartapel.hcl`:
 
 ```hcl
 source "main" {
   type    = "postgres"
-  url     = "env:STEWARD_DB"   # or a literal postgres:// url
+  url     = "env:CARTAPEL_DB"   # or a literal postgres:// url
   primary = true
 }
 ```
 
 ```bash
-export STEWARD_DB=postgres://user:pass@host:5432/mydb
-export STEWARD_SECRET_KEY=$(openssl rand -hex 32)
-export STEWARD_ADMIN_EMAIL=you@example.com STEWARD_ADMIN_PASSWORD=change-me
-steward serve \
-  --config ./admin --data ./steward-data \
+export CARTAPEL_DB=postgres://user:pass@host:5432/mydb
+export CARTAPEL_SECRET_KEY=$(openssl rand -hex 32)
+export CARTAPEL_ADMIN_EMAIL=you@example.com CARTAPEL_ADMIN_PASSWORD=change-me
+cartapel serve \
+  --config ./admin --data ./cartapel-data \
   --listen 0.0.0.0:8686
 ```
 
-`--db postgres://…` / `STEWARD_DB` overrides the primary source's URL, so the
+`--db postgres://…` / `CARTAPEL_DB` overrides the primary source's URL, so the
 same config runs against staging or prod by swapping one env var. The panel is
 served under **`/admin`** by default — change it with `--base-path /other`, or
 `--base-path ''` (or `/`) to serve at the domain root. The mount prefix is
@@ -95,7 +95,7 @@ with no rebuild.
 ```
 admin/
 ├── config/                   # reserved — globals, never a sidebar group
-│   ├── steward.hcl          #   brand, defaults, the `main` postgres source
+│   ├── cartapel.hcl          #   brand, defaults, the `main` postgres source
 │   ├── auth.hcl             #   roles, field masking, row-level filters
 │   └── dashboard.hcl        #   home widgets (SQL stat tiles, charts, tables)
 └── screens/                  # every table and page lives here
@@ -112,7 +112,7 @@ admin/
 ```
 
 `config/` is never a sidebar group and is never scanned for tables — it holds
-only the three globals (`steward.hcl`/`auth.hcl`/`dashboard.hcl`).
+only the three globals (`cartapel.hcl`/`auth.hcl`/`dashboard.hcl`).
 
 Under `screens/`, each folder is a sidebar group carrying a `_group.hcl`
 (`label`, `icon`, `order`); groups sort by `order` then `label`. Inside a group,
@@ -166,7 +166,7 @@ action "deactivate" {
 
 ```bash
 cd ui && pnpm install && pnpm build && cd ..   # SPA, embedded into the binary
-cargo build --release                          # → target/release/steward
+cargo build --release                          # → target/release/cartapel
 ```
 
 ## Security model
@@ -174,10 +174,10 @@ cargo build --release                          # → target/release/steward
 - Session cookies (HttpOnly, SameSite=Lax) are HMAC-SHA256-signed with the
   app secret key; a tampered or unsigned cookie is treated as no session.
   The signature is verified before any DB session lookup.
-- **Secret key** — steward's signing/encryption root. **REQUIRED**: steward
+- **Secret key** — cartapel's signing/encryption root. **REQUIRED**: cartapel
   refuses to start without it. Resolved at startup by precedence:
-  `STEWARD_SECRET_KEY` env → `[steward].secret_key` in `config/steward.hcl`
-  (env-interpolated, e.g. `secret_key = "env:STEWARD_SECRET_KEY"`). Prefer the
+  `CARTAPEL_SECRET_KEY` env → `[cartapel].secret_key` in `config/cartapel.hcl`
+  (env-interpolated, e.g. `secret_key = "env:CARTAPEL_SECRET_KEY"`). Prefer the
   env var or `${...}` interpolation — never commit a literal key to config.
   Rotating the key invalidates all existing sessions (users re-login once).
 - Passwords are argon2id; login is rate-limited per IP.
@@ -188,7 +188,7 @@ cargo build --release                          # → target/release/steward
   value is a bound parameter. Raw-SQL fragments exist only in your config
   files, which live in your repo and are trusted like code.
 - Dashboard SQL runs in `READ ONLY` transactions with a statement timeout.
-- Webhook actions are signed (`X-Steward-Signature`, HMAC-SHA256 with
-  `STEWARD_WEBHOOK_SECRET`).
+- Webhook actions are signed (`X-Cartapel-Signature`, HMAC-SHA256 with
+  `CARTAPEL_WEBHOOK_SECRET`).
 
 MIT licensed.

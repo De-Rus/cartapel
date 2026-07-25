@@ -1,17 +1,17 @@
 ---
-description: "Run steward in your team's language — built-in UI locales, per-string overrides, and per-locale labels for your own tables and fields."
+description: "Run cartapel in your team's language — built-in UI locales, per-string overrides, and per-locale labels for your own tables and fields."
 ---
 
 # Localization
 
-Two independent layers localize a panel: the **chrome** (steward's own UI —
+Two independent layers localize a panel: the **chrome** (cartapel's own UI —
 buttons, menus, empty states) and your **data labels** (table, field, group and
 action names, which come from your config).
 
 ## Basics: the UI language
 
 ```hcl
-# config/steward.hcl
+# config/cartapel.hcl
 locale = "en"     # "es" (default) | "en"
 ```
 

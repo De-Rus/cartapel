@@ -216,7 +216,7 @@ export function useQueries(api: WidgetApi | undefined, names: string[], opts: Fe
   return out
 }
 
-/** Read rows from a steward-configured table with the backend's list API:
+/** Read rows from a cartapel-configured table with the backend's list API:
  *  `useTable(api, "bots", { pp: 50, sort: "-id", filters: { status: "running" } })`. */
 export interface TableOpts extends FetchOpts { page?: number; pp?: number; sort?: string; q?: string; filters?: Record<string, string | number> }
 export function useTable(api: WidgetApi | undefined, table: string, opts: TableOpts = {}) {
@@ -235,13 +235,13 @@ const META_FORMAT: Record<string, Col['format']> = {
   bytes: 'bytes', duration: 'dur', dur: 'dur', date: 'date', datetime: 'datetime', rel: 'rel',
 }
 
-/** The meta descriptor of a steward-configured table (columns, list, pk). */
+/** The meta descriptor of a cartapel-configured table (columns, list, pk). */
 export function useMetaTable(api: WidgetApi | undefined, slug: string): any {
   const { data } = useFetch(api, 'meta')
   return ((data as any)?.tables ?? []).find((t: any) => t.name === slug) ?? null
 }
 
-/** Render a steward-configured table by its slug — the SAME columns, labels,
+/** Render a cartapel-configured table by its slug — the SAME columns, labels,
  *  formats and drill-down a `<slug>.hcl` describes, embeddable in any custom page:
  *  `<${AdminTable} api=${api} slug="bots" pp=${25} sort="-created" />`. This is the
  *  bridge that lets a screen mix auto-tables with bespoke `sx` UI. */
@@ -301,7 +301,7 @@ export function hrefFor(link: string | ((row: any) => string), row: any): string
   return withBase(path)
 }
 
-/** SPA-navigate to a steward path: `nav("bots/42")` opens that row's detail view. */
+/** SPA-navigate to a cartapel path: `nav("bots/42")` opens that row's detail view. */
 export function nav(path: string) {
   const to = withBase(path)
   window.history.pushState(null, '', to)
@@ -585,7 +585,7 @@ export function Page(p: { title: any; sub?: any; actions?: any; loading?: boolea
 export const components: Record<string, ComponentType<any>> = {}
 export const define = (name: string, C: ComponentType<any>) => { components[name] = C }
 
-/** Register a custom page as a Preact component. steward mounts `sx-page-<slug>`;
+/** Register a custom page as a Preact component. cartapel mounts `sx-page-<slug>`;
  *  the component receives `{ api }` and re-renders reactively. */
 const pageRegistry: Record<string, ComponentType<any>> = {}
 

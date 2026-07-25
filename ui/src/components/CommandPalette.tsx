@@ -27,7 +27,7 @@ function frecency(r: RecentItem): number {
   return (r.n ?? 1) / (1 + ageDays)
 }
 
-const RECENT_KEY = 'steward.recent'
+const RECENT_KEY = 'cartapel.recent'
 
 export function pushRecent(item: RecentItem): void {
   try {

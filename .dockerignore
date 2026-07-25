@@ -1,7 +1,7 @@
 target
 ui/node_modules
 ui/dist
-steward-data
+cartapel-data
 .git
 *.db
 *.db-wal

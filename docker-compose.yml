@@ -1,4 +1,4 @@
-# One command → a populated steward demo:
+# One command → a populated cartapel demo:
 #   docker compose up
 # then open http://localhost:8686 and log in with the credentials below.
 services:
@@ -16,20 +16,20 @@ services:
       timeout: 3s
       retries: 20
 
-  steward:
+  cartapel:
     build: .
     depends_on:
       db:
         condition: service_healthy
     environment:
-      STEWARD_DB: postgres://acme:acme@db:5432/acme
-      STEWARD_CONFIG: /demo/admin
-      STEWARD_BASE_PATH: /admin
-      STEWARD_SECRET_KEY: demo-secret-not-for-production
-      STEWARD_SECURE_COOKIES: "false"
+      CARTAPEL_DB: postgres://acme:acme@db:5432/acme
+      CARTAPEL_CONFIG: /demo/admin
+      CARTAPEL_BASE_PATH: /admin
+      CARTAPEL_SECRET_KEY: demo-secret-not-for-production
+      CARTAPEL_SECURE_COOKIES: "false"
       # Public read-mostly demo user (view everything + safe curated actions).
-      STEWARD_ADMIN_EMAIL: demo
-      STEWARD_ADMIN_PASSWORD: demo
-      STEWARD_ADMIN_ROLE: demo
+      CARTAPEL_ADMIN_EMAIL: demo
+      CARTAPEL_ADMIN_PASSWORD: demo
+      CARTAPEL_ADMIN_ROLE: demo
     ports:
       - "8686:8686"

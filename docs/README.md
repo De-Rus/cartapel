@@ -1,6 +1,6 @@
-# steward documentation
+# cartapel documentation
 
-These Markdown files are the **source of truth** for steward's documentation. A
+These Markdown files are the **source of truth** for cartapel's documentation. A
 [VitePress](https://vitepress.dev) site renders them into the published docs;
 the prose lives here so it can be reviewed, diffed, and versioned like any other
 part of the codebase.
@@ -11,7 +11,7 @@ part of the codebase.
 docs/
 ├── index.md                    # landing page / pitch / 60-second quickstart
 ├── getting-started.md          # install, first run, bootstrap admin
-├── cli.md                      # steward serve / user add flags + env vars
+├── cli.md                      # cartapel serve / user add flags + env vars
 ├── architecture.md             # the self-contained bundle, SQLite state, hot-reload
 ├── roles-and-permissions.md    # config/auth.hcl, the permission matrix
 ├── security.md                 # secret key, masking, row filters, path confinement
@@ -44,5 +44,5 @@ root) works too.
 
 `.github/workflows/docs.yml` builds this site and deploys it to GitHub Pages on
 every push to `main` that touches `docs/**` — live at
-<https://de-rus.github.io/steward/>. The site is built with `base: '/steward/'`
+<https://de-rus.github.io/cartapel/>. The site is built with `base: '/cartapel/'`
 (overridable via the `DOCS_BASE` env var for a custom domain).

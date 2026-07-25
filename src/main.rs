@@ -32,7 +32,7 @@ use std::sync::Arc;
 
 #[derive(Parser)]
 #[command(
-    name = "steward",
+    name = "cartapel",
     version,
     about = "Admin panel for your existing Postgres — one binary, code-first config."
 )]
@@ -46,25 +46,25 @@ enum Command {
     /// Run the admin server
     Serve {
         /// Postgres connection URL. Falls back to the primary `source` url in
-        /// config/steward.hcl (which supports `env:NAME` / `${NAME}`).
-        #[arg(long, env = "STEWARD_DB")]
+        /// config/cartapel.hcl (which supports `env:NAME` / `${NAME}`).
+        #[arg(long, env = "CARTAPEL_DB")]
         db: Option<String>,
         /// Postgres schema to introspect. Falls back to the primary source's `schemas`.
-        #[arg(long, env = "STEWARD_SCHEMA")]
+        #[arg(long, env = "CARTAPEL_SCHEMA")]
         schema: Option<String>,
         /// Directory of HCL config files
-        #[arg(long, env = "STEWARD_CONFIG")]
+        #[arg(long, env = "CARTAPEL_CONFIG")]
         config: Option<PathBuf>,
-        /// Directory for steward's own state (users, sessions, audit)
-        #[arg(long, env = "STEWARD_DATA", default_value = "./steward-data")]
+        /// Directory for cartapel's own state (users, sessions, audit)
+        #[arg(long, env = "CARTAPEL_DATA", default_value = "./cartapel-data")]
         data: PathBuf,
         /// URL prefix the panel is served under; injected into the SPA at runtime.
-        #[arg(long, env = "STEWARD_BASE_PATH", default_value = "/admin")]
+        #[arg(long, env = "CARTAPEL_BASE_PATH", default_value = "/admin")]
         base_path: String,
-        #[arg(long, env = "STEWARD_LISTEN", default_value = "127.0.0.1:8686")]
+        #[arg(long, env = "CARTAPEL_LISTEN", default_value = "127.0.0.1:8686")]
         listen: String,
         /// Set Secure on session cookies. On behind HTTPS; pass --secure-cookies=false for local http.
-        #[arg(long, env = "STEWARD_SECURE_COOKIES", action = clap::ArgAction::Set, default_value_t = true)]
+        #[arg(long, env = "CARTAPEL_SECURE_COOKIES", action = clap::ArgAction::Set, default_value_t = true)]
         secure_cookies: bool,
     },
     /// Manage panel users
@@ -75,14 +75,14 @@ enum Command {
     /// Validate a config directory (optionally cross-checked against a live
     /// database). Exit 0 = valid; exit 1 with the errors otherwise — CI-ready.
     Check {
-        #[arg(long, env = "STEWARD_CONFIG")]
+        #[arg(long, env = "CARTAPEL_CONFIG")]
         config: PathBuf,
         /// When given, every configured table is verified to exist in the
         /// introspected schema(s), and list/search/filter/sort columns are
         /// verified to be real columns.
-        #[arg(long, env = "STEWARD_DB")]
+        #[arg(long, env = "CARTAPEL_DB")]
         db: Option<String>,
-        #[arg(long, env = "STEWARD_SCHEMA")]
+        #[arg(long, env = "CARTAPEL_SCHEMA")]
         schema: Option<String>,
     },
 }
@@ -94,20 +94,20 @@ enum UserCommand {
         email: String,
         #[arg(long, default_value = "admin")]
         role: String,
-        #[arg(long, env = "STEWARD_PASSWORD")]
+        #[arg(long, env = "CARTAPEL_PASSWORD")]
         password: Option<String>,
-        #[arg(long, env = "STEWARD_DATA", default_value = "./steward-data")]
+        #[arg(long, env = "CARTAPEL_DATA", default_value = "./cartapel-data")]
         data: PathBuf,
     },
 }
 
-/// Resolve steward's app-level secret to a uniform 32-byte HMAC key.
-/// Precedence: `STEWARD_SECRET_KEY` env → config `steward.secret_key`
+/// Resolve cartapel's app-level secret to a uniform 32-byte HMAC key.
+/// Precedence: `CARTAPEL_SECRET_KEY` env → config `cartapel.secret_key`
 /// (env-interpolated). Each candidate is trimmed and required non-empty;
-/// with none set, steward refuses to start.
+/// with none set, cartapel refuses to start.
 fn resolve_secret_key(
     env: Option<String>,
-    cfg: &config::StewardConfig,
+    cfg: &config::CartapelConfig,
 ) -> Result<[u8; 32], String> {
     let candidate = env
         .as_deref()
@@ -123,14 +123,14 @@ fn resolve_secret_key(
         });
     match candidate {
         Some(s) => Ok(Sha256::digest(s.as_bytes()).into()),
-        None => Err("no SECRET_KEY set — set the STEWARD_SECRET_KEY env var or [steward].secret_key in config/steward.hcl".into()),
+        None => Err("no SECRET_KEY set — set the CARTAPEL_SECRET_KEY env var or [cartapel].secret_key in config/cartapel.hcl".into()),
     }
 }
 
 /// Supabase's transaction-mode pooler (pgbouncer) drops prepared statements
 /// between transactions, so sqlx's statement cache must be disabled or it errors
 /// with "prepared statement already exists". Detected by port 6543, or forced via
-/// STEWARD_DB_TX_POOL=1. The session pooler (5432) keeps the cache on.
+/// CARTAPEL_DB_TX_POOL=1. The session pooler (5432) keeps the cache on.
 fn is_transaction_pooler(db: &str, env_override: bool) -> bool {
     if env_override {
         return true;
@@ -143,7 +143,7 @@ fn is_transaction_pooler(db: &str, env_override: bool) -> bool {
 async fn connect_pg(url: &str) -> sqlx::PgPool {
     let tx_pooler = is_transaction_pooler(
         url,
-        std::env::var("STEWARD_DB_TX_POOL")
+        std::env::var("CARTAPEL_DB_TX_POOL")
             .map(|v| v == "1")
             .unwrap_or(false),
     );
@@ -176,7 +176,7 @@ async fn connect_pg(url: &str) -> sqlx::PgPool {
                 .map(|o| format!("{}:{}", o.get_host(), o.get_port()))
                 .unwrap_or_default();
             die(&format!(
-                "cannot connect to postgres at {host}: {e}\n  · is the database reachable from here?\n  · transaction poolers (e.g. Supabase :6543) are auto-detected; force with STEWARD_DB_TX_POOL=1"
+                "cannot connect to postgres at {host}: {e}\n  · is the database reachable from here?\n  · transaction poolers (e.g. Supabase :6543) are auto-detected; force with CARTAPEL_DB_TX_POOL=1"
             ));
         }
     }
@@ -200,7 +200,7 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "steward=info,tower_http=warn".into()),
+                .unwrap_or_else(|_| "cartapel=info,tower_http=warn".into()),
         )
         .init();
 
@@ -215,7 +215,7 @@ async fn main() {
                     data,
                 },
         } => {
-            let store = store::Store::open(&data).expect("open steward data dir");
+            let store = store::Store::open(&data).expect("open cartapel data dir");
             let (password, generated) = match password {
                 Some(p) => (p, false),
                 None => (gen_password(), true),
@@ -246,7 +246,7 @@ async fn main() {
     }
 }
 
-/// `steward check`: parse + validate the bundle, then (with --db) cross-check
+/// `cartapel check`: parse + validate the bundle, then (with --db) cross-check
 /// every configured table and referenced column against the live schema.
 async fn check(config: &std::path::Path, db: Option<String>, schema: Option<String>) -> i32 {
     let cfg = match config::load(Some(config)) {
@@ -406,10 +406,10 @@ async fn serve(
         .primary_source()
         .map(|(a, s)| (a.to_string(), s.clone()))
     else {
-        die("no primary postgres source — define `source \"main\" { type = \"postgres\" primary = true }` in config/steward.hcl");
+        die("no primary postgres source — define `source \"main\" { type = \"postgres\" primary = true }` in config/cartapel.hcl");
     };
     let Some(db) = db.or_else(|| config::resolve_env(&primary_src.url)) else {
-        die("no database url — pass --db / STEWARD_DB or set the primary source url");
+        die("no database url — pass --db / CARTAPEL_DB or set the primary source url");
     };
     let schemas: Vec<String> = match schema {
         Some(s) => vec![s],
@@ -418,7 +418,7 @@ async fn serve(
     };
     let primary_schema = schemas.first().cloned().unwrap_or_else(|| "public".into());
 
-    let store = store::Store::open(&data).expect("open steward data dir");
+    let store = store::Store::open(&data).expect("open cartapel data dir");
 
     let mut pools: std::collections::HashMap<String, sqlx::PgPool> =
         std::collections::HashMap::new();
@@ -434,14 +434,14 @@ async fn serve(
     let pg = pools[&primary_alias].clone();
     if store.user_count().unwrap_or(0) == 0 {
         let email =
-            std::env::var("STEWARD_ADMIN_EMAIL").unwrap_or_else(|_| "admin@localhost".into());
-        let (password, generated) = match std::env::var("STEWARD_ADMIN_PASSWORD") {
+            std::env::var("CARTAPEL_ADMIN_EMAIL").unwrap_or_else(|_| "admin@localhost".into());
+        let (password, generated) = match std::env::var("CARTAPEL_ADMIN_PASSWORD") {
             Ok(p) if !p.is_empty() => (p, false),
             _ => (gen_password(), true),
         };
         // The bootstrap user is an `admin` by default; a public demo can bootstrap
         // a restricted role instead (e.g. a read-mostly `demo` role from auth.hcl).
-        let role = std::env::var("STEWARD_ADMIN_ROLE")
+        let role = std::env::var("CARTAPEL_ADMIN_ROLE")
             .ok()
             .filter(|r| !r.is_empty())
             .unwrap_or_else(|| "admin".into());
@@ -517,11 +517,11 @@ async fn serve(
     }
 
     let brand = cfg
-        .steward
+        .cartapel
         .brand
         .clone()
-        .unwrap_or_else(|| "steward".into());
-    let secret_key = resolve_secret_key(std::env::var("STEWARD_SECRET_KEY").ok(), &cfg.steward)
+        .unwrap_or_else(|| "cartapel".into());
+    let secret_key = resolve_secret_key(std::env::var("CARTAPEL_SECRET_KEY").ok(), &cfg.cartapel)
         .unwrap_or_else(|e| {
             tracing::error!("{e}");
             std::process::exit(1);
@@ -546,7 +546,7 @@ async fn serve(
             .expect("build http client"),
         secure_cookies,
         secret_key,
-        webhook_secret: std::env::var("STEWARD_WEBHOOK_SECRET")
+        webhook_secret: std::env::var("CARTAPEL_WEBHOOK_SECRET")
             .ok()
             .filter(|s| !s.is_empty()),
         options_cache: Default::default(),
@@ -696,7 +696,7 @@ async fn serve(
     let app = app.layer(tower_http::trace::TraceLayer::new_for_http());
 
     let listener = tokio::net::TcpListener::bind(&listen).await.expect("bind");
-    tracing::info!("steward listening on http://{listen}{}/", base_path);
+    tracing::info!("cartapel listening on http://{listen}{}/", base_path);
 
     let warm_state = state.clone();
     tokio::spawn(async move {
@@ -721,8 +721,8 @@ async fn serve(
 mod secret_tests {
     use super::*;
 
-    fn cfg_with_key(key: Option<&str>) -> config::StewardConfig {
-        config::StewardConfig {
+    fn cfg_with_key(key: Option<&str>) -> config::CartapelConfig {
+        config::CartapelConfig {
             secret_key: key.map(str::to_string),
             ..Default::default()
         }

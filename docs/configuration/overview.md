@@ -4,7 +4,7 @@ description: "The config bundle: layout, globals, sources, environment interpola
 
 # Configuration overview
 
-steward is configured by a directory of [HCL](https://github.com/hashicorp/hcl)
+cartapel is configured by a directory of [HCL](https://github.com/hashicorp/hcl)
 files. The directory is a self-contained bundle — config, roles, dashboards,
 and any custom widget/page code all live inside it — so the whole panel is one
 portable, versionable folder you point `--config` at.
@@ -21,7 +21,7 @@ lives under `screens/`, one folder per navigation group:
 ```
 admin/
 ├── config/                     # reserved — globals + shared assets, never a group
-│   ├── steward.hcl            #   brand, theme, the `main` source, defaults
+│   ├── cartapel.hcl            #   brand, theme, the `main` source, defaults
 │   ├── auth.hcl               #   roles & permissions
 │   ├── dashboard.hcl          #   dashboard widgets
 │   └── widgets/               #   shared custom-widget JS (served at /static)
@@ -61,7 +61,7 @@ tables. It holds exactly three global files plus a `widgets/` asset folder:
 
 | File | Contents |
 | --- | --- |
-| `config/steward.hcl` | Brand, logo, locale, `per_page`, the secret key, `theme { }`, and the `source "…" { }` blocks. |
+| `config/cartapel.hcl` | Brand, logo, locale, `per_page`, the secret key, `theme { }`, and the `source "…" { }` blocks. |
 | `config/auth.hcl` | `role "…" { }` blocks — the permission model. See [Roles & permissions](/roles-and-permissions). |
 | `config/dashboard.hcl` | The home dashboard's `panel { }` blocks. See [Dashboard](/configuration/dashboard). |
 | `config/widgets/*.js` | Shared custom-widget web components, served at `/static/config/widgets/`. See [Pages & queries](/configuration/pages-and-queries). |
@@ -69,7 +69,7 @@ tables. It holds exactly three global files plus a `widgets/` asset folder:
 Putting anything else in `config/` is a loud load error. Folders whose name
 starts with an underscore are never treated as sidebar groups.
 
-## `config/steward.hcl` — globals
+## `config/cartapel.hcl` — globals
 
 ```hcl
 brand      = "Acme Admin"
@@ -78,36 +78,36 @@ per_page   = 100
 locale     = "en"
 
 # The signing secret. Prefer env interpolation over a literal.
-secret_key = "env:STEWARD_SECRET_KEY"
+secret_key = "env:CARTAPEL_SECRET_KEY"
 
 theme {
-  preset = "steward"          # "steward" (default) | "django"
+  preset = "cartapel"          # "cartapel" (default) | "django"
   accent = "hsl(33 100% 50%)"
   mode   = "auto"             # "light" | "dark" | "auto"
 }
 
-# The database steward reads. Exactly one postgres source must be `primary`.
+# The database cartapel reads. Exactly one postgres source must be `primary`.
 source "main" {
   type    = "postgres"
-  url     = "env:STEWARD_DB"   # or a literal postgres:// url
+  url     = "env:CARTAPEL_DB"   # or a literal postgres:// url
   schemas = ["public"]
   primary = true
 }
 ```
 
-Top-level `[steward]` keys:
+Top-level `[cartapel]` keys:
 
 | Key | Type | Description |
 | --- | --- | --- |
-| `brand` | string | Panel name, shown in the header. Defaults to `steward`. |
+| `brand` | string | Panel name, shown in the header. Defaults to `cartapel`. |
 | `brand_logo` | string | Logo URL, data URL, or a bundle asset filename served under `/static/`. |
 | `locale` | string | The instance language — picks the UI dictionary, date/number formatting and per-locale `labels` overrides. See [Localization](/localization). |
 | `strings` | map | Override individual UI strings (`{ "key" = "value" }`). |
 | `per_page` | number | Default list page size (a table's `list.per_page` overrides it). |
 | `group_nav` | string | Default sidebar mode for groups: `expanded` (default — every table is its own entry) or `page` (one entry per group; sibling tables become tabs). A group's own `nav` in `_group.hcl` overrides it. |
-| `secret_key` | string | Session-signing root. Supports `env:`/`${}`. Overridden by `STEWARD_SECRET_KEY`. **Required** somewhere. |
+| `secret_key` | string | Session-signing root. Supports `env:`/`${}`. Overridden by `CARTAPEL_SECRET_KEY`. **Required** somewhere. |
 | `theme { }` | block | Theme preset, accent, per-mode CSS token overrides, logos — see [Theming](/theming). |
-| `source "…" { }` | block | A named data source. The `primary` postgres one is the database steward introspects. |
+| `source "…" { }` | block | A named data source. The `primary` postgres one is the database cartapel introspects. |
 | `disable_sql_preview` | bool | Hardening: disable the dashboard builder's ad-hoc SQL preview (admin-supplied `SELECT`s). Blocks arbitrary read-SQL even for admins. Default `false`. |
 | `disable_webhooks` | bool | Hardening: disable outbound webhook actions (an SSRF surface). Default `false`. |
 
@@ -115,27 +115,27 @@ Top-level `[steward]` keys:
 
 | Key | Description |
 | --- | --- |
-| `preset` | Named base theme: `steward` (default) or `django`. |
+| `preset` | Named base theme: `cartapel` (default) or `django`. |
 | `accent` / `accent_btn` | Shorthand accent overrides (win over the preset). |
-| `light` / `dark` | Per-mode maps of CSS token → value. Keys are steward token names without the `--` prefix (`page`, `surface`, `ink`, `accent`, `good`, `critical`, …). |
+| `light` / `dark` | Per-mode maps of CSS token → value. Keys are cartapel token names without the `--` prefix (`page`, `surface`, `ink`, `accent`, `good`, `critical`, …). |
 | `mode` | Force `light`, `dark`, or `auto` (default). |
 | `logo_light` / `logo_dark` | Per-mode brand logo, overriding `brand_logo` for that mode. |
 
 ### `source "…" { }`
 
 The database is declared as a named source. Define at least one `postgres`
-source and mark it `primary` — that is what steward introspects and serves.
+source and mark it `primary` — that is what cartapel introspects and serves.
 
 | Key | Description |
 | --- | --- |
 | `type` | `"postgres"` for the database, or `"http"` for a read-only JSON source a custom page can call. |
 | `url` | Connection URL (postgres) or endpoint (http). Supports `env:NAME` / `${NAME}`. |
 | `schemas` | List of schemas to introspect (postgres). Defaults to `["public"]`. |
-| `primary` | Marks the postgres source steward introspects. With a single postgres source it is implied; declare it explicitly when you define several. |
+| `primary` | Marks the postgres source cartapel introspects. With a single postgres source it is implied; declare it explicitly when you define several. |
 | `token_env` / `header` | For `http` sources: attach a secret from this env var under `header` (default `x-admin-token`). The secret never reaches the browser. |
 | `roles` | Restrict a source to these roles (non-admins need an explicit match). |
 
-`--db postgres://…` / `STEWARD_DB` overrides the `primary` source's URL, so the
+`--db postgres://…` / `CARTAPEL_DB` overrides the `primary` source's URL, so the
 same bundle can run against dev, staging or prod by swapping one env var.
 
 ## Environment interpolation
@@ -147,11 +147,11 @@ config:
 ```hcl
 source "main" {
   type    = "postgres"
-  url     = "env:STEWARD_DB"
+  url     = "env:CARTAPEL_DB"
   primary = true
 }
 
-secret_key = "${STEWARD_SECRET_KEY}"
+secret_key = "${CARTAPEL_SECRET_KEY}"
 ```
 
 ## Validation & hot-reload
@@ -167,7 +167,7 @@ Config is validated as it loads, and again on every in-app edit:
 - **Named queries must be unique** across the whole bundle.
 
 Config edits **hot-reload** with no restart — both through the in-app builder
-and by editing the files on disk (steward watches the config directory,
+and by editing the files on disk (cartapel watches the config directory,
 debounced). A bad edit can never replace the running config: builder writes are
 trial-parsed first with a failed reload restoring the previous state, and a
 broken on-disk edit keeps the last good config and logs the error.

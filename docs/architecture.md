@@ -1,10 +1,10 @@
 ---
-description: "How steward works inside: one Rust binary, introspection, hot-reloadable HCL config, SQLite app state and the request path."
+description: "How cartapel works inside: one Rust binary, introspection, hot-reloadable HCL config, SQLite app state and the request path."
 ---
 
 # Architecture
 
-steward is deliberately small: one Rust binary, your Postgres, and a directory of
+cartapel is deliberately small: one Rust binary, your Postgres, and a directory of
 config. This page explains how those pieces fit together.
 
 ## The self-contained binary
@@ -17,7 +17,7 @@ The whole product ships in one executable:
 - Everything the panel needs beyond your database is either in the binary or in
   the config bundle.
 
-At startup steward:
+At startup cartapel:
 
 1. Loads and validates the config directory.
 2. Connects to Postgres and **introspects** the configured schema(s) — columns,
@@ -29,11 +29,11 @@ At startup steward:
 
 ## Two databases
 
-steward touches two separate stores, and keeps them strictly apart:
+cartapel touches two separate stores, and keeps them strictly apart:
 
-- **Your Postgres** — the data you administer. steward only ever writes to it in
+- **Your Postgres** — the data you administer. cartapel only ever writes to it in
   response to a user editing a row, running an action, or importing data.
-- **steward's SQLite state** (`--data`) — its own bookkeeping, never mixed into
+- **cartapel's SQLite state** (`--data`) — its own bookkeeping, never mixed into
   your database:
   - **users** — panel accounts (argon2id password hashes).
   - **sessions** — active login sessions.
@@ -41,7 +41,7 @@ steward touches two separate stores, and keeps them strictly apart:
   - **audit_log** — every write, with actor, timestamp and before/after diffs.
   - **config_versions** — the history of config edits (see below).
 
-This separation is the reason steward is safe to point at a production database:
+This separation is the reason cartapel is safe to point at a production database:
 its own state never contaminates yours.
 
 ## The config bundle
@@ -87,7 +87,7 @@ This is admin-only, and every publish is itself audited.
 
 ## The visual builder
 
-steward ships an in-app configuration UI that is a first-class alternative to
+cartapel ships an in-app configuration UI that is a first-class alternative to
 hand-editing HCL. It offers:
 
 - **Table config editors** — list columns, field widgets and params with a live
@@ -118,18 +118,18 @@ Browser ──▶ {base}/api/*        JSON API (auth, meta, rows, config, dashbo
 ```
 
 Every API call carries the signed session cookie; every mutation additionally
-carries the `X-Steward` CSRF header. See [Security](/security).
+carries the `X-Cartapel` CSRF header. See [Security](/security).
 
 ## Runtime mount path — one build, any prefix
 
-`{base}` above is the runtime `--base-path` / `STEWARD_BASE_PATH` (default
+`{base}` above is the runtime `--base-path` / `CARTAPEL_BASE_PATH` (default
 `/admin`, `''` for the domain root). It is **not baked in at build time**: Vite
 builds with `base: '/'` (so the hashed bundle lives at `/assets/…`), and the
 server injects the live prefix into `index.html` at serve time — it replaces a
-placeholder so the SPA reads `window.__STEWARD_BASE__` and threads it through the
+placeholder so the SPA reads `window.__CARTAPEL_BASE__` and threads it through the
 router basename, the API base, and every link. The API and static routes are
 nested under the prefix; `GET /` redirects to it.
 
 The upshot: **one published image serves under any path with no rebuild** — pull
-`ghcr.io/de-rus/steward` and set `STEWARD_BASE_PATH` to `/admin`, `/panel`, or
+`ghcr.io/de-rus/cartapel` and set `CARTAPEL_BASE_PATH` to `/admin`, `/panel`, or
 `''`. See [Deployment](/deployment#base-path-and-mounting).

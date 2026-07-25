@@ -8,6 +8,6 @@ disable_webhooks    = true
 
 source "main" {
   type    = "postgres"
-  url     = "env:STEWARD_DB"
+  url     = "env:CARTAPEL_DB"
   primary = true
 }

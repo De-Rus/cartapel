@@ -221,7 +221,7 @@ actions = ["orders.mark_shipped", "orders.refund", "products.deactivate"]
 
 Admins can manage roles and users from the in-app access screens. Role edits
 write `config/auth.hcl` (atomically, versioned, hot-swapped); users live in
-steward's SQLite state. Guardrails:
+cartapel's SQLite state. Guardrails:
 
 - The builtin `admin` role cannot be edited or deleted — and a new role named
   any casing of it (`Admin`, `ADMIN`) is rejected. Role names are 1–64 chars
@@ -235,7 +235,7 @@ steward's SQLite state. Guardrails:
   the would-be HCL for you to commit.
 
 Users can also be provisioned offline with
-[`steward user add`](/cli#steward-user-add).
+[`cartapel user add`](/cli#cartapel-user-add).
 
 ## View as a role
 

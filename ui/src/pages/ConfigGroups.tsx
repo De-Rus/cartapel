@@ -11,9 +11,9 @@ import { useToast } from '../components/Toast'
 import { IconColumns, IconDots, IconPlus, IconTrash } from '../components/Icons'
 import { IconPicker } from '../components/config/pickers'
 
-const DND_TABLE = 'application/x-steward-table'
-const DND_DISCOVER = 'application/x-steward-discover'
-const DND_COLUMN = 'application/x-steward-column'
+const DND_TABLE = 'application/x-cartapel-table'
+const DND_DISCOVER = 'application/x-cartapel-discover'
+const DND_COLUMN = 'application/x-cartapel-column'
 
 interface Col {
   slug: string

@@ -1,4 +1,4 @@
-const KEY = 'steward-view-as'
+const KEY = 'cartapel-view-as'
 
 export function viewAsRole(): string | null {
   return sessionStorage.getItem(KEY)

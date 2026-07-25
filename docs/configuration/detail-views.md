@@ -14,7 +14,7 @@ The `detail { }` block is entirely optional — it only refines this view.
 
 ## Zero-config
 
-With **no `detail` block at all**, steward already produces a good record view:
+With **no `detail` block at all**, cartapel already produces a good record view:
 
 - the hero shows the title, the first `badge` field, and a copyable id;
 - fields group by their `field { group = … }` tags (or into one "Details" card);
@@ -158,7 +158,7 @@ inlines render.
 
 ### Simple form
 
-List child table names and steward infers the foreign key:
+List child table names and cartapel infers the foreign key:
 
 ```hcl
 relations {

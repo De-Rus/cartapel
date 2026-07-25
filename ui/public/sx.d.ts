@@ -2,7 +2,7 @@
 // available to screen modules (`screen.hcl` with `module = "<name>.tsx"`).
 // Drop this file next to your modules and add to tsconfig / a triple-slash
 // reference for editor autocompletion:  /// <reference path="./sx.d.ts" />
-// Served by every steward instance at {base}/sx.d.ts.
+// Served by every cartapel instance at {base}/sx.d.ts.
 
 type VNode = any
 type ComponentType<P = any> = (props: P) => VNode

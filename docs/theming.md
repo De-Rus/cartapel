@@ -1,11 +1,11 @@
 ---
-description: "Make steward look like your product — presets, accent colors, per-mode design tokens and logos, all from one HCL block."
+description: "Make cartapel look like your product — presets, accent colors, per-mode design tokens and logos, all from one HCL block."
 ---
 
 # Theming
 
-steward ships dark-first with a clean default look, and everything visual is
-overridable from one `theme { }` block in `config/steward.hcl`. No CSS files,
+cartapel ships dark-first with a clean default look, and everything visual is
+overridable from one `theme { }` block in `config/cartapel.hcl`. No CSS files,
 no rebuild — it hot-reloads like the rest of the config.
 
 ## Basics
@@ -17,7 +17,7 @@ brand      = "Acme Admin"
 brand_logo = "logo.svg"        # a bundle asset (served from /static), URL or data URL
 
 theme {
-  preset = "steward"           # "steward" (default) | "django"
+  preset = "cartapel"           # "cartapel" (default) | "django"
   accent = "hsl(33 100% 50%)"  # any CSS color
   mode   = "auto"              # "light" | "dark" | "auto" (default)
 }
@@ -25,7 +25,7 @@ theme {
 
 | Key | What it does |
 | --- | --- |
-| `preset` | Named base theme. `steward` is the default dark look; `django` mimics the classic Django-admin palette. |
+| `preset` | Named base theme. `cartapel` is the default dark look; `django` mimics the classic Django-admin palette. |
 | `accent` | The highlight color — links, active states, focus rings. |
 | `accent_btn` | Primary-button color when you want it different from `accent`. |
 | `mode` | Force `light` or `dark`, or follow the visitor's OS with `auto`. |

@@ -1,7 +1,7 @@
--- Acme — a self-contained demo dataset for steward.
+-- Acme — a self-contained demo dataset for cartapel.
 -- Loaded automatically by the docker-compose demo (mounted into
 -- /docker-entrypoint-initdb.d). FK-rich, with enums, money, timestamps and one
--- secret column so every steward feature has something to show.
+-- secret column so every cartapel feature has something to show.
 
 CREATE TABLE customers (
     id          serial PRIMARY KEY,

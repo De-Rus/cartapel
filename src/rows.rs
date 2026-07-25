@@ -388,7 +388,7 @@ pub async fn list_handler(
             table_config(&state, &table)
                 .list
                 .per_page
-                .or(state.cfg().steward.per_page)
+                .or(state.cfg().cartapel.per_page)
                 .unwrap_or(100)
         })
         .clamp(1, MAX_PP);
@@ -1225,12 +1225,12 @@ pub async fn import_handler(
                 continue;
             }
         };
-        sqlx::query("SAVEPOINT steward_import")
+        sqlx::query("SAVEPOINT cartapel_import")
             .execute(&mut *tx)
             .await?;
         match binds.query(&sql).fetch_optional(&mut *tx).await {
             Ok(Some(row)) => {
-                sqlx::query("RELEASE SAVEPOINT steward_import")
+                sqlx::query("RELEASE SAVEPOINT cartapel_import")
                     .execute(&mut *tx)
                     .await?;
                 if row.get::<bool, _>("inserted") {
@@ -1240,13 +1240,13 @@ pub async fn import_handler(
                 }
             }
             Ok(None) => {
-                sqlx::query("RELEASE SAVEPOINT steward_import")
+                sqlx::query("RELEASE SAVEPOINT cartapel_import")
                     .execute(&mut *tx)
                     .await?;
                 errors.push(json!({ "row": i, "message": "row exists but not permitted" }));
             }
             Err(e) => {
-                sqlx::query("ROLLBACK TO SAVEPOINT steward_import")
+                sqlx::query("ROLLBACK TO SAVEPOINT cartapel_import")
                     .execute(&mut *tx)
                     .await?;
                 let msg = match &e {
@@ -1370,7 +1370,7 @@ pub async fn export_handler(
             header::CONTENT_DISPOSITION,
             format!("attachment; filename=\"{filename}\""),
         )
-        .header("X-Steward-Truncated", truncated.to_string())
+        .header("X-Cartapel-Truncated", truncated.to_string())
         .body(Body::from(body))
         .map_err(|e| AppError::internal(e.to_string()))
 }

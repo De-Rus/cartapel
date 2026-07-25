@@ -94,7 +94,7 @@ pub async fn action_handler(
             .await?
         }
         ActionKind::Webhook => {
-            if state.cfg().steward.disable_webhooks {
+            if state.cfg().cartapel.disable_webhooks {
                 return Err(AppError::forbidden("webhook actions are disabled"));
             }
             let url = action
@@ -126,7 +126,7 @@ pub async fn action_handler(
                     .map_err(|e| AppError::internal(e.to_string()))?;
                 mac.update(&body_bytes);
                 req = req.header(
-                    "x-steward-signature",
+                    "x-cartapel-signature",
                     hex::encode(mac.finalize().into_bytes()),
                 );
             }

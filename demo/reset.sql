@@ -8,6 +8,6 @@
 --   • or an hourly GitHub Action / cron that runs:  psql "$DB" -f demo/reset.sql
 --
 -- Run from the demo/ directory so the \i include resolves:
---   psql "$STEWARD_DB" -v ON_ERROR_STOP=1 -f reset.sql
+--   psql "$CARTAPEL_DB" -v ON_ERROR_STOP=1 -f reset.sql
 DROP TABLE IF EXISTS order_items, orders, subscriptions, products, customers CASCADE;
 \i seed.sql

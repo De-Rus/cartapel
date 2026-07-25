@@ -95,7 +95,7 @@ static DUMMY_HASH: LazyLock<PasswordHash<'static>> = LazyLock::new(|| {
     static RAW: LazyLock<String> = LazyLock::new(|| {
         let salt = SaltString::generate(&mut rand::rngs::OsRng);
         Argon2::default()
-            .hash_password(b"steward-dummy-password", &salt)
+            .hash_password(b"cartapel-dummy-password", &salt)
             .expect("dummy hash")
             .to_string()
     });
@@ -105,7 +105,7 @@ static DUMMY_HASH: LazyLock<PasswordHash<'static>> = LazyLock::new(|| {
 impl Store {
     pub fn open(data_dir: &Path) -> Result<Self, String> {
         std::fs::create_dir_all(data_dir).map_err(|e| e.to_string())?;
-        let mut conn = Connection::open(data_dir.join("steward.db")).map_err(|e| e.to_string())?;
+        let mut conn = Connection::open(data_dir.join("cartapel.db")).map_err(|e| e.to_string())?;
         conn.pragma_update(None, "journal_mode", "WAL")
             .map_err(|e| e.to_string())?;
         MIGRATIONS.to_latest(&mut conn).map_err(|e| e.to_string())?;
@@ -559,7 +559,7 @@ impl Store {
 
     #[cfg(test)]
     pub fn open_memory() -> Self {
-        let dir = std::env::temp_dir().join(format!("steward-test-{}", rand::random::<u64>()));
+        let dir = std::env::temp_dir().join(format!("cartapel-test-{}", rand::random::<u64>()));
         Store::open(&dir).expect("open test store")
     }
 
@@ -726,7 +726,7 @@ mod tests {
 
     #[test]
     fn reopening_existing_db_preserves_rows() {
-        let dir = std::env::temp_dir().join(format!("steward-reopen-{}", rand::random::<u64>()));
+        let dir = std::env::temp_dir().join(format!("cartapel-reopen-{}", rand::random::<u64>()));
         {
             let store = Store::open(&dir).unwrap();
             store.create_user("keep@x.io", "pw", "admin").unwrap();

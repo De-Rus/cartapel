@@ -1,6 +1,6 @@
-# steward ui
+# cartapel ui
 
-Meta-driven SPA for the steward admin panel: every table, column, widget, filter,
+Meta-driven SPA for the cartapel admin panel: every table, column, widget, filter,
 action and permission is rendered from `GET /manage/api/meta` — nothing is
 hardcoded per deployment. Vite + React 18 + TypeScript + Tailwind, hand-rolled
 SVG charts, dark-first theming via CSS custom properties. The Rust binary embeds

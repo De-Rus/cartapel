@@ -645,7 +645,7 @@ mod tests {
         use std::sync::atomic::{AtomicU32, Ordering};
         static SEQ: AtomicU32 = AtomicU32::new(0);
         let n = SEQ.fetch_add(1, Ordering::SeqCst);
-        let dir = std::env::temp_dir().join(format!("steward-roles-{}-{n}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("cartapel-roles-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("config")).unwrap();
         std::fs::write(dir.join("bots.hcl"), "").unwrap();
@@ -1606,7 +1606,7 @@ mod tests {
         let state = test_state();
         {
             let mut cfg = (*state.cfg()).clone();
-            cfg.steward.locale = Some("es".into());
+            cfg.cartapel.locale = Some("es".into());
             let tc = cfg.tables.get_mut("bots").unwrap();
             tc.label = Some("Bot".into());
             tc.labels.insert("es".into(), "Robot".into());

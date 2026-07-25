@@ -12,13 +12,13 @@ describe('BrandMark', () => {
     expect(out).toContain('Acme')
   })
 
-  it('renders the lowercase wordmark from name when no logo, defaulting to steward', () => {
+  it('renders the lowercase wordmark from name when no logo, defaulting to cartapel', () => {
     const named = html(<BrandMark logo={null} name="Acme" size="login" />)
     expect(named).not.toContain('<img')
     expect(named).toContain('Acme')
 
     const fallback = html(<BrandMark logo={null} name={null} size="sidebar" />)
-    expect(fallback).toContain('steward')
+    expect(fallback).toContain('cartapel')
   })
 
   it('colors the name with --band-ink on the band, --ink otherwise', () => {

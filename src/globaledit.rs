@@ -126,7 +126,7 @@ pub async fn preview_panel(
     Json(body): Json<PreviewWidget>,
 ) -> Result<Json<Value>, AppError> {
     admin_only(&user)?;
-    if state.cfg().steward.disable_sql_preview {
+    if state.cfg().cartapel.disable_sql_preview {
         return Err(AppError::forbidden("ad-hoc SQL preview is disabled"));
     }
     validate_panel(&body.widget)?;

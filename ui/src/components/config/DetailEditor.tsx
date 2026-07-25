@@ -8,7 +8,7 @@ import { IconPlus, IconX } from '../Icons'
 import { Labeled, Section, Toggle } from './parts'
 import { ColumnMultiSelect, EnumSelect } from './pickers'
 
-const DND = 'application/x-steward-field'
+const DND = 'application/x-cartapel-field'
 
 function FieldChip({ name, onDragStart }: { name: string; onDragStart: () => void }) {
   return (

@@ -1,30 +1,30 @@
 ---
-description: "The steward security model: signed sessions, bound SQL, column masking, row-level filters, path confinement and hardening toggles."
+description: "The cartapel security model: signed sessions, bound SQL, column masking, row-level filters, path confinement and hardening toggles."
 ---
 
 # Security model
 
-steward is designed to sit in front of a production database, so its defaults are
+cartapel is designed to sit in front of a production database, so its defaults are
 conservative: it never writes to your database on its own, every value is a bound
 parameter, and reads that could leak data are gated by roles.
 
 ## Secret key
 
-steward signs its session cookies with an app secret. **It is required** —
-steward refuses to start without one.
+cartapel signs its session cookies with an app secret. **It is required** —
+cartapel refuses to start without one.
 
 Resolution order at startup:
 
-1. `STEWARD_SECRET_KEY` environment variable.
-2. `[steward].secret_key` in `config/steward.hcl` (env-interpolated, e.g.
-   `secret_key = "env:STEWARD_SECRET_KEY"`).
+1. `CARTAPEL_SECRET_KEY` environment variable.
+2. `[cartapel].secret_key` in `config/cartapel.hcl` (env-interpolated, e.g.
+   `secret_key = "env:CARTAPEL_SECRET_KEY"`).
 
 Prefer the environment variable or `${...}` interpolation — never commit a
 literal key. Rotating the key invalidates all existing sessions (everyone
 re-logs-in once).
 
 ```bash
-export STEWARD_SECRET_KEY="$(openssl rand -hex 32)"
+export CARTAPEL_SECRET_KEY="$(openssl rand -hex 32)"
 ```
 
 ## Sessions & cookies
@@ -39,7 +39,7 @@ export STEWARD_SECRET_KEY="$(openssl rand -hex 32)"
 
 ## CSRF
 
-Every mutating request (POST / PATCH / DELETE) must carry the `X-Steward: 1`
+Every mutating request (POST / PATCH / DELETE) must carry the `X-Cartapel: 1`
 header. The bundled SPA sends it automatically; the `api` object injected into
 custom widgets and pages sends it for you too.
 
@@ -118,15 +118,15 @@ reserved stems (`config`, `_group`, `page`, `queries`).
 
 A `kind = "webhook"` action proxies the selected primary keys to a URL you
 configure — an escape hatch into your real backend rather than a direct DB write.
-When `STEWARD_WEBHOOK_SECRET` is set, outbound webhooks are signed with an
-`X-Steward-Signature` (HMAC-SHA256) header your backend can verify. Webhooks
+When `CARTAPEL_WEBHOOK_SECRET` is set, outbound webhooks are signed with an
+`X-Cartapel-Signature` (HMAC-SHA256) header your backend can verify. Webhooks
 can be disabled outright with `disable_webhooks` — see
 [Hardening toggles](#hardening-toggles).
 
 ## Audit log
 
 Every write — create, update, delete, bulk action, config change, user/role
-change — is recorded in steward's SQLite audit log with actor, timestamp and, for
+change — is recorded in cartapel's SQLite audit log with actor, timestamp and, for
 row edits, a before/after diff. Per-record history is available on each detail
 view; the full log is an admin-only view.
 
@@ -145,7 +145,7 @@ in one click from the record's history or the audit log. Guardrails:
 
 ## Hardening toggles
 
-Two opt-in switches in `config/steward.hcl` narrow the surface further:
+Two opt-in switches in `config/cartapel.hcl` narrow the surface further:
 
 - `disable_sql_preview = true` — disables the dashboard builder's ad-hoc SQL
   preview, blocking arbitrary read-SQL even for admins.

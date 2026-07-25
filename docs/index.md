@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: steward
+  name: cartapel
   text: An admin panel for your existing Postgres
   tagline: One binary. No ORM, no framework, no Node runtime. Your schema is the source of truth, and every customization is code you version — not a GUI you click.
   actions:
@@ -11,7 +11,7 @@ hero:
       link: /getting-started
     - theme: alt
       text: Live demo — demo / demo
-      link: https://steward-demo-derus.fly.dev
+      link: https://cartapel-demo-derus.fly.dev
     - theme: alt
       text: Configuration
       link: /configuration/overview
@@ -25,7 +25,7 @@ features:
     details: A directory of HCL files. Folders become sidebar groups, one file per table. List columns, filters, field widgets, detail layouts, inline child tables and bulk actions — all reviewable in your repo.
   - icon: 🔒
     title: Auth, roles, audit
-    details: Built-in users and sessions in steward's own SQLite file. Granular per-table / per-field / row-level permissions, column masking, and an audit log of every write with before/after diffs.
+    details: Built-in users and sessions in cartapel's own SQLite file. Granular per-table / per-field / row-level permissions, column masking, and an audit log of every write with before/after diffs.
   - icon: 📊
     title: Dashboards
     details: SQL-defined stat tiles, sparklines, line/bar/area charts and tables — all evaluated in read-only transactions with a statement timeout.
@@ -37,9 +37,9 @@ features:
     details: A single static binary or a Docker image. Bake the config read-only, or mount a writable volume to edit and version config live from the in-app builder.
 ---
 
-## What is steward?
+## What is cartapel?
 
-steward is an open-source, single-binary admin panel for an existing PostgreSQL
+cartapel is an open-source, single-binary admin panel for an existing PostgreSQL
 database — a Django-admin / Forest / Retool alternative you run yourself. You
 point the Rust binary at your database, register the tables you want to expose,
 and get a polished CRUD panel: paginated lists, search, filters, detail pages,
@@ -47,12 +47,12 @@ inline child rows, bulk actions, dashboards, roles and an audit log.
 
 ::: tip Try it without installing
 A hosted demo runs the bundled Acme dataset at
-**<https://steward-demo-derus.fly.dev>** — log in with `demo` / `demo`.
+**<https://cartapel-demo-derus.fly.dev>** — log in with `demo` / `demo`.
 :::
 
 Two ideas make it different:
 
-- **Your database is the schema.** steward introspects your live Postgres for
+- **Your database is the schema.** cartapel introspects your live Postgres for
   columns, types, primary keys and foreign keys. There is no separate model
   definition to keep in sync.
 - **Customization is code.** Everything you tune — which columns show in a list,
@@ -62,7 +62,7 @@ Two ideas make it different:
 
 ## 60-second quickstart
 
-steward needs three things: a Postgres URL, a signing secret, and (optionally) a
+cartapel needs three things: a Postgres URL, a signing secret, and (optionally) a
 directory of config. With no config directory it still runs — but the panel is
 an **allowlist**, so you will see no tables until you register at least one.
 
@@ -70,25 +70,25 @@ an **allowlist**, so you will see no tables until you register at least one.
 
 ```bash [Docker]
 docker run --rm -p 8686:8686 \
-  -e STEWARD_DB="postgres://user:pass@host:5432/mydb" \
-  -e STEWARD_SECRET_KEY="a-long-random-string" \
-  -e STEWARD_ADMIN_EMAIL="you@example.com" \
-  -e STEWARD_ADMIN_PASSWORD="change-me" \
+  -e CARTAPEL_DB="postgres://user:pass@host:5432/mydb" \
+  -e CARTAPEL_SECRET_KEY="a-long-random-string" \
+  -e CARTAPEL_ADMIN_EMAIL="you@example.com" \
+  -e CARTAPEL_ADMIN_PASSWORD="change-me" \
   -v "$PWD/admin:/config:ro" \
-  ghcr.io/de-rus/steward:latest \
+  ghcr.io/de-rus/cartapel:latest \
   serve --config /config --schema public
 ```
 
 ```bash [Cargo]
-export STEWARD_SECRET_KEY="a-long-random-string"
-export STEWARD_ADMIN_EMAIL="you@example.com"
-export STEWARD_ADMIN_PASSWORD="change-me"
+export CARTAPEL_SECRET_KEY="a-long-random-string"
+export CARTAPEL_ADMIN_EMAIL="you@example.com"
+export CARTAPEL_ADMIN_PASSWORD="change-me"
 
 cargo run --release -- serve \
   --db postgres://user:pass@host:5432/mydb \
   --schema public \
   --config ./admin \
-  --data ./steward-data
+  --data ./cartapel-data
 ```
 
 :::
@@ -96,8 +96,8 @@ cargo run --release -- serve \
 Open <http://localhost:8686/admin>, log in with the bootstrap admin, and you are in.
 
 ::: tip The secret key is required
-steward **refuses to start** without a secret key — it signs your session
-cookies. Set `STEWARD_SECRET_KEY` (or `[steward].secret_key` in the config). See
+cartapel **refuses to start** without a secret key — it signs your session
+cookies. Set `CARTAPEL_SECRET_KEY` (or `[cartapel].secret_key` in the config). See
 [Security](/security#secret-key).
 :::
 

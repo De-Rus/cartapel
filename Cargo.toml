@@ -1,20 +1,20 @@
 [workspace]
 
 [package]
-name = "steward"
+name = "cartapel"
 version = "0.6.1"
 edition = "2021"
 license = "MIT"
 description = "Point a single binary at your existing Postgres and get a Django-admin-quality panel: introspected CRUD, code-first HCL customization, auth, audit log, dashboards."
-repository = "https://github.com/De-Rus/steward"
-homepage = "https://de-rus.github.io/steward/"
+repository = "https://github.com/De-Rus/cartapel"
+homepage = "https://de-rus.github.io/cartapel/"
 readme = "README.md"
 keywords = ["admin", "postgres", "crud", "dashboard", "database"]
 categories = ["database", "web-programming::http-server", "command-line-utilities"]
 publish = false
 
 [[bin]]
-name = "steward"
+name = "cartapel"
 path = "src/main.rs"
 
 [dependencies]

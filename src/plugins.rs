@@ -138,7 +138,7 @@ pub async fn named_source_root(
 }
 
 /// `GET /source/:name/*rest` — proxy a configured external source, appending
-/// `rest` to its base url. steward attaches the secret server-side.
+/// `rest` to its base url. cartapel attaches the secret server-side.
 pub async fn named_source(
     State(state): State<Arc<AppState>>,
     user: CurrentUser,
@@ -235,7 +235,7 @@ mod tests {
         use std::sync::atomic::{AtomicU32, Ordering};
         static SEQ: AtomicU32 = AtomicU32::new(0);
         let n = SEQ.fetch_add(1, Ordering::SeqCst);
-        let root = std::env::temp_dir().join(format!("steward-asset-{}-{n}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("cartapel-asset-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("overview").join("ops")).unwrap();
         std::fs::create_dir_all(root.join("config").join("widgets")).unwrap();
@@ -349,7 +349,7 @@ mod tests {
     async fn rejects_out_of_tree_symlink() {
         let dir = bundle();
         let outside =
-            std::env::temp_dir().join(format!("steward-asset-out-{}", std::process::id()));
+            std::env::temp_dir().join(format!("cartapel-asset-out-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&outside);
         std::fs::create_dir_all(&outside).unwrap();
         std::fs::write(outside.join("evil.js"), "export const evil = 1;").unwrap();

@@ -1,25 +1,25 @@
-# Fly.io deployment for the steward demo (app + Supabase Postgres).
+# Fly.io deployment for the cartapel demo (app + Supabase Postgres).
 # See docs/deployment.md → "Deploy to Fly.io + Supabase" for the full flow.
 #
-#   fly apps create steward-demo          # pick your own name, then set it below
-#   fly secrets set STEWARD_DB=… STEWARD_SECRET_KEY=… STEWARD_ADMIN_PASSWORD=…
+#   fly apps create cartapel-demo          # pick your own name, then set it below
+#   fly secrets set CARTAPEL_DB=… CARTAPEL_SECRET_KEY=… CARTAPEL_ADMIN_PASSWORD=…
 #   fly deploy
 #
-# STEWARD_DB / STEWARD_SECRET_KEY / STEWARD_ADMIN_EMAIL / STEWARD_ADMIN_PASSWORD
+# CARTAPEL_DB / CARTAPEL_SECRET_KEY / CARTAPEL_ADMIN_EMAIL / CARTAPEL_ADMIN_PASSWORD
 # are SECRETS — never put them here. Set them with `fly secrets set`.
 
-app = "steward-demo-derus"
+app = "cartapel-demo-derus"
 primary_region = "cdg"
 
 # Runs the published image directly (it bakes the demo config at /demo) — the same
 # artifact anyone pulls. Bump the tag to adopt a new release.
-image = "ghcr.io/de-rus/steward:0.6.1"
+image = "ghcr.io/de-rus/cartapel:0.6.1"
 
 [env]
-  STEWARD_CONFIG = "/demo/admin"
-  STEWARD_BASE_PATH = "/admin"
-  STEWARD_LISTEN = "0.0.0.0:8686"
-  STEWARD_SECURE_COOKIES = "true"
+  CARTAPEL_CONFIG = "/demo/admin"
+  CARTAPEL_BASE_PATH = "/admin"
+  CARTAPEL_LISTEN = "0.0.0.0:8686"
+  CARTAPEL_SECURE_COOKIES = "true"
   # Public demo logs in as a full admin (demo/demo, set as fly secrets) so it
   # shows the real thing; the dangerous capabilities are disabled in the config
   # (disable_sql_preview / disable_webhooks) and the data resets daily.

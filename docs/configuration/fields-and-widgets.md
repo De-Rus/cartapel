@@ -42,7 +42,7 @@ field "price" {
 ## Computed columns (`sql`)
 
 A field with a `sql` expression is a **virtual, read-only column** that doesn't
-exist in the table. steward selects it as `(<sql>) AS "<name>"`. The current row
+exist in the table. cartapel selects it as `(<sql>) AS "<name>"`. The current row
 is aliased `t`, so you can aggregate related tables:
 
 ```hcl
@@ -189,7 +189,7 @@ field "image" {
 }
 ```
 
-Uploaded images are served back through steward's static asset route.
+Uploaded images are served back through cartapel's static asset route.
 
 ---
 

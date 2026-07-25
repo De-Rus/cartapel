@@ -591,7 +591,7 @@ const META: Meta = {
   strings: null,
   brand_logo: null,
   theme: {
-    preset: 'steward',
+    preset: 'cartapel',
     mode: 'auto',
     logo_light: MARK_LOGO,
     logo_dark: MARK_LOGO,

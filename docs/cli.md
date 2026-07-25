@@ -1,69 +1,69 @@
 ---
-description: "Every steward subcommand, flag and environment variable — serve, user management, and the CI-ready config validator."
+description: "Every cartapel subcommand, flag and environment variable — serve, user management, and the CI-ready config validator."
 ---
 
 # CLI & environment
 
-steward is one binary with three subcommands: `serve` (run the panel), `user`
+cartapel is one binary with three subcommands: `serve` (run the panel), `user`
 (manage panel users offline) and `check` (validate a config bundle, CI-ready). Every flag has a matching environment variable, so
 you can drive it entirely from the environment in a container.
 
-## `steward serve`
+## `cartapel serve`
 
 Runs the admin server.
 
 ```bash
-steward serve \
+cartapel serve \
   --db postgres://user:pass@host:5432/mydb \
   --schema public \
   --config ./admin \
-  --data ./steward-data \
+  --data ./cartapel-data \
   --listen 0.0.0.0:8686
 # → panel on http://0.0.0.0:8686/admin  (the default mount path)
 ```
 
 | Flag | Env var | Default | Description |
 | --- | --- | --- | --- |
-| `--db` | `STEWARD_DB` | — | Postgres connection URL. Falls back to the URL of the `primary` `source` in `config/steward.hcl` (which supports `env:NAME` / `${NAME}` interpolation). |
-| `--schema` | `STEWARD_SCHEMA` | `public` | Schema to introspect. Falls back to the primary source's `schemas` list. |
-| `--config` | `STEWARD_CONFIG` | — | Directory of HCL config files. Optional — without it, no tables are exposed. |
-| `--data` | `STEWARD_DATA` | `./steward-data` | Directory for steward's own SQLite state (users, sessions, audit, config history). |
-| `--base-path` | `STEWARD_BASE_PATH` | `/admin` | URL prefix the panel is served under. Injected into the SPA at runtime, so one build serves any prefix. A trailing slash is trimmed; pass `''` (or `/`) to serve at the domain root. |
-| `--listen` | `STEWARD_LISTEN` | `127.0.0.1:8686` | Address and port to bind. |
-| `--secure-cookies` | `STEWARD_SECURE_COOKIES` | `true` | Sets the `Secure` attribute on session cookies. Keep on behind HTTPS; pass `--secure-cookies=false` for local plain-HTTP development. |
+| `--db` | `CARTAPEL_DB` | — | Postgres connection URL. Falls back to the URL of the `primary` `source` in `config/cartapel.hcl` (which supports `env:NAME` / `${NAME}` interpolation). |
+| `--schema` | `CARTAPEL_SCHEMA` | `public` | Schema to introspect. Falls back to the primary source's `schemas` list. |
+| `--config` | `CARTAPEL_CONFIG` | — | Directory of HCL config files. Optional — without it, no tables are exposed. |
+| `--data` | `CARTAPEL_DATA` | `./cartapel-data` | Directory for cartapel's own SQLite state (users, sessions, audit, config history). |
+| `--base-path` | `CARTAPEL_BASE_PATH` | `/admin` | URL prefix the panel is served under. Injected into the SPA at runtime, so one build serves any prefix. A trailing slash is trimmed; pass `''` (or `/`) to serve at the domain root. |
+| `--listen` | `CARTAPEL_LISTEN` | `127.0.0.1:8686` | Address and port to bind. |
+| `--secure-cookies` | `CARTAPEL_SECURE_COOKIES` | `true` | Sets the `Secure` attribute on session cookies. Keep on behind HTTPS; pass `--secure-cookies=false` for local plain-HTTP development. |
 
 The connection URL and schema resolve in this order: **CLI flag → environment
 variable → config file**. When more than one schema is introspected, a table
 name that is unique across them keeps its bare key; a name that collides is keyed
 as `schema.table`.
 
-## `steward user add`
+## `cartapel user add`
 
 Create or update a panel user without the server running. Useful for
 provisioning and password resets.
 
 ```bash
-steward user add <email> [--role <role>] [--password <pw>] [--data <dir>]
+cartapel user add <email> [--role <role>] [--password <pw>] [--data <dir>]
 ```
 
 | Argument / flag | Env var | Default | Description |
 | --- | --- | --- | --- |
 | `<email>` | — | — | The user's email (lowercased on save). Positional, required. |
 | `--role` | — | `admin` | Role(s) to assign — comma-separate for several (`support,billing`; permissions union). Not validated offline: a name with no matching role in `auth.hcl` simply grants nothing. |
-| `--password` | `STEWARD_PASSWORD` | *generated* | The password. When omitted, a strong random password is generated and printed once. |
-| `--data` | `STEWARD_DATA` | `./steward-data` | The state directory to write to. |
+| `--password` | `CARTAPEL_PASSWORD` | *generated* | The password. When omitted, a strong random password is generated and printed once. |
+| `--data` | `CARTAPEL_DATA` | `./cartapel-data` | The state directory to write to. |
 
 Running `user add` for an existing email updates that user's role and/or
 password.
 
-## `steward check`
+## `cartapel check`
 
 Validate a config directory without running the server — CI-ready (exit 0 =
 valid, exit 1 with the errors printed):
 
 ```bash
-steward check --config ./admin                    # parse + validate the bundle
-steward check --config ./admin --db postgres://…  # + verify every configured
+cartapel check --config ./admin                    # parse + validate the bundle
+cartapel check --config ./admin --db postgres://…  # + verify every configured
                                                   #   table/column against the
                                                   #   live schema
 # --schema <name> narrows the live check to one schema
@@ -74,17 +74,17 @@ becomes a red build instead of a silent broken panel.
 
 ## Environment variables
 
-Beyond the per-flag variables above, steward reads:
+Beyond the per-flag variables above, cartapel reads:
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `STEWARD_SECRET_KEY` | **Yes** | The app signing root for session cookies. steward refuses to start if this is unset **and** `[steward].secret_key` is also unset. See [Security](/security#secret-key). |
-| `STEWARD_ADMIN_EMAIL` | No | Email for the bootstrap admin created on first run. Defaults to `admin@localhost`. |
-| `STEWARD_ADMIN_PASSWORD` | No | Password for the bootstrap admin. When unset, a random one is generated and logged. |
-| `STEWARD_ADMIN_ROLE` | No | Role(s) for the bootstrap user (comma-separate for several). Defaults to `admin`; a public demo can bootstrap a restricted role (e.g. a read-mostly `demo` role from `auth.hcl`) instead. |
-| `STEWARD_WEBHOOK_SECRET` | No | HMAC secret for signing outbound webhook actions (`X-Steward-Signature`). |
-| `STEWARD_DB_TX_POOL` | No | Set to `1` to force transaction-pooler mode (disables sqlx's prepared-statement cache). Auto-detected for Supabase's port `6543` pooler. |
-| `RUST_LOG` | No | Standard `tracing` filter. Defaults to `steward=info,tower_http=warn`. |
+| `CARTAPEL_SECRET_KEY` | **Yes** | The app signing root for session cookies. cartapel refuses to start if this is unset **and** `[cartapel].secret_key` is also unset. See [Security](/security#secret-key). |
+| `CARTAPEL_ADMIN_EMAIL` | No | Email for the bootstrap admin created on first run. Defaults to `admin@localhost`. |
+| `CARTAPEL_ADMIN_PASSWORD` | No | Password for the bootstrap admin. When unset, a random one is generated and logged. |
+| `CARTAPEL_ADMIN_ROLE` | No | Role(s) for the bootstrap user (comma-separate for several). Defaults to `admin`; a public demo can bootstrap a restricted role (e.g. a read-mostly `demo` role from `auth.hcl`) instead. |
+| `CARTAPEL_WEBHOOK_SECRET` | No | HMAC secret for signing outbound webhook actions (`X-Cartapel-Signature`). |
+| `CARTAPEL_DB_TX_POOL` | No | Set to `1` to force transaction-pooler mode (disables sqlx's prepared-statement cache). Auto-detected for Supabase's port `6543` pooler. |
+| `RUST_LOG` | No | Standard `tracing` filter. Defaults to `cartapel=info,tower_http=warn`. |
 
 ::: tip Config values can read the environment
 Anywhere config accepts a value, `env:NAME` or `${NAME}` is replaced with the

@@ -5,14 +5,14 @@ description: "Custom pages with the sx SDK, named read-only queries, template va
 # Pages, queries & custom widgets
 
 Some flows aren't a single-table CRUD — reconciliation queues, moderation
-boards, ops dashboards. steward's plugin layer lets you add **custom pages**
+boards, ops dashboards. cartapel's plugin layer lets you add **custom pages**
 (full-screen modules), **named queries** (read-only SQL those modules call), and
 **custom field widgets**. All three live inside the config bundle as plain files;
 there is no separate build step, no npm, and no core changes.
 
 ## How assets are served
 
-steward serves any file under the config directory at
+cartapel serves any file under the config directory at
 `/static/<path-relative-to-config>`, so your JS/CSS/image assets sit right next
 to the HCL that references them. Serving is path-confined (directory traversal
 and out-of-tree symlinks are rejected) and extension-allowlisted:
@@ -92,7 +92,7 @@ Conventions for a page module:
 
 A page doesn't need a module at all: give its `screen.hcl` `panel { }` blocks
 instead (the same panel schema as the [dashboard](/configuration/dashboard),
-plus an optional `columns` grid count) and steward renders it as a
+plus an optional `columns` grid count) and cartapel renders it as a
 query-driven grid — no JS. A screen that sets both `module` and `panel { }`
 is a load error.
 
@@ -208,7 +208,7 @@ field "equity" {
 
 ### Authoring one
 
-Define a custom element named `sx-widget-<name>`. steward sets three properties
+Define a custom element named `sx-widget-<name>`. cartapel sets three properties
 on it; re-render whenever a property is assigned:
 
 | Property | Value |
@@ -235,7 +235,7 @@ An unknown custom widget falls back to the raw value — never a crash.
 
 ### Bundled widgets
 
-steward's reference bundle ships three drop-in custom widgets under
+cartapel's reference bundle ships three drop-in custom widgets under
 `config/widgets/`:
 
 - **`sparkline`** — inline SVG trend line.

@@ -34,7 +34,7 @@ export interface ColumnState {
   widths: Record<string, number>
 }
 
-const COLS_PREFIX = 'steward.cols.'
+const COLS_PREFIX = 'cartapel.cols.'
 
 export function loadColumnState(table: string): ColumnState {
   try {

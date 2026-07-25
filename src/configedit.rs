@@ -87,7 +87,7 @@ pub(crate) fn dir_writable(dir: &std::path::Path) -> bool {
     if !dir.is_dir() {
         return false;
     }
-    let probe = dir.join(format!(".steward-write-probe-{}", std::process::id()));
+    let probe = dir.join(format!(".cartapel-write-probe-{}", std::process::id()));
     match std::fs::File::create(&probe) {
         Ok(_) => {
             let _ = std::fs::remove_file(&probe);
@@ -941,7 +941,7 @@ pub(crate) fn port_legacy_roles(state: &AppState) {
         }
         let _ = state
             .store
-            .config_version_add("config/auth", &hcl, "steward-migration", None);
+            .config_version_add("config/auth", &hcl, "cartapel-migration", None);
         let names: Vec<&str> = orphans.iter().map(|(n, _)| n.as_str()).collect();
         tracing::info!(
             "ported {} legacy DB role(s) into config/auth.hcl: {:?}",
@@ -1083,7 +1083,7 @@ pub(crate) mod test_support {
 
     pub fn tmp_dir() -> PathBuf {
         let n = SEQ.fetch_add(1, Ordering::SeqCst);
-        let d = std::env::temp_dir().join(format!("steward-cfgtest-{}-{n}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("cartapel-cfgtest-{}-{n}", std::process::id()));
         std::fs::create_dir_all(&d).unwrap();
         d
     }
@@ -1303,19 +1303,23 @@ action "pause" {
     async fn reload_keeps_old_config_on_bad_file() {
         let dir = tmp_dir();
         std::fs::create_dir_all(dir.join("config")).unwrap();
-        std::fs::write(dir.join("config").join("steward.hcl"), "brand = \"Good\"\n").unwrap();
+        std::fs::write(
+            dir.join("config").join("cartapel.hcl"),
+            "brand = \"Good\"\n",
+        )
+        .unwrap();
         let state = state_with_dir(Some(dir.clone()));
-        assert_eq!(state.cfg().steward.brand.as_deref(), Some("Good"));
+        assert_eq!(state.cfg().cartapel.brand.as_deref(), Some("Good"));
 
         std::fs::write(
-            dir.join("config").join("steward.hcl"),
+            dir.join("config").join("cartapel.hcl"),
             "this is @@@ not hcl =\n",
         )
         .unwrap();
         let err = state.reload_config();
         assert!(err.is_err(), "bad config must fail reload");
         // Live config is untouched — auth/branding never degrade on a bad file.
-        assert_eq!(state.cfg().steward.brand.as_deref(), Some("Good"));
+        assert_eq!(state.cfg().cartapel.brand.as_deref(), Some("Good"));
     }
 
     #[tokio::test]
@@ -1857,7 +1861,7 @@ action "pause" {
         cfg.table_sources.insert(
             "bots".into(),
             TableSource {
-                path: PathBuf::from("/etc/steward-escape.hcl"),
+                path: PathBuf::from("/etc/cartapel-escape.hcl"),
                 group: None,
             },
         );

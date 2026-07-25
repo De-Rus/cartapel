@@ -96,7 +96,7 @@ export async function uploadImage(
   const res = await fetch(`${API_BASE}/t/${table}/image/${col}/${encodeURIComponent(pk)}`, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'X-Steward': '1' },
+    headers: { 'X-Cartapel': '1' },
     body: fd,
   })
   if (res.status === 401) {
@@ -126,9 +126,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
   const headers: Record<string, string> = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json'
-  if (method !== 'GET') headers['X-Steward'] = '1'
+  if (method !== 'GET') headers['X-Cartapel'] = '1'
   const asRole = viewAsRole()
-  if (asRole && !path.startsWith('/auth/')) headers['X-Steward-As-Role'] = asRole
+  if (asRole && !path.startsWith('/auth/')) headers['X-Cartapel-As-Role'] = asRole
   const res = await fetch(API_BASE + path, {
     method,
     credentials: 'include',

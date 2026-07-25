@@ -1,30 +1,30 @@
 ---
-description: "Deploy steward with Docker, Fly.io, Render one-click, or a bare binary — plus secrets, volumes and pooler notes."
+description: "Deploy cartapel with Docker, Fly.io, Render one-click, or a bare binary — plus secrets, volumes and pooler notes."
 ---
 
 # Deployment
 
-steward is a single self-contained binary — the SPA is embedded, there is no Node
+cartapel is a single self-contained binary — the SPA is embedded, there is no Node
 runtime, and its only external dependency is your Postgres. Deploy it as a bare
 binary, a container, or behind a reverse proxy at a sub-path.
 
 ## The pieces
 
-A running steward needs:
+A running cartapel needs:
 
 1. **The binary** (or Docker image).
-2. **A Postgres URL** — via `--db`, `STEWARD_DB`, or the primary `source`'s
-   `url` in `config/steward.hcl`.
-3. **A secret key** — via `STEWARD_SECRET_KEY` or `[steward].secret_key`.
+2. **A Postgres URL** — via `--db`, `CARTAPEL_DB`, or the primary `source`'s
+   `url` in `config/cartapel.hcl`.
+3. **A secret key** — via `CARTAPEL_SECRET_KEY` or `[cartapel].secret_key`.
    Required.
 4. **A config directory** — optional, but without it no tables are exposed.
-5. **A data directory** — steward's own SQLite state (users, sessions, audit,
-   config history). Defaults to `./steward-data`; put it on durable storage.
+5. **A data directory** — cartapel's own SQLite state (users, sessions, audit,
+   config history). Defaults to `./cartapel-data`; put it on durable storage.
 
 
 ## One-click deploy
 
-**Render** (free tier): [deploy from this repo](https://render.com/deploy?repo=https://github.com/De-Rus/steward)
+**Render** (free tier): [deploy from this repo](https://render.com/deploy?repo=https://github.com/De-Rus/cartapel)
 — the blueprint (`render.yaml`) runs the published image, prompts for your
 `postgres://` URL and admin credentials, generates the secret key and seeds a
 minimal config so you land in the `/_setup` wizard over your own database.
@@ -34,25 +34,25 @@ redeploys) — attach a disk at `/data` for durability.
 **Fly.io** in two commands, with a durable volume:
 
 ```bash
-fly launch --image ghcr.io/de-rus/steward:latest --no-deploy
-fly volumes create steward_data --size 1
-# add [mounts] source="steward_data" destination="/data" to fly.toml, then:
-fly secrets set STEWARD_DB=postgres://… STEWARD_SECRET_KEY=$(openssl rand -hex 32) \
-  STEWARD_ADMIN_EMAIL=you@example.com STEWARD_ADMIN_PASSWORD=change-me
+fly launch --image ghcr.io/de-rus/cartapel:latest --no-deploy
+fly volumes create cartapel_data --size 1
+# add [mounts] source="cartapel_data" destination="/data" to fly.toml, then:
+fly secrets set CARTAPEL_DB=postgres://… CARTAPEL_SECRET_KEY=$(openssl rand -hex 32) \
+  CARTAPEL_ADMIN_EMAIL=you@example.com CARTAPEL_ADMIN_PASSWORD=change-me
 fly deploy
 ```
 
 ## Docker
 
 ```bash
-docker run -d --name steward -p 8686:8686 \
-  -e STEWARD_DB="postgres://user:pass@db:5432/app" \
-  -e STEWARD_SECRET_KEY="a-long-random-secret" \
-  -e STEWARD_ADMIN_EMAIL="you@example.com" \
-  -e STEWARD_ADMIN_PASSWORD="change-me" \
+docker run -d --name cartapel -p 8686:8686 \
+  -e CARTAPEL_DB="postgres://user:pass@db:5432/app" \
+  -e CARTAPEL_SECRET_KEY="a-long-random-secret" \
+  -e CARTAPEL_ADMIN_EMAIL="you@example.com" \
+  -e CARTAPEL_ADMIN_PASSWORD="change-me" \
   -v "$PWD/admin:/config:ro" \
-  -v "steward-data:/data" \
-  ghcr.io/de-rus/steward:latest \
+  -v "cartapel-data:/data" \
+  ghcr.io/de-rus/cartapel:latest \
   serve --config /config --data /data --schema public --listen 0.0.0.0:8686
 ```
 
@@ -63,36 +63,36 @@ docker run -d --name steward -p 8686:8686 \
 
 ## Deploy to Fly.io + Supabase
 
-The repo ships a [`fly.toml`](https://github.com/De-Rus/steward/blob/main/fly.toml)
+The repo ships a [`fly.toml`](https://github.com/De-Rus/cartapel/blob/main/fly.toml)
 that builds the image from the `Dockerfile` and runs the bundled Acme demo. To
 run it — swap in your own config and database as you go.
 
 1. **Database — Supabase.** Create a free project and copy its **Transaction
    pooler** connection string (host ends in `…pooler.supabase.com`, port
-   `6543`). steward auto-detects that pooler and disables the prepared-statement
+   `6543`). cartapel auto-detects that pooler and disables the prepared-statement
    cache for it (see [below](#connection-pooling-note)).
 
 2. **App — Fly.** Pick an app name in `fly.toml` (`app = "…"`), then:
 
    ```bash
-   fly apps create your-steward
+   fly apps create your-cartapel
    fly secrets set \
-     STEWARD_DB="postgresql://postgres.__ref__:PASSWORD@aws-0-…pooler.supabase.com:6543/postgres" \
-     STEWARD_SECRET_KEY="$(openssl rand -hex 32)" \
-     STEWARD_ADMIN_EMAIL="you@example.com" \
-     STEWARD_ADMIN_PASSWORD="a-strong-password"
+     CARTAPEL_DB="postgresql://postgres.__ref__:PASSWORD@aws-0-…pooler.supabase.com:6543/postgres" \
+     CARTAPEL_SECRET_KEY="$(openssl rand -hex 32)" \
+     CARTAPEL_ADMIN_EMAIL="you@example.com" \
+     CARTAPEL_ADMIN_PASSWORD="a-strong-password"
    fly deploy
    ```
 
 Secrets are set with `fly secrets set` and **never** committed to `fly.toml`.
-The `[env]` block there carries only non-secrets (`STEWARD_CONFIG`,
-`STEWARD_BASE_PATH`, `STEWARD_LISTEN`, `STEWARD_SECURE_COOKIES`). To serve your
-**own** admin instead of the demo, point `STEWARD_CONFIG` at your bundle (bake it
+The `[env]` block there carries only non-secrets (`CARTAPEL_CONFIG`,
+`CARTAPEL_BASE_PATH`, `CARTAPEL_LISTEN`, `CARTAPEL_SECURE_COOKIES`). To serve your
+**own** admin instead of the demo, point `CARTAPEL_CONFIG` at your bundle (bake it
 into the image or mount a volume) rather than `/demo/admin`.
 
-steward's SQLite state lives on the machine's ephemeral disk here; the admin user
-re-bootstraps from `STEWARD_ADMIN_*` on each fresh machine. Mount a Fly volume at
-`/data` (and set `STEWARD_DATA=/data`) if you want sessions and the audit log to
+cartapel's SQLite state lives on the machine's ephemeral disk here; the admin user
+re-bootstraps from `CARTAPEL_ADMIN_*` on each fresh machine. Mount a Fly volume at
+`/data` (and set `CARTAPEL_DATA=/data`) if you want sessions and the audit log to
 survive redeploys.
 
 ## Environment-first configuration
@@ -103,26 +103,26 @@ essentials:
 
 | Variable | Purpose |
 | --- | --- |
-| `STEWARD_DB` | Postgres URL. |
-| `STEWARD_SECRET_KEY` | Cookie-signing secret. **Required.** |
-| `STEWARD_CONFIG` | Config directory. |
-| `STEWARD_DATA` | State directory. |
-| `STEWARD_BASE_PATH` | URL prefix the panel is served under. Defaults to `/admin`; set `''` (or `/`) for the domain root, or any prefix like `/panel`. |
-| `STEWARD_LISTEN` | Bind address. |
-| `STEWARD_SECURE_COOKIES` | `true` behind HTTPS (default); `false` for local HTTP. |
-| `STEWARD_WEBHOOK_SECRET` | Signs outbound webhook actions. |
+| `CARTAPEL_DB` | Postgres URL. |
+| `CARTAPEL_SECRET_KEY` | Cookie-signing secret. **Required.** |
+| `CARTAPEL_CONFIG` | Config directory. |
+| `CARTAPEL_DATA` | State directory. |
+| `CARTAPEL_BASE_PATH` | URL prefix the panel is served under. Defaults to `/admin`; set `''` (or `/`) for the domain root, or any prefix like `/panel`. |
+| `CARTAPEL_LISTEN` | Bind address. |
+| `CARTAPEL_SECURE_COOKIES` | `true` behind HTTPS (default); `false` for local HTTP. |
+| `CARTAPEL_WEBHOOK_SECRET` | Signs outbound webhook actions. |
 
-First-run bootstrap reads `STEWARD_ADMIN_EMAIL` / `STEWARD_ADMIN_PASSWORD` /
-`STEWARD_ADMIN_ROLE` — the role defaults to `admin`, and a public demo can
+First-run bootstrap reads `CARTAPEL_ADMIN_EMAIL` / `CARTAPEL_ADMIN_PASSWORD` /
+`CARTAPEL_ADMIN_ROLE` — the role defaults to `admin`, and a public demo can
 bootstrap a restricted role instead.
 
 Config values themselves can read the environment with `env:NAME` / `${NAME}`, so
-you can keep the DB URL and secret in `config/steward.hcl` while still sourcing
+you can keep the DB URL and secret in `config/cartapel.hcl` while still sourcing
 them from the environment.
 
 ## Writable config volume
 
-steward can edit its own config through the in-app visual builder, but only when
+cartapel can edit its own config through the in-app visual builder, but only when
 the config directory is **writable**. It probes this at startup:
 
 - **Read-only bundle** (baked into the image, `:ro` mount): the builder is
@@ -144,21 +144,21 @@ single build/image serves under any path — you never rebuild to change it:
 
 ```bash
 # same published image, three different mount points
-docker run … ghcr.io/de-rus/steward serve                     # → /admin (default)
-docker run … -e STEWARD_BASE_PATH="" ghcr.io/de-rus/steward serve       # → /  (root)
-docker run … -e STEWARD_BASE_PATH=/panel ghcr.io/de-rus/steward serve   # → /panel
+docker run … ghcr.io/de-rus/cartapel serve                     # → /admin (default)
+docker run … -e CARTAPEL_BASE_PATH="" ghcr.io/de-rus/cartapel serve       # → /  (root)
+docker run … -e CARTAPEL_BASE_PATH=/panel ghcr.io/de-rus/cartapel serve   # → /panel
 ```
 
-That's what lets you pull `ghcr.io/de-rus/steward` and mount it wherever your
+That's what lets you pull `ghcr.io/de-rus/cartapel` and mount it wherever your
 setup wants — no fork, no custom build. `GET /` redirects to the mount path.
 
 ### Behind a reverse proxy
 
-To serve steward under a sub-path (e.g. `https://app.example.com/panel`), set
-`STEWARD_BASE_PATH=/panel` and proxy that prefix. steward serves everything — the
+To serve cartapel under a sub-path (e.g. `https://app.example.com/panel`), set
+`CARTAPEL_BASE_PATH=/panel` and proxy that prefix. cartapel serves everything — the
 SPA, the API under `{base}/api`, and static assets under `{base}/static` —
 beneath it (plus the hashed bundle at `/assets/…` from the root). An nginx
-location proxying to steward on `:8686`:
+location proxying to cartapel on `:8686`:
 
 ```nginx
 location /panel/ {
@@ -181,14 +181,14 @@ balancer or orchestrator's liveness probe at it.
 
 ## Connection pooling note
 
-steward keeps a small Postgres pool and sets a per-connection statement timeout.
+cartapel keeps a small Postgres pool and sets a per-connection statement timeout.
 If you sit it behind a **transaction-mode** pooler (like Supabase's pgbouncer on
-port `6543`), steward auto-detects it and disables the prepared-statement cache
+port `6543`), cartapel auto-detects it and disables the prepared-statement cache
 (which such poolers drop between transactions). Force this with
-`STEWARD_DB_TX_POOL=1` if you use a non-standard port. The session-mode pooler
+`CARTAPEL_DB_TX_POOL=1` if you use a non-standard port. The session-mode pooler
 (port `5432`) needs no special handling.
 
 ::: tip Validate before you ship
-`steward check --config ./admin --db …` exits non-zero on any parse error or
-schema drift — run it in CI next to your migrations. See the [CLI reference](/cli#steward-check).
+`cartapel check --config ./admin --db …` exits non-zero on any parse error or
+schema drift — run it in CI next to your migrations. See the [CLI reference](/cli#cartapel-check).
 :::

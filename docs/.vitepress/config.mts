@@ -1,13 +1,13 @@
 import { defineConfig } from 'vitepress'
 
-const SITE = 'https://de-rus.github.io/steward/'
+const SITE = 'https://de-rus.github.io/cartapel/'
 
 export default defineConfig({
-  // GitHub Pages project site serves under /steward/. Override with DOCS_BASE=/
+  // GitHub Pages project site serves under /cartapel/. Override with DOCS_BASE=/
   // when deploying to a custom domain (root).
-  base: process.env.DOCS_BASE || '/steward/',
-  title: 'steward',
-  titleTemplate: ':title · steward — Postgres admin panel',
+  base: process.env.DOCS_BASE || '/cartapel/',
+  title: 'cartapel',
+  titleTemplate: ':title · cartapel — Postgres admin panel',
   description:
     'Open-source, single-binary admin panel for your existing Postgres. A Django-admin alternative in one Rust binary: introspected CRUD, roles, audit and dashboards, configured with HCL you version like code.',
   lang: 'en-US',
@@ -20,8 +20,8 @@ export default defineConfig({
   head: [
     ['meta', { name: 'theme-color', content: '#f59e0b' }],
     ['meta', { property: 'og:type', content: 'website' }],
-    ['meta', { property: 'og:site_name', content: 'steward' }],
-    ['meta', { property: 'og:title', content: 'steward — an admin panel for your existing Postgres' }],
+    ['meta', { property: 'og:site_name', content: 'cartapel' }],
+    ['meta', { property: 'og:title', content: 'cartapel — an admin panel for your existing Postgres' }],
     [
       'meta',
       {
@@ -42,7 +42,7 @@ export default defineConfig({
       JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'SoftwareApplication',
-        name: 'steward',
+        name: 'cartapel',
         applicationCategory: 'DeveloperApplication',
         operatingSystem: 'Linux, macOS, Docker',
         description:
@@ -50,7 +50,7 @@ export default defineConfig({
         license: 'https://opensource.org/licenses/MIT',
         url: SITE,
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-        codeRepository: 'https://github.com/De-Rus/steward',
+        codeRepository: 'https://github.com/De-Rus/cartapel',
       }),
     ],
     [
@@ -66,7 +66,7 @@ export default defineConfig({
   transformPageData(pageData) {
     const path = pageData.relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')
     const canonical = SITE + path
-    const title = pageData.frontmatter.layout === 'home' ? 'steward — Postgres admin panel' : `${pageData.title} · steward`
+    const title = pageData.frontmatter.layout === 'home' ? 'cartapel — Postgres admin panel' : `${pageData.title} · cartapel`
     pageData.frontmatter.head ??= []
     pageData.frontmatter.head.push(
       ['link', { rel: 'canonical', href: canonical }],
@@ -88,14 +88,14 @@ export default defineConfig({
       { text: 'Guide', link: '/getting-started' },
       { text: 'Configuration', link: '/configuration/overview' },
       { text: 'Deploy', link: '/deployment' },
-      { text: 'Live demo (demo/demo)', link: 'https://steward-demo-derus.fly.dev' },
+      { text: 'Live demo (demo/demo)', link: 'https://cartapel-demo-derus.fly.dev' },
     ],
 
     sidebar: [
       {
         text: 'Start here',
         items: [
-          { text: 'What is steward?', link: '/' },
+          { text: 'What is cartapel?', link: '/' },
           { text: 'Getting started', link: '/getting-started' },
           { text: 'CLI & environment', link: '/cli' },
         ],
@@ -136,16 +136,16 @@ export default defineConfig({
 
     search: { provider: 'local' },
 
-    socialLinks: [{ icon: 'github', link: 'https://github.com/de-rus/steward' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/de-rus/cartapel' }],
 
     editLink: {
-      pattern: 'https://github.com/De-Rus/steward/edit/main/docs/:path',
+      pattern: 'https://github.com/De-Rus/cartapel/edit/main/docs/:path',
       text: 'Edit this page on GitHub',
     },
 
     footer: {
       message: 'Released under the MIT License.',
-      copyright: 'steward — an admin panel for your existing Postgres.',
+      copyright: 'cartapel — an admin panel for your existing Postgres.',
     },
   },
 })

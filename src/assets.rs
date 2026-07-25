@@ -60,7 +60,7 @@ pub async fn spa_handler(uri: Uri, base_path: axum::extract::State<String>) -> R
                 String::from_utf8_lossy(&index.data).replace("'%BASE_PATH%'", &base_json);
             // The HTML entry refs are emitted root-absolute (`/assets/…`); prefix
             // them with the mount path so a sub-path proxy forwards them (lazy JS
-            // chunks already resolve via window.__stewardAsset).
+            // chunks already resolve via window.__cartapelAsset).
             if !base.is_empty() {
                 html = html.replace("/assets/", &format!("{base}/assets/"));
             }

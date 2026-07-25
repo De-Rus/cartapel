@@ -17,11 +17,11 @@ FROM debian:bookworm-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=build /app/target/release/steward /usr/local/bin/steward
+COPY --from=build /app/target/release/cartapel /usr/local/bin/cartapel
 COPY demo /demo
-ENV STEWARD_LISTEN=0.0.0.0:8686 \
-    STEWARD_DATA=/data
+ENV CARTAPEL_LISTEN=0.0.0.0:8686 \
+    CARTAPEL_DATA=/data
 EXPOSE 8686
 VOLUME ["/data"]
-ENTRYPOINT ["steward"]
+ENTRYPOINT ["cartapel"]
 CMD ["serve"]
