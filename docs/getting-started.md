@@ -9,7 +9,7 @@ registered.
 
 ::: tip Prefer to click around first?
 A hosted demo runs the bundled Acme dataset at
-**<https://cartapel-demo-derus.fly.dev>** (`demo` / `demo`) — or run it locally
+**<https://demo.cartapel.com>** (no login needed) — or run it locally
 with `docker compose up` from a repo checkout.
 :::
 

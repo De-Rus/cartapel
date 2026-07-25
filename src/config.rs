@@ -1003,6 +1003,12 @@ pub enum ActionKind {
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct AuthConfig {
+    /// Anonymous sessions act as this role — no login required (kiosk mode /
+    /// public dashboards / the hosted demo). Omit to require login for
+    /// everything. Must name `admin` or a defined role (load error otherwise);
+    /// think carefully before pointing it at anything with write access.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub public_role: Option<String>,
     #[serde(
         default,
         rename = "role",
@@ -1669,6 +1675,15 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
         }
     }
     validate_role_inheritance(&cfg.auth.roles)?;
+    if let Some(pr) = &cfg.auth.public_role {
+        let known = pr
+            .split(',')
+            .map(str::trim)
+            .all(|p| p == "admin" || cfg.auth.roles.contains_key(p));
+        if !known {
+            return Err(format!("auth: public_role \"{pr}\" names an unknown role"));
+        }
+    }
     Ok(cfg)
 }
 

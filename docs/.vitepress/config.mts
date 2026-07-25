@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitepress'
 
-const SITE = 'https://de-rus.github.io/cartapel/'
+const SITE = process.env.DOCS_SITE || 'https://de-rus.github.io/cartapel/'
 
 export default defineConfig({
   // GitHub Pages project site serves under /cartapel/. Override with DOCS_BASE=/
@@ -90,7 +90,7 @@ export default defineConfig({
       { text: 'Guide', link: '/getting-started' },
       { text: 'Configuration', link: '/configuration/overview' },
       { text: 'Deploy', link: '/deployment' },
-      { text: 'Live demo (demo/demo)', link: 'https://cartapel-demo-derus.fly.dev' },
+      { text: 'Live demo', link: 'https://demo.cartapel.com' },
     ],
 
     sidebar: [

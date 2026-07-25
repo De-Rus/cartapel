@@ -23,19 +23,33 @@ impl FromRequestParts<Arc<AppState>> for CurrentUser {
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
+        // Anonymous access: with `public_role` configured, a request without a
+        // valid session acts as that role. A real session always wins.
+        let public_user = || {
+            state
+                .cfg()
+                .auth
+                .public_role
+                .clone()
+                .map(|role| CurrentUser {
+                    email: "public".into(),
+                    role,
+                })
+        };
         let jar = CookieJar::from_headers(&parts.headers);
-        let cookie = jar.get(COOKIE).ok_or_else(AppError::unauthorized)?;
-        let (token, sig) = cookie
-            .value()
-            .split_once('.')
-            .ok_or_else(AppError::unauthorized)?;
-        if !state.verify(token.as_bytes(), sig) {
-            return Err(AppError::unauthorized());
-        }
-        let (email, role) = state
-            .store
-            .session_user(token)
-            .ok_or_else(AppError::unauthorized)?;
+        let session = jar.get(COOKIE).and_then(|cookie| {
+            let (token, sig) = cookie.value().split_once('.')?;
+            if !state.verify(token.as_bytes(), sig) {
+                return None;
+            }
+            state.store.session_user(token)
+        });
+        let (email, role) = match session {
+            Some(s) => s,
+            None => {
+                return public_user().ok_or_else(AppError::unauthorized);
+            }
+        };
         // View-as: admins may impersonate a lesser role to verify what it sees.
         // Never escalates — only admins are honored, and `admin` itself is a no-op.
         let is_admin = role.split(',').map(str::trim).any(|r| r == "admin");
@@ -303,5 +317,33 @@ mod tests {
                 .is_err(),
             "valid stored token with a bad signature is 401 — verify gates the DB lookup"
         );
+    }
+
+    #[tokio::test]
+    async fn public_role_grants_anonymous_access_but_session_wins() {
+        let state = test_state();
+        {
+            let mut cfg = (*state.cfg()).clone();
+            cfg.auth
+                .roles
+                .insert("viewer".into(), crate::config::RoleConfig::default());
+            cfg.auth.public_role = Some("viewer".into());
+            state.cfg.store(std::sync::Arc::new(cfg));
+        }
+        let anon = extract(&state, None).await.unwrap();
+        assert_eq!(anon.email, "public");
+        assert_eq!(anon.role, "viewer");
+        assert!(!anon.is_admin());
+
+        let bad = extract(&state, Some("garbage.deadbeef")).await.unwrap();
+        assert_eq!(bad.role, "viewer", "invalid cookie degrades to public");
+
+        state.store.create_user("u@x.io", "pw", "admin").unwrap();
+        let token = state.store.create_session("u@x.io").unwrap();
+        let sig = state.sign(token.as_bytes());
+        let real = extract(&state, Some(&format!("{token}.{sig}")))
+            .await
+            .unwrap();
+        assert_eq!(real.email, "u@x.io", "a real session always wins");
     }
 }

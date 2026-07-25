@@ -8,7 +8,7 @@ Point a single binary at your existing Postgres and get a Django-admin-quality
 panel. No framework, no ORM, no Node runtime — your database schema is the
 source of truth, and customization is code you version, not a GUI you click.
 
-**[▶ Live demo](https://cartapel-demo-derus.fly.dev)** (log in with `demo` / `demo`) · **[📖 Docs](https://de-rus.github.io/cartapel/)** · **[🚀 Deploy to Render](https://render.com/deploy?repo=https://github.com/De-Rus/cartapel)**
+**[▶ Live demo](https://demo.cartapel.com)** (no login needed) · **[📖 Docs](https://de-rus.github.io/cartapel/)** · **[🚀 Deploy to Render](https://render.com/deploy?repo=https://github.com/De-Rus/cartapel)**
 
 ```bash
 git clone https://github.com/De-Rus/cartapel && cd cartapel
@@ -55,7 +55,7 @@ your own database:
 docker compose up
 ```
 
-Then open **http://localhost:8686/admin** and log in with `demo` / `demo`.
+Then open **http://localhost:8686/admin** — the demo config grants public access, no login needed.
 The stack is `db` (Postgres, auto-seeded from
 [`demo/seed.sql`](demo/seed.sql)) + `cartapel` (built from this repo, config in
 [`demo/admin/`](demo/admin/)). Nothing is written to your machine outside the

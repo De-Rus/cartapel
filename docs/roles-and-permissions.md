@@ -13,6 +13,19 @@ screen edits that same file: creates, edits and deletes write `config/auth.hcl`
 atomically and hot-swap the live config (on a read-only bundle it hands you the
 HCL to commit yourself).
 
+## Public access (no login)
+
+```hcl
+# config/auth.hcl
+public_role = "viewer"
+```
+
+With `public_role` set, anonymous visitors act as that role without logging
+in — kiosk dashboards, read-only status panels, hosted demos. A real session
+always wins over the anonymous identity, log in normally to switch. Naming an
+unknown role is a load error. Point it at a write-capable role only if you
+truly mean it: **everyone on the network gets that power**.
+
 ## The `admin` role
 
 `admin` is built in. It has full access to everything and cannot be edited or

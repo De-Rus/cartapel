@@ -11,7 +11,7 @@ hero:
       link: /getting-started
     - theme: alt
       text: Live demo — demo / demo
-      link: https://cartapel-demo-derus.fly.dev
+      link: https://demo.cartapel.com
     - theme: alt
       text: Configuration
       link: /configuration/overview
@@ -47,7 +47,7 @@ inline child rows, bulk actions, dashboards, roles and an audit log.
 
 ::: tip Try it without installing
 A hosted demo runs the bundled Acme dataset at
-**<https://cartapel-demo-derus.fly.dev>** — log in with `demo` / `demo`.
+**<https://demo.cartapel.com>** — no login needed.
 :::
 
 Two ideas make it different:
