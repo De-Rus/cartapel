@@ -1,194 +1,107 @@
-# cartapel
+<div align="center">
+  <img src="site/public/logo.svg" width="84" alt="cartapel logo" />
 
-[![CI](https://github.com/De-Rus/cartapel/actions/workflows/ci.yml/badge.svg)](https://github.com/De-Rus/cartapel/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/tag/De-Rus/cartapel?label=release&sort=semver)](https://github.com/De-Rus/cartapel/releases)
+  # cartapel
 
-Point a single binary at your existing Postgres and get a Django-admin-quality
-panel. No framework, no ORM, no Node runtime — your database schema is the
-source of truth, and customization is code you version, not a GUI you click.
+  **An admin panel for your existing Postgres.**
+  One Rust binary · config as code · no framework, no ORM, no Node runtime.
 
-**[▶ Live demo](https://demo.cartapel.com)** (no login needed) · **[📖 Docs](https://de-rus.github.io/cartapel/)** · **[🚀 Deploy to Render](https://render.com/deploy?repo=https://github.com/De-Rus/cartapel)**
+  [![CI](https://github.com/De-Rus/cartapel/actions/workflows/ci.yml/badge.svg)](https://github.com/De-Rus/cartapel/actions/workflows/ci.yml)
+  [![Release](https://img.shields.io/github/v/tag/De-Rus/cartapel?label=release&sort=semver)](https://github.com/De-Rus/cartapel/releases)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-```bash
-git clone https://github.com/De-Rus/cartapel && cd cartapel
-docker compose up            # → populated demo on http://localhost:8686/admin
-```
+  **[cartapel.com](https://cartapel.com)** · **[▶ Live demo](https://demo.cartapel.com)** (no login) · **[📖 Docs](https://docs.cartapel.com)** · **[🚀 Deploy to Render](https://render.com/deploy?repo=https://github.com/De-Rus/cartapel)**
 
-- **Opt-in tables**: the admin exposes only the tables you register with a
-  config file — an introspected-but-unconfigured table is not part of the panel.
-  Once registered, columns, PKs and FKs are introspected: lists get pagination,
-  search, sorting and sane widgets (FKs as links labeled with the related
-  record's name — not a bare id — enums as badges, timestamps localized). Views and PK-less tables degrade to read-only.
-- **Code-first customization**: a directory of per-table HCL files — list
-  columns, search fields, featured filters (incl. raw-SQL filters — any real
-  column is filterable from the list's chip bar; the declared list only
-  curates), field widgets,
-  readonly/masked fields, inline child tables, bulk actions (declarative
-  `UPDATE`s or HMAC-signed webhooks into your real backend).
-- **Auth, roles, audit**: built-in users/sessions (stored in cartapel's own
-  SQLite file — your database is never written to unless you edit a row),
-  per-table/per-field/row-level permissions, and an audit log of every write
-  with before/after diffs — **audited field edits revert in one click**
-  (admin-only, refused with a conflict if the row has drifted since), and the
-  revert is itself audited and undoable. Admins can **view as any role** to
-  verify exactly what it sees (read-only while impersonating).
-- **Dashboards**: SQL-defined stat tiles, charts and tables, evaluated
-  read-only — parametric via **template variables** (`{{var}}`, bound server-side,
-  URL-backed selector, shareable links).
-- **Zero-config relations**: introspected FKs surface automatically — related
-  records appear as inlines on every detail page with no config at all.
-- **Fast to live in**: a ⌘K command palette (jump to any table, "New X",
-  export CSV/JSON with the current filters, admin screens — recents ranked by
-  frecency), Notion-style filter chips on every list, and saved views you can
-  share with the team via a copyable link.
-- **Speaks your language**: per-locale `labels = { es = "Cliente" }` on
-  tables, fields, groups and actions; the deployment's `locale` picks them.
+  <img src="site/public/shots/list.png" alt="cartapel — list view with filter chips, saved views and inline editing" width="820" />
+</div>
 
-## Try the demo
+## Why
 
-A self-contained "Acme" dataset (customers, products, orders, subscriptions)
-with a ready-made config, so you can click around before pointing cartapel at
-your own database:
+Every project ends up needing an admin: support wants to fix a record, ops wants
+a dashboard, someone needs to flip a flag. The usual options are heavy (Retool),
+framework-locked (Django admin) or become a second codebase to maintain.
 
-```bash
-docker compose up
-```
-
-Then open **http://localhost:8686/admin** — the demo config grants public access, no login needed.
-The stack is `db` (Postgres, auto-seeded from
-[`demo/seed.sql`](demo/seed.sql)) + `cartapel` (built from this repo, config in
-[`demo/admin/`](demo/admin/)). Nothing is written to your machine outside the
-containers; `docker compose down -v` removes everything.
-
-## Point it at your own database
-
-cartapel is config-first: a table appears only once you give it a `.hcl` file,
-and the database it reads is declared as a `source`. A minimal `config/cartapel.hcl`:
+cartapel takes a different bet: **your database schema is the source of truth,
+and every customization is code you version** — a directory of small HCL files
+reviewed in pull requests, not a GUI you click. The binary introspects Postgres
+and renders a complete panel; config only refines it.
 
 ```hcl
-source "main" {
-  type    = "postgres"
-  url     = "env:CARTAPEL_DB"   # or a literal postgres:// url
-  primary = true
-}
-```
-
-```bash
-export CARTAPEL_DB=postgres://user:pass@host:5432/mydb
-export CARTAPEL_SECRET_KEY=$(openssl rand -hex 32)
-export CARTAPEL_ADMIN_EMAIL=you@example.com CARTAPEL_ADMIN_PASSWORD=change-me
-cartapel serve \
-  --config ./admin --data ./cartapel-data \
-  --listen 0.0.0.0:8686
-```
-
-`--db postgres://…` / `CARTAPEL_DB` overrides the primary source's URL, so the
-same config runs against staging or prod by swapping one env var. The panel is
-served under **`/admin`** by default — change it with `--base-path /other`, or
-`--base-path ''` (or `/`) to serve at the domain root. The mount prefix is
-injected into the SPA at runtime, so the **same binary/image serves any path**
-with no rebuild.
-
-`--config` points at a directory of HCL files:
-
-```
-admin/
-├── config/                   # reserved — globals, never a sidebar group
-│   ├── cartapel.hcl          #   brand, defaults, the `main` postgres source
-│   ├── auth.hcl             #   roles, field masking, row-level filters
-│   └── dashboard.hcl        #   home widgets (SQL stat tiles, charts, tables)
-└── screens/                  # every table and page lives here
-    ├── customers/            # a folder under screens/ IS a sidebar group
-    │   ├── _group.hcl       #   its label, icon (lucide), order
-    │   ├── customers/       #   one folder per table — the folder name is the table
-    │   │   └── screen.hcl   #     list/fields/actions (empty file = introspected defaults)
-    │   └── subscriptions/
-    │       └── screen.hcl
-    └── overview/
-        └── summary/          # a scripted page instead of a table
-            ├── screen.hcl   #   module = "summary.tsx"
-            └── summary.tsx  #   authored with the sx SDK
-```
-
-`config/` is never a sidebar group and is never scanned for tables — it holds
-only the three globals (`cartapel.hcl`/`auth.hcl`/`dashboard.hcl`).
-
-Under `screens/`, each folder is a sidebar group carrying a `_group.hcl`
-(`label`, `icon`, `order`); groups sort by `order` then `label`. Inside a group,
-each table is a subfolder whose `screen.hcl` configures it — and the folder name
-*is* the table name. A scripted page is the same shape: a subfolder whose
-`screen.hcl` sets `module = "<name>.tsx"` next to the module authored with the
-`sx` SDK. See the [configuration docs](docs/configuration/pages-and-queries.md).
-
-The admin is an allowlist: only tables with a `screen.hcl` are exposed (an empty
-file is enough — it renders with introspected defaults), and an admin can author
-one in-app from the generated template. Unconfigured tables are absent from the
-nav and 404 by direct URL, so there is no denylist to maintain. Config files
-are watched: edit them on disk and the panel hot-reloads (debounced; a broken
-edit keeps the last good config). See [`docs/`](docs/)
-for the full option surface and [`demo/admin/`](demo/admin/) for a worked example.
-
-## Configuration sketch
-
-```hcl
-# admin/screens/market-data/instruments/screen.hcl
+# screens/sales/orders/screen.hcl — this is the whole customization
 list {
-  columns = ["symbol", "exchange", "asset_class", "active"]
-  search  = ["symbol", "name"]
-  filters = ["asset_class", "active", "stale"]
-  sort    = "-id"
-
-  filter_def "stale" {
-    label = "No recent price"
-    sql   = "id NOT IN (SELECT instrument_id FROM prices WHERE ts > now() - interval '7 days')"
-  }
+  columns = ["id", "customer_id", "status", "total"]
+  filters = ["status"]
+  sort    = "-placed_at"
 }
 
-field "asset_class" {
+field "status" {
   widget = "badge"
-  params = { colors = { crypto = "orange", stock = "blue" } }
+  params = { colors = { paid = "green", refunded = "red" } }
 }
 
-edit {
-  readonly = ["id", "source", "symbol"]
-}
-
-action "deactivate" {
-  label   = "Deactivate"
+action "refund" {
+  label   = "Refund"
   kind    = "update"
-  set     = { active = false }
-  confirm = "Deactivate {count} instruments?"
+  set     = { status = "refunded" }
+  confirm = "Refund {count} orders?"
 }
 ```
 
-## Build
+An **empty** `screen.hcl` is already a working table: pagination, search,
+Notion-style filter chips on any column, sorting, inline editing, and foreign
+keys rendered as links carrying the related record's *name*, not a bare id.
+
+## Try it
+
+```bash
+# The bundled demo (Acme dataset + a worked config), nothing touches your machine:
+git clone https://github.com/De-Rus/cartapel && cd cartapel
+docker compose up            # → http://localhost:8686/admin
+
+# Or against YOUR database, in one command:
+docker run -p 8686:8686 \
+  -e CARTAPEL_DB=postgres://user:pass@host/db \
+  -e CARTAPEL_SECRET_KEY=$(openssl rand -hex 32) \
+  -e CARTAPEL_ADMIN_EMAIL=you@example.com -e CARTAPEL_ADMIN_PASSWORD=change-me \
+  ghcr.io/de-rus/cartapel serve
+```
+
+First boot with an empty config drops you into a **setup wizard** that
+discovers your tables, suggests groups and writes the HCL for you — ready to
+commit.
+
+## What you get
+
+| | |
+|---|---|
+| **Introspected CRUD** | Lists, detail pages, inline child tables from reverse FKs, bulk actions, CSV/JSON import & export. Views and PK-less tables degrade to read-only. |
+| **Roles & permissions** | Per-table / per-column / row-level, in versioned config. Role inheritance (`extends`), multi-role union, a per-role `customize` grant, and a read-only **view-as** mode to verify what a role sees. |
+| **Audit & revert** | Every write logged with before/after diffs. Field edits revert in one click — and the revert is itself audited. |
+| **SQL dashboards** | Stat tiles, charts and tables straight from SQL, with template variables (`{{window}}`), all in read-only transactions with timeouts. |
+| **Custom pages** | Drop a `.tsx` module next to your config — transpiled in the browser with the `sx` SDK in scope. No build step, no npm. Typed via `{base}/sx.d.ts`. |
+| **Theming & i18n** | Presets (including a faithful Django look), your accent, per-mode design tokens, per-locale labels — one hot-reloaded HCL block. |
+| **Ops-friendly** | Single static binary or Docker image. Config hot-reloads from disk (a broken edit keeps the last good config). `cartapel check` validates the bundle in CI. Optional `public_role` for kiosk/demo access. |
+
+## Security model, in short
+
+Sessions are HMAC-signed HttpOnly cookies; passwords are argon2id; login is
+rate-limited. Every SQL identifier is validated against the introspected
+schema and every value is a bound parameter. Secret-shaped columns (`*token*`,
+`*secret*`, `*password*`, …) are auto-masked for **everyone, admins included**.
+Dashboard SQL runs `READ ONLY` with statement timeouts; webhook actions are
+HMAC-signed. Details: [docs → Security](https://docs.cartapel.com/security).
+
+## Build from source
 
 ```bash
 cd ui && pnpm install && pnpm build && cd ..   # SPA, embedded into the binary
 cargo build --release                          # → target/release/cartapel
 ```
 
-## Security model
+## The name
 
-- Session cookies (HttpOnly, SameSite=Lax) are HMAC-SHA256-signed with the
-  app secret key; a tampered or unsigned cookie is treated as no session.
-  The signature is verified before any DB session lookup.
-- **Secret key** — cartapel's signing/encryption root. **REQUIRED**: cartapel
-  refuses to start without it. Resolved at startup by precedence:
-  `CARTAPEL_SECRET_KEY` env → `[cartapel].secret_key` in `config/cartapel.hcl`
-  (env-interpolated, e.g. `secret_key = "env:CARTAPEL_SECRET_KEY"`). Prefer the
-  env var or `${...}` interpolation — never commit a literal key to config.
-  Rotating the key invalidates all existing sessions (users re-login once).
-- Passwords are argon2id; login is rate-limited per IP.
-- Secret-shaped columns (`*token*`, `*secret*`, `*password*`, `*api_key*`, …)
-  are auto-masked for everyone — admins included — unless you give the column
-  an explicit `field` block. An explicit `masked = true` also binds admins.
-- Every SQL identifier is validated against the introspected schema; every
-  value is a bound parameter. Raw-SQL fragments exist only in your config
-  files, which live in your repo and are trusted like code.
-- Dashboard SQL runs in `READ ONLY` transactions with a statement timeout.
-- Webhook actions are signed (`X-Cartapel-Signature`, HMAC-SHA256 with
-  `CARTAPEL_WEBHOOK_SECRET`).
+A *cartapel* is old Spanish for the bundle of papers that holds all the
+records. That's the job: one place where everything in your database is
+findable, readable and safely editable.
 
 MIT licensed.
