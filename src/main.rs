@@ -306,6 +306,49 @@ async fn check(config: &std::path::Path, db: Option<String>, schema: Option<Stri
     }
 }
 
+/// Hot-reload the config when its files change on disk (editor saves, git
+/// checkout, volume sync). Debounced; a failed load keeps the last good config
+/// and logs the error. In-app edits already reload synchronously — the watcher
+/// just re-runs an idempotent load after them.
+fn watch_config(state: Arc<AppState>) {
+    use notify::Watcher;
+    let Some(dir) = state.config_dir.clone() else { return };
+    let (tx, rx) = std::sync::mpsc::channel::<()>();
+    let mut watcher = match notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        if let Ok(ev) = res {
+            let relevant = ev.paths.iter().any(|p| {
+                p.extension().is_some_and(|e| e == "hcl")
+                    || p.extension().is_some_and(|e| e == "tsx" || e == "ts" || e == "js")
+            });
+            if relevant {
+                let _ = tx.send(());
+            }
+        }
+    }) {
+        Ok(w) => w,
+        Err(e) => {
+            tracing::warn!("config watcher unavailable: {e}");
+            return;
+        }
+    };
+    if let Err(e) = watcher.watch(&dir, notify::RecursiveMode::Recursive) {
+        tracing::warn!("config watcher failed to start: {e}");
+        return;
+    }
+    std::thread::spawn(move || {
+        let _keepalive = watcher;
+        while rx.recv().is_ok() {
+            // Debounce: a save often lands as several events (tmp write + rename).
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            while rx.try_recv().is_ok() {}
+            match state.reload_config() {
+                Ok(()) => tracing::info!("config reloaded from disk"),
+                Err(e) => tracing::warn!("config change ignored (kept last good): {e}"),
+            }
+        }
+    });
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn serve(
     db: Option<String>,
@@ -443,6 +486,7 @@ async fn serve(
         config_write_lock: Default::default(),
     });
     configedit::port_legacy_roles(&state);
+    watch_config(state.clone());
 
     let api = Router::new()
         .route("/health", get(auth::health_handler))

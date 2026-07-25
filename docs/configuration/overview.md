@@ -158,9 +158,11 @@ Config is validated as it loads, and again on every in-app edit:
   (see [Fields & widgets](/configuration/fields-and-widgets)).
 - **Named queries must be unique** across the whole bundle.
 
-When you edit config through the in-app builder, steward **hot-swaps** the live
-config with no restart. A bad edit can never replace the running config: writes
-are trial-parsed first, and a failed reload restores the previous state.
+Config edits **hot-reload** with no restart — both through the in-app builder
+and by editing the files on disk (steward watches the config directory,
+debounced). A bad edit can never replace the running config: builder writes are
+trial-parsed first with a failed reload restoring the previous state, and a
+broken on-disk edit keeps the last good config and logs the error.
 
 ::: tip Round-tripping through the visual builder drops comments
 The builder regenerates canonical HCL from the parsed model. If you keep

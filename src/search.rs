@@ -67,7 +67,10 @@ pub async fn search_handler(
                 for v in &b.values {
                     qq = qq.bind(v.as_deref());
                 }
-                qq.fetch_optional(&mut *tx).await.ok()?
+                qq.fetch_optional(&mut *tx)
+                    .await
+                    .map_err(|e| tracing::warn!("pk search on {table} failed: {e}"))
+                    .ok()?
             }
             .await;
             if let Some((Some(pkv), titlev)) = hit {
@@ -103,7 +106,10 @@ pub async fn search_handler(
             for v in &binds.values {
                 q = q.bind(v.as_deref());
             }
-            q.fetch_all(&mut *tx).await.ok()
+            q.fetch_all(&mut *tx)
+                .await
+                .map_err(|e| tracing::warn!("search on {table} failed: {e}"))
+                .ok()
         }
         .await
         .unwrap_or_default();

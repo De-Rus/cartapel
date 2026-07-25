@@ -194,10 +194,11 @@ icon  = "package"   # any lucide icon name
 order = 1
 ```
 
-Save the files and **restart steward** — config files on disk are read at
-startup, and there is no filesystem watcher. (Edits made through the in-app
-builder — including the setup wizard — do hot-swap the live config with no
-restart.) The Catalog group then appears with your Products table inside it.
+Save the files — steward **watches the config directory** and hot-reloads on
+change (debounced; a broken edit keeps the last good config and logs the
+error). The Catalog group appears with your Products table inside it, no
+restart. In-app builder edits — including the setup wizard — hot-swap the same
+way.
 
 ## What's next
 
