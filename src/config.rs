@@ -137,6 +137,11 @@ pub struct ThemeConfig {
 #[serde(deny_unknown_fields)]
 pub struct GroupConfig {
     pub label: String,
+    /// Per-locale label overrides, e.g. `labels = { es = "Cliente" }` — the
+    /// deployment's `[steward].locale` picks one, `label` is the fallback.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub labels: BTreeMap<String, String>,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
     #[serde(default)]
@@ -155,6 +160,7 @@ pub struct GroupConfig {
 pub struct LoadedGroup {
     pub slug: String,
     pub label: String,
+    pub labels: BTreeMap<String, String>,
     pub icon: Option<String>,
     pub order: i64,
     pub table_order: Vec<String>,
@@ -429,6 +435,12 @@ pub struct TableConfig {
     pub label: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_plural: Option<String>,
+    /// Per-locale label overrides, e.g. `labels = { es = "Cliente" }` — the
+    /// deployment's `[steward].locale` picks one, `label` is the fallback.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub labels: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub labels_plural: BTreeMap<String, String>,
     #[serde(
         default,
         skip_serializing_if = "ListConfig::is_empty",
@@ -596,6 +608,11 @@ pub struct DetailSection {
 pub struct FieldConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+    /// Per-locale label overrides, e.g. `labels = { es = "Cliente" }` — the
+    /// deployment's `[steward].locale` picks one, `label` is the fallback.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub labels: BTreeMap<String, String>,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub widget: Option<String>,
     #[serde(default, skip_serializing_if = "is_false")]
@@ -939,6 +956,11 @@ fn is_true(b: &bool) -> bool {
 #[serde(deny_unknown_fields)]
 pub struct ActionConfig {
     pub label: String,
+    /// Per-locale label overrides, e.g. `labels = { es = "Cliente" }` — the
+    /// deployment's `[steward].locale` picks one, `label` is the fallback.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub labels: BTreeMap<String, String>,
+
     pub kind: ActionKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
@@ -1151,10 +1173,13 @@ pub struct ConfigDir {
 impl ConfigDir {
     /// The presentation label of a folder-group, by its folder slug.
     pub fn group_label(&self, slug: &str) -> Option<String> {
-        self.groups
-            .iter()
-            .find(|g| g.slug == slug)
-            .map(|g| g.label.clone())
+        self.groups.iter().find(|g| g.slug == slug).map(|g| {
+            self.steward
+                .locale
+                .as_deref()
+                .and_then(|l| g.labels.get(l).cloned())
+                .unwrap_or_else(|| g.label.clone())
+        })
     }
 
     /// The label of the folder-group a table belongs to, if any.
@@ -1343,6 +1368,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                 cfg.groups.push(LoadedGroup {
                     slug,
                     label: g.label,
+                    labels: g.labels,
                     icon: g.icon,
                     order: g.order,
                     table_order: g.table_order,

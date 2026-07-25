@@ -27,6 +27,22 @@ pub fn table_config(state: &AppState, table: &str) -> TableConfig {
     state.cfg().tables.get(table).cloned().unwrap_or_default()
 }
 
+/// Deployment-locale label resolution: `labels[locale]` wins, else the base
+/// label. Emission-time so the frontend needs no locale logic for data labels.
+pub fn localize(
+    state: &AppState,
+    labels: &std::collections::BTreeMap<String, String>,
+    base: String,
+) -> String {
+    state
+        .cfg()
+        .steward
+        .locale
+        .as_deref()
+        .and_then(|l| labels.get(l).cloned())
+        .unwrap_or(base)
+}
+
 pub fn humanize(name: &str) -> String {
     name.replace('_', " ")
 }
@@ -411,7 +427,11 @@ fn column_meta(
             }
             let mut m = json!({
                 "name": c.name,
-                "label": fc.and_then(|f| f.label.clone()).unwrap_or_else(|| humanize(&c.name)),
+                "label": localize(
+                    state,
+                    fc.map(|f| &f.labels).unwrap_or(&Default::default()),
+                    fc.and_then(|f| f.label.clone()).unwrap_or_else(|| humanize(&c.name)),
+                ),
                 "kind": c.kind,
                 "nullable": c.nullable,
                 "has_default": c.has_default,
@@ -435,7 +455,11 @@ fn column_meta(
         let is_masked = masked.contains(name);
         let mut m = json!({
             "name": name,
-            "label": fc.and_then(|f| f.label.clone()).unwrap_or_else(|| humanize(name)),
+            "label": localize(
+                state,
+                fc.map(|f| &f.labels).unwrap_or(&Default::default()),
+                fc.and_then(|f| f.label.clone()).unwrap_or_else(|| humanize(name)),
+            ),
             "kind": "text",
             "nullable": true,
             "has_default": false,
@@ -607,8 +631,8 @@ pub async fn table_meta(state: &AppState, user: &CurrentUser, table: &str) -> Op
         .filter(|(n, _)| actions_allowed.contains(n))
         .map(|(n, a)| {
             json!({
-                "name": n, "label": a.label, "danger": a.danger,
-                "confirm": a.confirm, "kind": a.kind,
+                "name": n, "label": localize(state, &a.labels, a.label.clone()),
+                "danger": a.danger, "confirm": a.confirm, "kind": a.kind,
             })
         })
         .collect();
@@ -626,11 +650,15 @@ pub async fn table_meta(state: &AppState, user: &CurrentUser, table: &str) -> Op
         })
         .collect();
     let read_only = dbt.is_view || dbt.pk.is_none();
-    let label = cfg.label.clone().unwrap_or_else(|| humanize(table));
+    let label = localize(
+        state,
+        &cfg.labels,
+        cfg.label.clone().unwrap_or_else(|| humanize(table)),
+    );
     Some(json!({
         "name": table,
         "label": label,
-        "label_plural": cfg.label_plural.clone().unwrap_or_else(|| capitalize(&humanize(table))),
+        "label_plural": localize(state, &cfg.labels_plural, cfg.label_plural.clone().unwrap_or_else(|| capitalize(&humanize(table)))),
         "group": state.cfg().table_group_label(table),
         "pk": dbt.pk,
         "read_only": read_only,
@@ -780,6 +808,7 @@ mod nav_tests {
         let mut cfg = ConfigDir::default();
         cfg.groups.push(LoadedGroup {
             slug: "overview".into(),
+            labels: Default::default(),
             label: "Overview".into(),
             icon: None,
             order: 0,
@@ -960,6 +989,7 @@ mod nav_tests {
 
         let groups = vec![LoadedGroup {
             slug: "g".into(),
+            labels: Default::default(),
             label: "G".into(),
             icon: None,
             order: 0,

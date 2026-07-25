@@ -159,6 +159,7 @@ pub async fn create_group(
 
     let group_cfg = GroupConfig {
         label: body.label,
+        labels: Default::default(),
         icon: body.icon,
         order: body.order.unwrap_or(0),
         table_order: Vec::new(),
@@ -238,6 +239,7 @@ pub async fn patch_group(
 
     let group_cfg = GroupConfig {
         label: body.label.unwrap_or_else(|| existing.label.clone()),
+        labels: existing.labels.clone(),
         icon: body.icon.or_else(|| existing.icon.clone()),
         order: body.order.unwrap_or(existing.order),
         table_order: body
@@ -647,6 +649,7 @@ pub async fn save_layout(
             .unwrap_or(existing.table_order.as_slice());
         let group_cfg = GroupConfig {
             label: existing.label.clone(),
+            labels: existing.labels.clone(),
             icon: existing.icon.clone(),
             order: existing.order,
             table_order: reconcile_order(&members, preferred),

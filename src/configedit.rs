@@ -263,6 +263,7 @@ async fn create_in_group(
 
     let mut group_cfg = crate::config::GroupConfig {
         label: g.label.clone(),
+        labels: g.labels.clone(),
         icon: g.icon.clone(),
         order: g.order,
         table_order: g.table_order.clone(),
@@ -501,6 +502,7 @@ pub async fn apply_setup(
         }
         let group_cfg = crate::config::GroupConfig {
             label: g.label.clone(),
+            labels: Default::default(),
             icon: g.icon.clone(),
             order: (i + 1) as i64,
             table_order: g.tables.clone(),

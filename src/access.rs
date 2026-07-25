@@ -584,6 +584,7 @@ mod tests {
         bots_cfg.actions.insert(
             "halt".into(),
             ActionConfig {
+                labels: Default::default(),
                 label: "Halt".into(),
                 kind: ActionKind::Update,
                 set: serde_json::Map::new(),
@@ -1598,5 +1599,31 @@ mod tests {
             ensure_roles(&state, " ,").is_err(),
             "empty role list rejected"
         );
+    }
+
+    #[tokio::test]
+    async fn labels_localize_by_deployment_locale() {
+        let state = test_state();
+        {
+            let mut cfg = (*state.cfg()).clone();
+            cfg.steward.locale = Some("es".into());
+            let tc = cfg.tables.get_mut("bots").unwrap();
+            tc.label = Some("Bot".into());
+            tc.labels.insert("es".into(), "Robot".into());
+            cfg.auth.roles.insert("viewer".into(), {
+                let mut r = RoleConfig::default();
+                r.tables.insert("bots".into(), "read".into());
+                r
+            });
+            state.cfg.store(Arc::new(cfg));
+        }
+        let user = CurrentUser {
+            email: "u@x.io".into(),
+            role: "viewer".into(),
+        };
+        let table = crate::meta::table_meta(&state, &user, "bots")
+            .await
+            .unwrap();
+        assert_eq!(table["label"], serde_json::json!("Robot"));
     }
 }
