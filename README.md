@@ -11,17 +11,19 @@ source of truth, and customization is code you version, not a GUI you click.
 **[▶ Live demo](https://steward-demo-derus.fly.dev)** (log in with `demo` / `demo`) · **[📖 Docs](https://de-rus.github.io/steward/)**
 
 ```bash
-git clone … && cd steward
+git clone https://github.com/De-Rus/steward && cd steward
 docker compose up            # → populated demo on http://localhost:8686/admin
 ```
 
 - **Opt-in tables**: the admin exposes only the tables you register with a
   config file — an introspected-but-unconfigured table is not part of the panel.
   Once registered, columns, PKs and FKs are introspected: lists get pagination,
-  search, sorting and sane widgets (FKs as links, enums as badges, timestamps
-  localized). Views and PK-less tables degrade to read-only.
+  search, sorting and sane widgets (FKs as links labeled with the related
+  record's name — not a bare id — enums as badges, timestamps localized). Views and PK-less tables degrade to read-only.
 - **Code-first customization**: a directory of per-table HCL files — list
-  columns, search fields, filters (incl. raw-SQL filters), field widgets,
+  columns, search fields, featured filters (incl. raw-SQL filters — any real
+  column is filterable from the list's chip bar; the declared list only
+  curates), field widgets,
   readonly/masked fields, inline child tables, bulk actions (declarative
   `UPDATE`s or HMAC-signed webhooks into your real backend).
 - **Auth, roles, audit**: built-in users/sessions (stored in steward's own
@@ -36,6 +38,12 @@ docker compose up            # → populated demo on http://localhost:8686/admin
   URL-backed selector, shareable links).
 - **Zero-config relations**: introspected FKs surface automatically — related
   records appear as inlines on every detail page with no config at all.
+- **Fast to live in**: a ⌘K command palette (jump to any table, "New X",
+  export CSV/JSON with the current filters, admin screens — recents ranked by
+  frecency), Notion-style filter chips on every list, and saved views you can
+  share with the team via a copyable link.
+- **Speaks your language**: per-locale `labels = { es = "Cliente" }` on
+  tables, fields, groups and actions; the deployment's `locale` picks them.
 
 ## Try the demo
 
@@ -116,7 +124,9 @@ each table is a subfolder whose `screen.hcl` configures it — and the folder na
 The admin is an allowlist: only tables with a `screen.hcl` are exposed (an empty
 file is enough — it renders with introspected defaults), and an admin can author
 one in-app from the generated template. Unconfigured tables are absent from the
-nav and 404 by direct URL, so there is no denylist to maintain. See [`docs/`](docs/)
+nav and 404 by direct URL, so there is no denylist to maintain. Config files
+are watched: edit them on disk and the panel hot-reloads (debounced; a broken
+edit keeps the last good config). See [`docs/`](docs/)
 for the full option surface and [`demo/admin/`](demo/admin/) for a worked example.
 
 ## Configuration sketch
@@ -171,6 +181,9 @@ cargo build --release                          # → target/release/steward
   env var or `${...}` interpolation — never commit a literal key to config.
   Rotating the key invalidates all existing sessions (users re-login once).
 - Passwords are argon2id; login is rate-limited per IP.
+- Secret-shaped columns (`*token*`, `*secret*`, `*password*`, `*api_key*`, …)
+  are auto-masked for everyone — admins included — unless you give the column
+  an explicit `field` block. An explicit `masked = true` also binds admins.
 - Every SQL identifier is validated against the introspected schema; every
   value is a bound parameter. Raw-SQL fragments exist only in your config
   files, which live in your repo and are trusted like code.

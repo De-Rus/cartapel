@@ -3,6 +3,12 @@
 This walks you from a fresh binary to a working panel with your first table
 registered.
 
+::: tip Prefer to click around first?
+A hosted demo runs the bundled Acme dataset at
+**<https://steward-demo-derus.fly.dev>** (`demo` / `demo`) — or run it locally
+with `docker compose up` from a repo checkout.
+:::
+
 ## Install
 
 steward is a single binary. Get it one of three ways:

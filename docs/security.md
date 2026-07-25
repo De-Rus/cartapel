@@ -46,12 +46,23 @@ custom widgets and pages sends it for you too.
 
 ## Column masking
 
-A column marked `masked` (per-field in a table config, or per-role in
-`config/auth.hcl`) is protected end to end:
+A column can be masked three ways, and all are protected end to end:
+
+- **Automatically** — a column whose name looks secret-shaped (contains
+  `token`, `secret`, `password`, `passwd`, `api_key`, `apikey` or
+  `private_key`) is masked by default for **everyone, admins included**.
+  Declaring a `field` block on the column hands control back to you.
+- **Per field** — `masked = true` in a table config. The author's call — it
+  also binds admins.
+- **Per role** — `masked` in `config/auth.hcl`, hiding the column from that
+  role only. (With several roles, it holds only when every view-granting
+  role masks it.)
+
+Whichever way a column is masked:
 
 - Its value is returned pre-masked (e.g. `a3f…`), never in the clear.
 - It is skipped in global search and in the record title.
-- It is rejected as a sort key.
+- It is rejected as a sort key and as a filter key.
 - It is masked in CSV/JSON exports.
 
 Use it for tokens, wallets, secrets and PII you want visible to some roles but
@@ -62,8 +73,10 @@ not others.
 A role's `row_filter` predicate is ANDed into the `WHERE` clause of every query
 that touches the table — list, count, search, and the `WHERE` of bulk updates and
 imports. A scoped user can never read or write a row outside their filter. When a
-filter, search or row-filter applies, `count(*)` is still computed exactly. See
-[Roles & permissions](/roles-and-permissions#row-level-filters).
+filter, search or row-filter applies, `count(*)` is still computed exactly. With
+several roles, per-role filters OR together — a view-granting role with no
+filter lifts the restriction for that table. See
+[Roles & permissions](/roles-and-permissions#multiple-roles-per-user).
 
 ## SQL safety
 
@@ -85,7 +98,7 @@ non-admin caller.
 
 ## Static-asset path confinement
 
-Custom widget and page assets are served from the config bundle at `/static/*`,
+Custom widget and page assets are served from the config bundle at `{base}/static/*`,
 but only safely:
 
 - Directory traversal (`..`) and out-of-tree symlinks are rejected.

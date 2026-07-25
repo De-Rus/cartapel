@@ -10,13 +10,16 @@ hero:
       text: Get started
       link: /getting-started
     - theme: alt
+      text: Live demo
+      link: https://steward-demo-derus.fly.dev
+    - theme: alt
       text: Configuration
       link: /configuration/overview
 
 features:
   - icon: 🗄️
     title: Point it at Postgres
-    details: Introspects tables, primary keys, foreign keys and enums. Lists get pagination, search, sorting and sensible widgets automatically. Views and PK-less tables degrade to read-only.
+    details: Introspects tables, primary keys, foreign keys and enums. Lists get pagination, search, sorting, Notion-style filter chips on any column, shareable saved views, a ⌘K palette and sensible widgets automatically. Views and PK-less tables degrade to read-only.
   - icon: 📝
     title: Code-first config
     details: A directory of HCL files. Folders become sidebar groups, one file per table. List columns, filters, field widgets, detail layouts, inline child tables and bulk actions — all reviewable in your repo.
@@ -41,6 +44,11 @@ database — a Django-admin / Forest / Retool alternative you run yourself. You
 point the Rust binary at your database, register the tables you want to expose,
 and get a polished CRUD panel: paginated lists, search, filters, detail pages,
 inline child rows, bulk actions, dashboards, roles and an audit log.
+
+::: tip Try it without installing
+A hosted demo runs the bundled Acme dataset at
+**<https://steward-demo-derus.fly.dev>** — log in with `demo` / `demo`.
+:::
 
 Two ideas make it different:
 

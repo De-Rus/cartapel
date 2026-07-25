@@ -1,6 +1,8 @@
 # Roles & permissions
 
-Access is governed by **roles**. Each user has one role; a role grants access to
+Access is governed by **roles**. Each user carries one or more roles
+(permissions union — see [Multiple roles per user](#multiple-roles-per-user));
+a role grants access to
 tables, columns, rows and actions. Roles are authoritative in
 `config/auth.hcl` — versioned config you review like code. The in-app roles
 screen edits that same file: creates, edits and deletes write `config/auth.hcl`
@@ -72,7 +74,10 @@ role "support" {
 - Chains are allowed (`a` → `b` → `c`). An `extends` naming an unknown role or
   forming a cycle is a startup/config error, and the runtime editors reject it
   with a 400 — a broken hierarchy never loads silently.
-- The runtime Roles editor exposes this as the **Inherits from** selector.
+- The runtime Roles editor exposes this as the **Inherits from** selector,
+  plus a **show effective permissions** toggle that renders the fully-resolved
+  matrix (parents flattened in) read-only — what the role actually grants, not
+  just its own overrides.
 
 ## Multiple roles per user
 
@@ -169,7 +174,9 @@ masked = {
 }
 ```
 
-See [Security → Column masking](/security#column-masking).
+Independent of roles, secret-shaped column names auto-mask for everyone
+(admins included), and a field-level `masked = true` binds admins too — see
+[Security → Column masking](/security#column-masking).
 
 ## Row-level filters
 
@@ -211,8 +218,11 @@ Admins can manage roles and users from the in-app access screens. Role edits
 write `config/auth.hcl` (atomically, versioned, hot-swapped); users live in
 steward's SQLite state. Guardrails:
 
-- The builtin `admin` role cannot be edited or deleted.
+- The builtin `admin` role cannot be edited or deleted — and a new role named
+  any casing of it (`Admin`, `ADMIN`) is rejected. Role names are 1–64 chars
+  of letters, digits, `_` or `-`.
 - A role still assigned to users cannot be deleted — reassign them first.
+- A role other roles `extends` cannot be deleted — remove the inheritance first.
 - You cannot delete or demote the **last** admin user.
 - Role definitions are validated against the live schema — every referenced
   table, column and action must exist.

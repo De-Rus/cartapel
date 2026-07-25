@@ -1,7 +1,7 @@
 # CLI & environment
 
-steward is one binary with two subcommands: `serve` (run the panel) and `user`
-(manage panel users offline). Every flag has a matching environment variable, so
+steward is one binary with three subcommands: `serve` (run the panel), `user`
+(manage panel users offline) and `check` (validate a config bundle, CI-ready). Every flag has a matching environment variable, so
 you can drive it entirely from the environment in a container.
 
 ## `steward serve`
@@ -45,7 +45,7 @@ steward user add <email> [--role <role>] [--password <pw>] [--data <dir>]
 | Argument / flag | Env var | Default | Description |
 | --- | --- | --- | --- |
 | `<email>` | — | — | The user's email (lowercased on save). Positional, required. |
-| `--role` | — | `admin` | Role to assign. Must be a known role (`admin`, or one you define). |
+| `--role` | — | `admin` | Role(s) to assign — comma-separate for several (`support,billing`; permissions union). Not validated offline: a name with no matching role in `auth.hcl` simply grants nothing. |
 | `--password` | `STEWARD_PASSWORD` | *generated* | The password. When omitted, a strong random password is generated and printed once. |
 | `--data` | `STEWARD_DATA` | `./steward-data` | The state directory to write to. |
 
@@ -62,6 +62,7 @@ steward check --config ./admin                    # parse + validate the bundle
 steward check --config ./admin --db postgres://…  # + verify every configured
                                                   #   table/column against the
                                                   #   live schema
+# --schema <name> narrows the live check to one schema
 ```
 
 Run it in CI next to your migrations: config drift against a schema change
@@ -76,7 +77,7 @@ Beyond the per-flag variables above, steward reads:
 | `STEWARD_SECRET_KEY` | **Yes** | The app signing root for session cookies. steward refuses to start if this is unset **and** `[steward].secret_key` is also unset. See [Security](/security#secret-key). |
 | `STEWARD_ADMIN_EMAIL` | No | Email for the bootstrap admin created on first run. Defaults to `admin@localhost`. |
 | `STEWARD_ADMIN_PASSWORD` | No | Password for the bootstrap admin. When unset, a random one is generated and logged. |
-| `STEWARD_ADMIN_ROLE` | No | Role for the bootstrap user. Defaults to `admin`; a public demo can bootstrap a restricted role (e.g. a read-mostly `demo` role from `auth.hcl`) instead. |
+| `STEWARD_ADMIN_ROLE` | No | Role(s) for the bootstrap user (comma-separate for several). Defaults to `admin`; a public demo can bootstrap a restricted role (e.g. a read-mostly `demo` role from `auth.hcl`) instead. |
 | `STEWARD_WEBHOOK_SECRET` | No | HMAC secret for signing outbound webhook actions (`X-Steward-Signature`). |
 | `STEWARD_DB_TX_POOL` | No | Set to `1` to force transaction-pooler mode (disables sqlx's prepared-statement cache). Auto-detected for Supabase's port `6543` pooler. |
 | `RUST_LOG` | No | Standard `tracing` filter. Defaults to `steward=info,tower_http=warn`. |

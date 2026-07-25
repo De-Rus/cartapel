@@ -162,3 +162,8 @@ port `6543`), steward auto-detects it and disables the prepared-statement cache
 (which such poolers drop between transactions). Force this with
 `STEWARD_DB_TX_POOL=1` if you use a non-standard port. The session-mode pooler
 (port `5432`) needs no special handling.
+
+::: tip Validate before you ship
+`steward check --config ./admin --db …` exits non-zero on any parse error or
+schema drift — run it in CI next to your migrations. See the [CLI reference](/cli#steward-check).
+:::

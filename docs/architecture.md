@@ -33,7 +33,7 @@ steward touches two separate stores, and keeps them strictly apart:
   your database:
   - **users** — panel accounts (argon2id password hashes).
   - **sessions** — active login sessions.
-  - **saved_views** — users' saved list filters.
+  - **saved_views** — saved list filters, personal or shared with the whole team.
   - **audit_log** — every write, with actor, timestamp and before/after diffs.
   - **config_versions** — the history of config edits (see below).
 
@@ -53,13 +53,17 @@ reviewable in pull requests.
 
 ## Config hot-reload
 
-Config edits made through the in-app builder **hot-swap the live configuration
-with no restart**. The swap is safe by construction:
+The config directory is **watched** (notify-based): edits from the in-app
+builder, your editor, a `git checkout` or a volume sync all hot-swap the live
+configuration with no restart. The swap is safe by construction:
 
 - A write is trial-parsed before it is applied.
 - The whole directory is re-read; if that fails, the previous good config is
   kept.
 - Files are written atomically (temp file + rename).
+- Disk changes are debounced (a save's tmp-write + rename collapse to one
+  reload); a change that fails to load is ignored and logged, keeping the
+  last good config.
 
 A bad edit therefore can never replace the running config.
 
@@ -104,6 +108,7 @@ becomes a read-only viewer that hands you the HCL to commit yourself.
 ```
 Browser ──▶ {base}/api/*        JSON API (auth, meta, rows, config, dashboard, queries)
         ──▶ {base}/static/*     path-confined bundle assets (widget/page JS, logos)
+        ──▶ {base}/sx.d.ts      type declarations for the `sx` page/widget SDK
         ──▶ {base}/*            the embedded SPA (client-side routing)
         ──▶ /assets/*           the hashed SPA bundle (served from the root)
 ```
