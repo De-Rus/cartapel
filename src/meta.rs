@@ -439,11 +439,34 @@ pub struct ResolvedInline {
     pub can_delete: bool,
 }
 
+/// Zero-config inlines: every configured table with an introspected FK into
+/// `parent` becomes an inline on the parent's detail page.
+fn auto_inline_specs(state: &AppState, parent_key: &str, parent_phys: &str) -> Vec<InlineSpec> {
+    let cfg = state.cfg();
+    cfg.tables
+        .keys()
+        .filter(|child| child.as_str() != parent_key)
+        .filter(|child| {
+            state.resolve_table(child).is_some_and(|ct| {
+                ct.columns
+                    .iter()
+                    .any(|c| c.fk.as_ref().is_some_and(|(ft, _)| ft == parent_phys))
+            })
+        })
+        .map(|child| InlineSpec::Table(child.clone()))
+        .collect()
+}
+
 pub fn resolve_inlines(state: &AppState, user: &CurrentUser, table: &str) -> Vec<ResolvedInline> {
     let cfg = table_config(state, table);
     let Some(dbt) = state.resolve_table(table) else { return vec![] };
+    let specs = if !cfg.relations.inlines.is_empty() || cfg.relations.auto == Some(false) {
+        cfg.relations.inlines.clone()
+    } else {
+        auto_inline_specs(state, table, &dbt.name)
+    };
     let mut out = Vec::new();
-    for spec in &cfg.relations.inlines {
+    for spec in &specs {
         let (child, fk_col, label, columns, want_create, want_delete) = match spec {
             InlineSpec::Table(t) => (t.clone(), None, None, Vec::new(), None, None),
             InlineSpec::Full { table, fk_col, label, columns, can_create, can_delete } => {

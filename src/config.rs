@@ -811,11 +811,15 @@ impl EditConfig {
 pub struct RelationsConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub inlines: Vec<InlineSpec>,
+    /// `auto = false` opts out of the zero-config inlines derived from
+    /// introspected reverse FKs when no `inlines` are declared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto: Option<bool>,
 }
 
 impl RelationsConfig {
     fn is_empty(&self) -> bool {
-        self.inlines.is_empty()
+        self.inlines.is_empty() && self.auto.is_none()
     }
 }
 
