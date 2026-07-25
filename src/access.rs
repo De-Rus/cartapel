@@ -1582,9 +1582,7 @@ mod tests {
             role: "support, admin".into(),
         };
         assert!(user.is_admin());
-        let e = ensure_roles(&state, "ghost")
-            .err()
-            .expect("unknown role rejected");
+        let e = ensure_roles(&state, "ghost").expect_err("unknown role rejected");
         assert!(e.1.contains("unknown role"), "{}", e.1);
         assert!(
             ensure_roles(&state, " ,").is_err(),
