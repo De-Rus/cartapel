@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import clsx from 'clsx'
+import { useT } from '../lib/i18n'
 import type { TableMeta } from '../api/types'
 import { useClickOutside } from '../lib/hooks'
 import type { ColumnState } from '../lib/viewState'
@@ -23,6 +24,7 @@ export function ColumnMenu({
   onChange: (next: ColumnState) => void
   onReset: () => void
 }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [drag, setDrag] = useState<number | null>(null)
   const ref = useClickOutside(() => setOpen(false))
@@ -53,7 +55,7 @@ export function ColumnMenu({
         aria-haspopup="menu"
       >
         <IconColumns size={13} />
-        Columns
+        {t('col_button')}
         {hiddenCount > 0 && <span className="text-xxs text-muted">({hiddenCount})</span>}
       </button>
       {open && (

@@ -9,6 +9,7 @@ import {
   opsForKind,
 } from '../lib/filters'
 import { useClickOutside } from '../lib/hooks'
+import { useT } from '../lib/i18n'
 import { IconFilter, IconX } from './Icons'
 
 function filterOps(f: FilterMeta) {
@@ -70,6 +71,7 @@ export function FilterBuilder({
   activeCount: number
   onApply: (conditions: Condition[]) => void
 }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const ref = useClickOutside(() => setOpen(false))
   // Defaults-first: with no configured filters, every introspected column is a
@@ -122,7 +124,7 @@ export function FilterBuilder({
         aria-expanded={open}
       >
         <IconFilter size={13} />
-        Filter
+        {t('flt_button')}
         {activeCount > 0 && (
           <span className="ml-0.5 rounded-full bg-selected px-1.5 text-xxs tabular-nums text-accent">
             {activeCount}
@@ -133,7 +135,7 @@ export function FilterBuilder({
       {open && (
         <div className="pop-in absolute left-0 z-30 mt-1 w-[360px] rounded-card bg-surface1 p-3 shadow-menu">
           {conds.length === 0 && (
-            <p className="px-1 py-3 text-center text-[13px] text-muted">No conditions yet.</p>
+            <p className="px-1 py-3 text-center text-[13px] text-muted">{t('flt_empty')}</p>
           )}
           <div className="space-y-2">
             {conds.map((c, i) => {
@@ -182,10 +184,10 @@ export function FilterBuilder({
           </div>
           <div className="mt-3 flex items-center justify-between">
             <button type="button" className="text-[13px] text-accent hover:underline" onClick={addCondition}>
-              + Add condition
+              {t('flt_add')}
             </button>
             <button type="button" className="btn btn-primary" onClick={apply}>
-              Apply
+              {t('flt_apply')}
             </button>
           </div>
         </div>
