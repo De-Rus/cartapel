@@ -354,6 +354,7 @@ function ListInner({ table }: { table: TableMeta }) {
         <div className="relative">
           <IconSearch size={14} className="pointer-events-none absolute left-2.5 top-2 text-muted" />
           <input
+            name="q"
             className="input-sm w-56 !pl-8"
             placeholder={t('search_placeholder', { label: table.label_plural.toLowerCase() })}
             value={qInput}

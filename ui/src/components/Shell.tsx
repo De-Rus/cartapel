@@ -695,6 +695,7 @@ function ShellChrome({ meta }: { meta: Meta }) {
         {!rail && (
           <div className="mb-2 hidden px-1 wide:block">
             <input
+              name="nav-filter"
               className="input-sm w-full"
               placeholder={t('nav_filter_placeholder')}
               value={navFilter}
