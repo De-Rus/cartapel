@@ -1,19 +1,46 @@
 import { defineConfig } from 'vitepress'
 
+const SITE = 'https://de-rus.github.io/steward/'
+
 export default defineConfig({
   // GitHub Pages project site serves under /steward/. Override with DOCS_BASE=/
   // when deploying to a custom domain (root).
   base: process.env.DOCS_BASE || '/steward/',
   title: 'steward',
+  titleTemplate: ':title · steward — Postgres admin panel',
   description:
-    'A single-binary, code-first admin panel for your existing Postgres. Point the Rust binary at your database and get introspected CRUD, configured with HCL you version like code.',
+    'Open-source, single-binary admin panel for your existing Postgres. A Django-admin alternative in one Rust binary: introspected CRUD, roles, audit and dashboards, configured with HCL you version like code.',
   lang: 'en-US',
   cleanUrls: true,
   ignoreDeadLinks: [/^https?:\/\/localhost/],
   lastUpdated: true,
   appearance: 'dark',
+  sitemap: { hostname: SITE },
 
-  head: [['meta', { name: 'theme-color', content: '#f59e0b' }]],
+  head: [
+    ['meta', { name: 'theme-color', content: '#f59e0b' }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:site_name', content: 'steward' }],
+    ['meta', { property: 'og:title', content: 'steward — an admin panel for your existing Postgres' }],
+    [
+      'meta',
+      {
+        property: 'og:description',
+        content:
+          'One Rust binary, config as code. Introspected CRUD, roles, audit log and SQL dashboards for any Postgres database.',
+      },
+    ],
+    ['meta', { property: 'og:url', content: SITE }],
+    ['meta', { name: 'twitter:card', content: 'summary' }],
+    [
+      'meta',
+      {
+        name: 'keywords',
+        content:
+          'postgres admin panel, django admin alternative, database admin ui, rust admin panel, retool alternative, open source admin panel, postgres crud',
+      },
+    ],
+  ],
 
   markdown: {
     theme: { light: 'github-light', dark: 'github-dark' },
@@ -31,7 +58,7 @@ export default defineConfig({
 
     sidebar: [
       {
-        text: 'Introduction',
+        text: 'Start here',
         items: [
           { text: 'What is steward?', link: '/' },
           { text: 'Getting started', link: '/getting-started' },
@@ -39,21 +66,24 @@ export default defineConfig({
         ],
       },
       {
-        text: 'Configuration',
+        text: 'Basics',
         collapsed: false,
         items: [
-          { text: 'Overview', link: '/configuration/overview' },
-          { text: 'Tables', link: '/configuration/tables' },
-          { text: 'Fields & widgets', link: '/configuration/fields-and-widgets' },
+          { text: 'Configuration layout', link: '/configuration/overview' },
+          { text: 'Tables & lists', link: '/configuration/tables' },
           { text: 'Detail views', link: '/configuration/detail-views' },
           { text: 'Groups & navigation', link: '/configuration/groups-and-nav' },
-          { text: 'Pages & queries', link: '/configuration/pages-and-queries' },
           { text: 'Dashboard', link: '/configuration/dashboard' },
         ],
       },
       {
-        text: 'Access & security',
+        text: 'Advanced',
+        collapsed: false,
         items: [
+          { text: 'Fields & widgets', link: '/configuration/fields-and-widgets' },
+          { text: 'Custom pages & queries', link: '/configuration/pages-and-queries' },
+          { text: 'Theming', link: '/theming' },
+          { text: 'Localization', link: '/localization' },
           { text: 'Roles & permissions', link: '/roles-and-permissions' },
           { text: 'Security model', link: '/security' },
         ],
@@ -72,6 +102,11 @@ export default defineConfig({
     search: { provider: 'local' },
 
     socialLinks: [{ icon: 'github', link: 'https://github.com/de-rus/steward' }],
+
+    editLink: {
+      pattern: 'https://github.com/De-Rus/steward/edit/main/docs/:path',
+      text: 'Edit this page on GitHub',
+    },
 
     footer: {
       message: 'Released under the MIT License.',

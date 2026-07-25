@@ -1,3 +1,7 @@
+---
+description: "Deploy steward with Docker, Fly.io, Render one-click, or a bare binary — plus secrets, volumes and pooler notes."
+---
+
 # Deployment
 
 steward is a single self-contained binary — the SPA is embedded, there is no Node

@@ -1,3 +1,7 @@
+---
+description: "The steward security model: signed sessions, bound SQL, column masking, row-level filters, path confinement and hardening toggles."
+---
+
 # Security model
 
 steward is designed to sit in front of a production database, so its defaults are

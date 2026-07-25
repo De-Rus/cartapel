@@ -1,7 +1,22 @@
 import { BASE } from './base'
-const nf = new Intl.NumberFormat('es')
-const nf2 = new Intl.NumberFormat('es', { maximumFractionDigits: 2 })
-const nfCompact = new Intl.NumberFormat('es', { notation: 'compact', maximumFractionDigits: 1 })
+
+// Formatters follow the instance locale (meta.locale); Shell calls
+// setFormatLocale once the meta arrives, before anything renders rows.
+let nf = new Intl.NumberFormat('es')
+let nf2 = new Intl.NumberFormat('es', { maximumFractionDigits: 2 })
+let nfCompact = new Intl.NumberFormat('es', { notation: 'compact', maximumFractionDigits: 1 })
+let moneyLocale = 'es'
+
+export function setFormatLocale(locale: string | null | undefined): void {
+  const loc = locale || 'es'
+  if (loc === moneyLocale) return
+  moneyLocale = loc
+  nf = new Intl.NumberFormat(loc)
+  nf2 = new Intl.NumberFormat(loc, { maximumFractionDigits: 2 })
+  nfCompact = new Intl.NumberFormat(loc, { notation: 'compact', maximumFractionDigits: 1 })
+  dtf = new Intl.DateTimeFormat(loc, DTF_OPTS)
+  df = new Intl.DateTimeFormat(loc, DF_OPTS)
+}
 
 export function fmtInt(n: number): string {
   return nf.format(n)
@@ -26,7 +41,7 @@ export function fmtCompact(n: number): string {
 
 export function fmtMoney(n: number, currency = 'USD'): string {
   try {
-    return new Intl.NumberFormat('es', { style: 'currency', currency }).format(n)
+    return new Intl.NumberFormat(moneyLocale, { style: 'currency', currency }).format(n)
   } catch {
     return `${nf2.format(n)} ${currency}`
   }
@@ -78,19 +93,20 @@ export function fmtBytes(n: number): string {
   return `${nf2.format(v)} PB`
 }
 
-const dtf = new Intl.DateTimeFormat('es', {
+const DTF_OPTS: Intl.DateTimeFormatOptions = {
   day: 'numeric',
   month: 'short',
   year: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
-})
-
-const df = new Intl.DateTimeFormat('es', {
+}
+const DF_OPTS: Intl.DateTimeFormatOptions = {
   day: 'numeric',
   month: 'short',
   year: 'numeric',
-})
+}
+let dtf = new Intl.DateTimeFormat('es', DTF_OPTS)
+let df = new Intl.DateTimeFormat('es', DF_OPTS)
 
 export function fmtDateTime(isoStr: string): string {
   const d = new Date(isoStr)

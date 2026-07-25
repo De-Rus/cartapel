@@ -1,3 +1,7 @@
+---
+description: "Every steward subcommand, flag and environment variable — serve, user management, and the CI-ready config validator."
+---
+
 # CLI & environment
 
 steward is one binary with three subcommands: `serve` (run the panel), `user`

@@ -5,7 +5,7 @@ export interface ThemePreset {
   dark: ThemeTokens
 }
 
-export type PresetName = 'steward'
+export type PresetName = 'steward' | 'django'
 
 const steward: ThemePreset = {
   dark: {
@@ -82,10 +82,95 @@ const steward: ThemePreset = {
   },
 }
 
-export const PRESETS: Record<PresetName, ThemePreset> = { steward }
 
-export function presetOf(_name: string | null | undefined): PresetName {
-  return 'steward'
+// The classic Django-admin palette: light body, blue-teal chrome, its familiar
+// green/amber/red status colors. Dark mode is a faithful translation of
+// Django 4's dark admin.
+const django: ThemePreset = {
+  light: {
+    page: '#f8f8f8',
+    surface: '#ffffff',
+    'surface-1': '#ffffff',
+    'surface-2': '#f5f5f5',
+    'surface-3': '#eeeeee',
+    hover: 'rgba(65, 118, 144, 0.06)',
+    press: 'rgba(65, 118, 144, 0.12)',
+    selected: 'rgba(121, 174, 200, 0.18)',
+    border: '#e0e0e0',
+    ink: '#333333',
+    sec: '#555555',
+    muted: '#888888',
+    gridline: '#eaeaea',
+    accent: '#417690',
+    'accent-btn': '#417690',
+    good: '#70bf2b',
+    warning: '#efb80b',
+    serious: '#e87e1e',
+    critical: '#ba2121',
+    'delta-good': '#3d7a09',
+    band: '#417690',
+    'band-ink': '#ffffff',
+    'band-border': '#417690',
+    s1: '#417690',
+    s2: '#70bf2b',
+    s3: '#efb80b',
+    s4: '#205067',
+    s5: '#79aec8',
+    s6: '#ba2121',
+    s7: '#e87e1e',
+    s8: '#6c8ea0',
+    'badge-blue': '#417690',
+    'badge-green': '#3d7a09',
+    'badge-orange': '#9a6a00',
+    'badge-red': '#ba2121',
+    'badge-violet': '#5b4d8f',
+    'badge-gray': '#666666',
+  },
+  dark: {
+    page: '#121212',
+    surface: '#1c1c1c',
+    'surface-1': '#1c1c1c',
+    'surface-2': '#242424',
+    'surface-3': '#2d2d2d',
+    hover: 'rgba(121, 174, 200, 0.08)',
+    press: 'rgba(121, 174, 200, 0.14)',
+    selected: 'rgba(121, 174, 200, 0.16)',
+    border: '#353535',
+    ink: '#eeeeee',
+    sec: '#c5c5c5',
+    muted: '#9a9a9a',
+    gridline: '#2e2e2e',
+    accent: '#79aec8',
+    'accent-btn': '#417690',
+    good: '#70bf2b',
+    warning: '#efb80b',
+    serious: '#e87e1e',
+    critical: '#d4534f',
+    'delta-good': '#70bf2b',
+    band: '#264b5d',
+    'band-ink': '#f5f5f5',
+    'band-border': '#264b5d',
+    s1: '#79aec8',
+    s2: '#70bf2b',
+    s3: '#efb80b',
+    s4: '#417690',
+    s5: '#b0c8d4',
+    s6: '#d4534f',
+    s7: '#e87e1e',
+    s8: '#6c8ea0',
+    'badge-blue': '#79aec8',
+    'badge-green': '#8ed44f',
+    'badge-orange': '#f0c14b',
+    'badge-red': '#e88585',
+    'badge-violet': '#a89bf0',
+    'badge-gray': '#a5a5a5',
+  },
+}
+
+export const PRESETS: Record<PresetName, ThemePreset> = { steward, django }
+
+export function presetOf(name: string | null | undefined): PresetName {
+  return name === 'django' ? 'django' : 'steward'
 }
 
 export function resolveTheme(cfg: ThemeConfig): ThemePreset {

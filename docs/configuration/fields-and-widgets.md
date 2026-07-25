@@ -1,3 +1,7 @@
+---
+description: "Per-column control: labels, widgets, formats, colors, masking, computed columns and custom web-component widgets."
+---
+
 # Fields & widgets
 
 A `field "column" { }` block controls how one column is rendered and edited. Only

@@ -1,3 +1,7 @@
+---
+description: "Roles in config you review like code: table levels, granular capabilities, inheritance, multi-role union, masking and row filters."
+---
+
 # Roles & permissions
 
 Access is governed by **roles**. Each user carries one or more roles

@@ -1,3 +1,7 @@
+---
+description: "Detail pages: sections, tabs, stats, meta sidebar and inline child tables — zero-config first."
+---
+
 # Detail views
 
 Opening a record shows a **record view**, not a form: a hero header (title,

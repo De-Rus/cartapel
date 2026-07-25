@@ -1,3 +1,7 @@
+---
+description: "Register a table and shape its list: columns, search, filters, sort, display titles and permissions ceilings."
+---
+
 # Tables
 
 A `screen.hcl` registers one database table with the panel and describes how it

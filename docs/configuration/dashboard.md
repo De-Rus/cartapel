@@ -1,3 +1,7 @@
+---
+description: "SQL-defined dashboards: stat tiles, charts, tables, template variables and the window selector."
+---
+
 # Dashboard
 
 The home dashboard is a grid of SQL-defined panels declared in

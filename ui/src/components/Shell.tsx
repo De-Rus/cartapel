@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { api } from '../api/client'
 import type { Meta, PageMeta, TableMeta } from '../api/types'
-import { fmtCompact } from '../lib/format'
+import { fmtCompact, setFormatLocale } from '../lib/format'
 import { MetaContext } from '../lib/meta'
 import { I18nProvider, makeT, TFn, useT } from '../lib/i18n'
 import { pickBrandLogo } from '../lib/brand'
@@ -854,6 +854,7 @@ export default function Shell() {
     )
   }
 
+  setFormatLocale(meta.locale)
   return (
     <MetaContext.Provider value={meta}>
       <I18nProvider locale={meta.locale} strings={meta.strings}>

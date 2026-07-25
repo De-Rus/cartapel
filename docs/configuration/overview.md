@@ -1,3 +1,7 @@
+---
+description: "The config bundle: layout, globals, sources, environment interpolation, validation and hot reload."
+---
+
 # Configuration overview
 
 steward is configured by a directory of [HCL](https://github.com/hashicorp/hcl)
@@ -97,12 +101,12 @@ Top-level `[steward]` keys:
 | --- | --- | --- |
 | `brand` | string | Panel name, shown in the header. Defaults to `steward`. |
 | `brand_logo` | string | Logo URL, data URL, or a bundle asset filename served under `/static/`. |
-| `locale` | string | UI locale hint. Also picks per-locale `labels = { es = "…" }` overrides on tables, fields, groups and actions (tables also `labels_plural`); `label` is the fallback. |
+| `locale` | string | The instance language — picks the UI dictionary, date/number formatting and per-locale `labels` overrides. See [Localization](/localization). |
 | `strings` | map | Override individual UI strings (`{ "key" = "value" }`). |
 | `per_page` | number | Default list page size (a table's `list.per_page` overrides it). |
 | `group_nav` | string | Default sidebar mode for groups: `expanded` (default — every table is its own entry) or `page` (one entry per group; sibling tables become tabs). A group's own `nav` in `_group.hcl` overrides it. |
 | `secret_key` | string | Session-signing root. Supports `env:`/`${}`. Overridden by `STEWARD_SECRET_KEY`. **Required** somewhere. |
-| `theme { }` | block | Theme preset, accent, per-mode CSS token overrides, logos. |
+| `theme { }` | block | Theme preset, accent, per-mode CSS token overrides, logos — see [Theming](/theming). |
 | `source "…" { }` | block | A named data source. The `primary` postgres one is the database steward introspects. |
 | `disable_sql_preview` | bool | Hardening: disable the dashboard builder's ad-hoc SQL preview (admin-supplied `SELECT`s). Blocks arbitrary read-SQL even for admins. Default `false`. |
 | `disable_webhooks` | bool | Hardening: disable outbound webhook actions (an SSRF surface). Default `false`. |

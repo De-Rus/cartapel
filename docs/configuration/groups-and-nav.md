@@ -1,3 +1,7 @@
+---
+description: "Sidebar groups from folders: labels, icons, ordering, nav modes and moving tables between groups."
+---
+
 # Groups & navigation
 
 The sidebar is built from your folder layout. Each folder under `screens/` is a

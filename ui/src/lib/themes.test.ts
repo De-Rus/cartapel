@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { PRESETS, presetOf, resolveTheme, themeCss } from './themes'
 
 describe('theme presets', () => {
-  it('ships only the brand-neutral steward preset', () => {
-    expect(Object.keys(PRESETS)).toEqual(['steward'])
+  it('ships the steward + django presets', () => {
+    expect(Object.keys(PRESETS)).toEqual(['steward', 'django'])
+    expect(PRESETS.django.light.accent).toBe('#417690')
+    expect(PRESETS.django.light.band).toBe('#417690')
     expect(PRESETS.steward.dark.accent).toBe('#3987e5')
     expect(PRESETS.steward.dark.page).toBe('#0d0d0d')
     expect(PRESETS.steward.light.page).toBe('#f9f9f7')
@@ -22,7 +24,7 @@ describe('theme presets', () => {
 
   it('maps unknown / legacy preset names to the steward base', () => {
     expect(presetOf('legacy')).toBe('steward')
-    expect(presetOf('django')).toBe('steward')
+    expect(presetOf('django')).toBe('django')
     expect(presetOf(null)).toBe('steward')
     expect(presetOf('anything')).toBe('steward')
   })

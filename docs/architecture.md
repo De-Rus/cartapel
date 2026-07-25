@@ -1,3 +1,7 @@
+---
+description: "How steward works inside: one Rust binary, introspection, hot-reloadable HCL config, SQLite app state and the request path."
+---
+
 # Architecture
 
 steward is deliberately small: one Rust binary, your Postgres, and a directory of

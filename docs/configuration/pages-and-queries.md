@@ -1,3 +1,7 @@
+---
+description: "Custom pages with the sx SDK, named read-only queries, template variables and declarative panel pages."
+---
+
 # Pages, queries & custom widgets
 
 Some flows aren't a single-table CRUD — reconciliation queues, moderation

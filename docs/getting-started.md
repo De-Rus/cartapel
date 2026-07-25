@@ -1,3 +1,7 @@
+---
+description: "From a fresh binary to a working Postgres admin panel: install, connect your database, and register tables with the setup wizard."
+---
+
 # Getting started
 
 This walks you from a fresh binary to a working panel with your first table
