@@ -14,7 +14,7 @@ services:
     name: steward
     runtime: image
     image:
-      url: ghcr.io/de-rus/steward:0.6.0
+      url: ghcr.io/de-rus/steward:0.6.1
     plan: free
     healthCheckPath: /admin/api/health
     dockerCommand: >-
