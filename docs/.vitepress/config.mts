@@ -26,6 +26,7 @@ export default defineConfig({
       { text: 'Guide', link: '/getting-started' },
       { text: 'Configuration', link: '/configuration/overview' },
       { text: 'Deploy', link: '/deployment' },
+      { text: 'Live demo (demo/demo)', link: 'https://steward-demo-derus.fly.dev' },
     ],
 
     sidebar: [

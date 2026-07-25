@@ -10,7 +10,7 @@ hero:
       text: Get started
       link: /getting-started
     - theme: alt
-      text: Live demo
+      text: Live demo — demo / demo
       link: https://steward-demo-derus.fly.dev
     - theme: alt
       text: Configuration
