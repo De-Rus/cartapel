@@ -5,6 +5,7 @@ import { api, ApiError } from '../api/client'
 import type { RoleInfo, RolesResponse, RoleSource } from '../api/types'
 import {
   definitionToMatrix,
+  flattenDefinition,
   matrixToDefinition,
   validateRoleName,
   type MatrixModel,
@@ -59,6 +60,13 @@ function RoleEditor({
   const editable = role.editable
   const [name, setName] = useState(role.name)
   const [model, setModel] = useState<MatrixModel>(() => definitionToMatrix(role.definition, vocab.tables))
+  const [showEffective, setShowEffective] = useState(false)
+  const effectiveModel = useMemo(() => {
+    if (!showEffective) return null
+    const byName = new Map(vocab.roles.map((r) => [r.name, r.definition]))
+    byName.set(role.name || '(new)', matrixToDefinition(model))
+    return definitionToMatrix(flattenDefinition(role.name || '(new)', byName), vocab.tables)
+  }, [showEffective, model, role.name, vocab])
   const [nameError, setNameError] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
 
@@ -140,13 +148,25 @@ function RoleEditor({
               ))}
           </select>
           <span className="text-xxs text-muted">{t('role_extends_hint')}</span>
+          {model.extends && (
+            <button
+              type="button"
+              className={clsx(
+                'mt-1.5 rounded-full border px-2 py-0.5 text-xxs',
+                showEffective ? 'border-accent text-ink' : 'text-muted hover:text-ink',
+              )}
+              onClick={() => setShowEffective(!showEffective)}
+            >
+              {showEffective ? t('role_effective_on') : t('role_effective_off')}
+            </button>
+          )}
         </label>
 
         <PermissionMatrix
-          model={model}
+          model={effectiveModel ?? model}
           actions={vocab.actions}
           columnsFor={columnsFor}
-          onChange={editable || isNew ? setModel : undefined}
+          onChange={effectiveModel ? undefined : editable || isNew ? setModel : undefined}
         />
 
         {serverError && <p className="text-[13px] text-critical">{serverError}</p>}

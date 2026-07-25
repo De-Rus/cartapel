@@ -134,6 +134,36 @@ export function matrixToDefinition(model: MatrixModel): RoleDefinition {
   return definition
 }
 
+
+/// Mirror of the server's extends resolution: root ancestor first, each
+/// descendant overrides per key, actions union. For the read-only
+/// "effective permissions" view in the roles editor.
+export function flattenDefinition(
+  name: string,
+  byName: Map<string, RoleDefinition | null>,
+): RoleDefinition {
+  const chain: RoleDefinition[] = []
+  const seen = new Set<string>([name])
+  let cur = byName.get(name) ?? null
+  while (cur) {
+    chain.push({ ...EMPTY_DEF, ...cur })
+    const parent = cur.extends
+    if (!parent || seen.has(parent)) break
+    seen.add(parent)
+    cur = byName.get(parent) ?? null
+  }
+  const out: RoleDefinition = { tables: {}, actions: [], masked: {}, row_filter: {} }
+  for (const def of chain.reverse()) {
+    Object.assign(out.tables, def.tables)
+    Object.assign(out.masked, def.masked)
+    Object.assign(out.row_filter, def.row_filter)
+    if (def.perms) out.perms = { ...(out.perms ?? {}), ...def.perms }
+    if (def.editable) out.editable = { ...(out.editable ?? {}), ...def.editable }
+    for (const a of def.actions) if (!out.actions.includes(a)) out.actions.push(a)
+  }
+  return out
+}
+
 const LEVEL_PERM: Record<Level, RolePerm> = {
   none: { view: false, create: false, update: false, delete: false },
   read: { view: true, create: false, update: false, delete: false },
