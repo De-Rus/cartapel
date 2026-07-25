@@ -10,3 +10,11 @@ export function rowSnapshot(
   if ('from' in row || 'to' in row) return null
   return row as Record<string, unknown>
 }
+
+/// Whether one payload entry is a {from,to} diff (row updates) — anything else
+/// (role definitions, layout summaries) renders as a plain value pill.
+export function isDiffEntry(v: unknown): v is { from?: unknown; to?: unknown } {
+  return (
+    !!v && typeof v === 'object' && !Array.isArray(v) && ('from' in v || 'to' in v)
+  )
+}

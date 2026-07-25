@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { api } from '../api/client'
 import type { Row, StatWidget, TableColumn, TableWidget, Widget } from '../api/types'
-import { applyFormat, fmtByFormat, fmtPercent } from '../lib/format'
+import { applyFormat, fmtByFormat, fmtDateTime, fmtPercent } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useMeta } from '../lib/meta'
 import { VarBar, useVarQuery } from '../components/VarBar'
@@ -271,6 +271,15 @@ function DeclaredTable({ w }: { w: TableWidget }) {
   )
 }
 
+
+const ISO_LIKE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
+
+function fmtLoose(v: unknown): string {
+  if (v == null) return '\u2014'
+  if (typeof v === 'string' && ISO_LIKE.test(v)) return fmtDateTime(v)
+  return String(v)
+}
+
 function WidgetTable({ w }: { w: TableWidget }) {
   const meta = useMeta()
   const t = useT()
@@ -283,7 +292,7 @@ function WidgetTable({ w }: { w: TableWidget }) {
           <tr className="text-left text-xxs font-medium uppercase tracking-wide text-muted">
             {w.columns.map((c) => (
               <th key={c} className="px-2 py-1.5 font-medium">
-                {c}
+                {c.replace(/_/g, ' ')}
               </th>
             ))}
           </tr>
@@ -305,7 +314,7 @@ function WidgetTable({ w }: { w: TableWidget }) {
                   const cell = colMeta ? (
                     <CellValue col={colMeta} value={row[c]} row={row} mode="list" pkName={table?.pk ?? w.pk ?? ''} tableName={w.link ?? ''} />
                   ) : (
-                    String(row[c] ?? '—')
+                    fmtLoose(row[c])
                   )
                   return (
                     <td

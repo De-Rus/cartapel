@@ -107,7 +107,7 @@ export function ColumnMenu({
               setOpen(false)
             }}
           >
-            Reset columns
+            {t('col_reset')}
           </button>
         </div>
       )}

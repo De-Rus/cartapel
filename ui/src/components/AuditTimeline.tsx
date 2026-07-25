@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { api, ApiError } from '../api/client'
 import type { AuditChange, AuditRow } from '../api/types'
-import { rowSnapshot } from '../lib/audit'
+import { isDiffEntry, rowSnapshot } from '../lib/audit'
 import { fmtDateTime, relTime } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { Skeleton } from './Skeleton'
@@ -49,9 +49,15 @@ function Changes({ changes }: { changes: Record<string, AuditChange> | null }) {
       {Object.entries(changes).map(([k, c]) => (
         <span key={k} className="inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[10px]">
           <span className="text-muted">{k}</span>
-          <span className="text-serious line-through decoration-[color:var(--muted)]">{fmtVal(c.from)}</span>
-          <span className="text-muted">→</span>
-          <span className="font-medium text-ink">{fmtVal(c.to)}</span>
+          {isDiffEntry(c) ? (
+            <>
+              <span className="text-serious line-through decoration-[color:var(--muted)]">{fmtVal(c.from)}</span>
+              <span className="text-muted">→</span>
+              <span className="font-medium text-ink">{fmtVal(c.to)}</span>
+            </>
+          ) : (
+            <span className="text-ink">{fmtVal(c)}</span>
+          )}
         </span>
       ))}
     </div>

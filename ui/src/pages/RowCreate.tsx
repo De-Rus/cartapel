@@ -18,6 +18,7 @@ export default function RowCreate() {
   const toast = useToast()
   const t = useT()
   const [draft, setDraft] = useState<Row>({})
+  const [emptyError, setEmptyError] = useState(false)
 
   const createMut = useMutation({
     mutationFn: (set: Row) => api.create(table!.name, set),
@@ -52,6 +53,11 @@ export default function RowCreate() {
       <form
         onSubmit={(e) => {
           e.preventDefault()
+          if (!Object.values(draft).some((v) => v !== undefined && v !== null && v !== '')) {
+            setEmptyError(true)
+            return
+          }
+          setEmptyError(false)
           createMut.mutate(draft)
         }}
       >
@@ -84,6 +90,7 @@ export default function RowCreate() {
           })}
         </div>
         <div className="mt-4 flex items-center justify-end gap-3">
+          {emptyError && <span className="text-[13px] text-critical">{t('create_empty')}</span>}
           {errMsg && !anyFieldErr && <span className="text-[13px] text-critical">{errMsg}</span>}
           <Link to={`/${table.name}`} className="btn">
             {t('cancel')}

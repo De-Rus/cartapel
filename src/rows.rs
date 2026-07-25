@@ -476,7 +476,11 @@ async fn fetch_inline_page(
         .as_ref()
         .map(|p| format!("ORDER BY {} DESC", ident(p)))
         .unwrap_or_default();
-    let sel = crate::meta::row_select(child_t, &table_config(state, key));
+    let mut sel = crate::meta::row_select(child_t, &table_config(state, key));
+    let pairs = fk_label_pairs(state, user, key, child_t);
+    if !pairs.is_empty() {
+        sel = format!("({sel}) || jsonb_build_object({})", pairs.join(", "));
+    }
     let sql = format!(
         "SELECT {sel} AS r, count(*) OVER () AS total FROM {} t WHERE {where_sql} {order} LIMIT {INLINE_CAP} OFFSET {}",
         state.qualified_of(child_t),
@@ -512,13 +516,45 @@ fn resolve_configured_inline(
         .ok_or_else(|| AppError::not_found(format!("{child} is not an inline of {parent}")))
 }
 
+/// Detail-page-only FK label enrichment — kept OUT of fetch_one so audit
+/// before/after snapshots never carry display companions.
+async fn attach_fk_labels(
+    state: &AppState,
+    user: &CurrentUser,
+    key: &str,
+    dbt: &DbTable,
+    pk: &str,
+    row: &mut Value,
+) -> Result<(), AppError> {
+    let pairs = fk_label_pairs(state, user, key, dbt);
+    let Some(pk_col) = dbt.pk.as_ref().and_then(|p| dbt.column(p)) else { return Ok(()) };
+    if pairs.is_empty() {
+        return Ok(());
+    }
+    let mut binds = Binds::new();
+    let where_sql = pk_predicate(pk_col, pk, &mut binds);
+    let sql = format!(
+        "SELECT jsonb_build_object({}) AS r FROM {} t WHERE {where_sql}",
+        pairs.join(", "),
+        state.qualified_of(dbt)
+    );
+    let labels: Value = binds.query(&sql).fetch_one(state.pool_of(dbt)).await?.get("r");
+    if let (Some(obj), Some(extra)) = (row.as_object_mut(), labels.as_object()) {
+        for (k, v) in extra {
+            obj.insert(k.clone(), v.clone());
+        }
+    }
+    Ok(())
+}
+
 pub async fn detail_handler(
     State(state): State<Arc<AppState>>,
     user: CurrentUser,
     Path((table, pk)): Path<(String, String)>,
 ) -> Result<Json<Value>, AppError> {
     let dbt = table_of(&state, &user, &table)?;
-    let row = fetch_one(&state, &user, &table, dbt, &pk).await?;
+    let mut row = fetch_one(&state, &user, &table, dbt, &pk).await?;
+    attach_fk_labels(&state, &user, &table, dbt, &pk, &mut row).await?;
 
     let mut inlines = Vec::new();
     for ri in resolve_inlines(&state, &user, &table) {

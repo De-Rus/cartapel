@@ -2,7 +2,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '../api/client'
 import type { AuditChange, AuditRow } from '../api/types'
-import { rowSnapshot } from '../lib/audit'
+import { isDiffEntry, rowSnapshot } from '../lib/audit'
 import { fmtDateTime, fmtInt } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useMeta } from '../lib/meta'
@@ -59,11 +59,17 @@ function ChangePills({ changes }: { changes: Record<string, AuditChange> | null 
           className="inline-flex items-center gap-1 rounded-full border px-2 py-px text-xxs"
         >
           <span className="text-muted">{k}:</span>
-          <span className="text-serious line-through decoration-[color:var(--muted)]">
-            {fmtVal(c.from)}
-          </span>
-          <span className="text-muted">→</span>
-          <span className="font-medium text-ink">{fmtVal(c.to)}</span>
+          {isDiffEntry(c) ? (
+            <>
+              <span className="text-serious line-through decoration-[color:var(--muted)]">
+                {fmtVal(c.from)}
+              </span>
+              <span className="text-muted">→</span>
+              <span className="font-medium text-ink">{fmtVal(c.to)}</span>
+            </>
+          ) : (
+            <span className="text-ink">{fmtVal(c)}</span>
+          )}
         </span>
       ))}
     </span>
