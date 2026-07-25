@@ -386,15 +386,17 @@ function ListInner({ table }: { table: TableMeta }) {
         )}
       </div>
 
-      <SavedViews
-        table={table.name}
-        params={sp}
-        hasListState={hasListState}
-        onApply={applyViewQuery}
-        onClear={clearListState}
-      />
-
-      <FilterBar table={table} entries={activeFilters} onApply={applyConditions} />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <FilterBar table={table} entries={activeFilters} onApply={applyConditions} />
+        <div className="min-w-4 flex-1" />
+        <SavedViews
+          table={table.name}
+          params={sp}
+          hasListState={hasListState}
+          onApply={applyViewQuery}
+          onClear={clearListState}
+        />
+      </div>
 
       {hasSelection && selected.size > 0 && (
         <div className="card pop-in flex items-center gap-2 px-3 py-2">

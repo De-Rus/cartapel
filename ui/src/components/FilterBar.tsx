@@ -252,8 +252,8 @@ export function FilterBar({
           <button
             type="button"
             className={clsx(
-              'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xxs',
-              editing === i ? 'border-accent text-ink' : 'text-sec hover:text-ink',
+              'flex h-6 items-center gap-1 rounded-full border bg-surface2 px-2.5 text-xxs',
+              editing === i ? 'border-accent text-ink' : 'text-sec hover:border-[color:var(--sec)] hover:text-ink',
             )}
             onClick={() => {
               if (!isToggle(fm(c.col))) setEditing(editing === i ? null : i)
@@ -290,7 +290,7 @@ export function FilterBar({
 
       {draft && (
         <span className="relative">
-          <button type="button" className="flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-xxs text-sec">
+          <button type="button" className="flex h-6 items-center gap-1 rounded-full border border-accent bg-surface2 px-2.5 text-xxs text-sec">
             <span className="text-muted">{fm(draft.col)?.label ?? draft.col}</span>
             <span className="text-muted">{t(`flt_op_${draft.op}`)}</span>
           </button>
@@ -318,7 +318,12 @@ export function FilterBar({
       <span className="relative">
         <button
           type="button"
-          className="flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-xxs text-muted hover:text-ink"
+          className={clsx(
+            'flex h-6 items-center gap-1 rounded-full border px-2.5 text-xxs',
+            adding
+              ? 'border-accent text-ink'
+              : 'border-transparent text-muted hover:border-[color:var(--border)] hover:bg-surface2 hover:text-ink',
+          )}
           onClick={() => setAdding(!adding)}
         >
           <IconPlus size={10} /> {t('flt_add_filter')}
@@ -340,15 +345,6 @@ export function FilterBar({
         )}
       </span>
 
-      {applied.length > 0 && (
-        <button
-          type="button"
-          className="text-xxs text-muted hover:text-ink"
-          onClick={() => onApply([])}
-        >
-          {t('clear_all')}
-        </button>
-      )}
     </div>
   )
 }

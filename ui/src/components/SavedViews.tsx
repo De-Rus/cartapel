@@ -5,7 +5,7 @@ import { api } from '../api/client'
 import { viewMatchesParams } from '../lib/viewState'
 import { useT } from '../lib/i18n'
 import { useToast } from './Toast'
-import { IconPlus, IconX } from './Icons'
+import { IconFilterOff, IconPlus, IconX } from './Icons'
 
 export function SavedViews({
   table,
@@ -62,24 +62,14 @@ export function SavedViews({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <button
-        type="button"
-        onClick={onClear}
-        className={clsx(
-          'rounded-full px-2.5 py-1 text-xxs font-medium',
-          !anyActive ? 'bg-surface3 text-ink' : 'text-sec hover:text-ink',
-        )}
-      >
-        {t('sv_all')}
-      </button>
       {views.map((v) => {
         const active = v.id === activeView?.id
         return (
           <span
             key={v.id}
             className={clsx(
-              'group flex items-center gap-1 rounded-full px-2.5 py-1 text-xxs font-medium',
-              active ? 'bg-surface3 text-ink' : 'text-sec hover:text-ink',
+              'group flex h-6 items-center gap-1 rounded-full px-2.5 text-xxs font-medium',
+              active ? 'bg-surface3 text-ink' : 'text-sec hover:bg-surface2 hover:text-ink',
             )}
           >
             <button type="button" onClick={() => onApply(v.query)}>
@@ -121,11 +111,22 @@ export function SavedViews({
           <button
             type="button"
             onClick={() => setNaming(true)}
-            className="flex items-center gap-1 rounded-full px-2 py-1 text-xxs text-muted hover:text-ink"
+            className="flex h-6 items-center gap-1 rounded-full border border-transparent px-2 text-xxs text-muted hover:border-[color:var(--border)] hover:bg-surface2 hover:text-ink"
           >
-            <IconPlus size={10} /> {t('sv_new')}
+            <IconPlus size={10} /> {t('sv_save_view')}
           </button>
         )
+      )}
+      {anyActive && (
+        <button
+          type="button"
+          onClick={onClear}
+          title={t('clear_filters')}
+          aria-label={t('clear_filters')}
+          className="flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-surface2 hover:text-ink"
+        >
+          <IconFilterOff size={12} />
+        </button>
       )}
     </div>
   )

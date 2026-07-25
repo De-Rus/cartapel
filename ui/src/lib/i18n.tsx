@@ -370,6 +370,7 @@ const es: Dict = {
   sv_name_ph: 'Nombre de la vista…',
   sv_save: 'Guardar',
   sv_new: 'Nueva',
+  sv_save_view: 'Guardar vista',
 
   cfg_detail_hint: 'Agrupa los campos en secciones con título en la ficha.',
   cfg_detail_add_section: 'Añadir sección',
@@ -910,6 +911,7 @@ const en: Dict = {
   sv_name_ph: 'View name…',
   sv_save: 'Save',
   sv_new: 'New',
+  sv_save_view: 'Save view',
 
   cfg_detail_hint: 'Group fields into titled sections on the record page.',
   cfg_detail_add_section: 'Add section',
