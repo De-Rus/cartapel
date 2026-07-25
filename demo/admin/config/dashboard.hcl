@@ -37,11 +37,11 @@ panel {
 
 panel {
   type    = "chart"
-  label   = "Revenue booked per day (30d)"
+  label   = "Revenue booked per day"
   chart   = "bar"
   w       = 2
   h       = 2
-  sql     = "SELECT date_trunc('day', placed_at)::date AS label, sum(total) AS value FROM orders WHERE status IN ('paid', 'shipped') AND placed_at > now() - interval '30 days' GROUP BY 1 ORDER BY 1"
+  sql     = "SELECT date_trunc('day', placed_at)::date AS label, sum(total) AS value FROM orders WHERE status IN ('paid', 'shipped') AND placed_at > now() - {{days}} * interval '1 day' GROUP BY 1 ORDER BY 1"
 }
 
 panel {
@@ -49,5 +49,5 @@ panel {
   label   = "Latest orders"
   w       = 2
   h       = 2
-  sql     = "SELECT o.id, c.name AS customer, o.status, o.total, o.placed_at FROM orders o JOIN customers c ON c.id = o.customer_id ORDER BY o.placed_at DESC LIMIT 8"
+  sql     = "SELECT o.id, c.name AS customer, o.status, o.total, o.placed_at FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.placed_at > now() - {{days}} * interval '1 day' ORDER BY o.placed_at DESC LIMIT 8"
 }

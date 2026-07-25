@@ -170,9 +170,26 @@ panel {
 ```
 
 Whenever any variables are in scope, the dashboard renders a selector bar above
-the grid; changing a value re-runs the panels and updates the URL
-(`?v_window=90`), so a parameterized dashboard view is shareable by link. A
-supplied value outside a variable's option set is a hard 400.
+the grid — a **segmented control** when a variable has few options, a select
+otherwise. Changing a value re-runs every panel that references it and updates
+the URL (`?v_window=90`), so a parameterized dashboard view is shareable by
+link. A supplied value outside a variable's option set is a hard 400.
+
+The common case has a shorthand — `type = "window"` declares a ready-made
+time-window selector (7/30/90 days, default 30, label "Window", `int`
+semantics), each part overridable by declaring it yourself:
+
+```hcl
+# variables.hcl
+variable "days" {
+  type = "window"
+}
+```
+
+```sql
+-- any panel:
+… WHERE placed_at > now() - {{days}} * interval '1 day'
+```
 
 ## Safety
 

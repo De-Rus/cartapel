@@ -169,6 +169,16 @@ export function VarBar({ api, only }: { api: WidgetApi | undefined; only?: strin
   if (!shown.length) return null
   return html`<div class="sx-varbar">${shown.map((d) => {
     const value = vars[d.name] ?? d.default ?? d.options[0]?.value ?? ''
+    if (d.options.length > 0 && d.options.length <= 6) {
+      return html`<label class="sx-var"><span>${d.label ?? d.name}</span>
+        <span class="sx-seg">${d.options.map(
+          (o) => html`<button
+            type="button"
+            class=${String(o.value) === String(value) ? 'on' : ''}
+            onClick=${() => setVar(d.name, String(o.value))}
+          >${o.label}</button>`,
+        )}</span></label>`
+    }
     return html`<label class="sx-var"><span>${d.label ?? d.name}</span>
       <select value=${value} onChange=${(e: any) => setVar(d.name, e.target.value)}>
         ${d.options.map((o) => html`<option value=${o.value} selected=${String(o.value) === String(value)}>${o.label}</option>`)}
@@ -648,6 +658,11 @@ function ensureStyles() {
     .sx-var > span { color: var(--muted, #8a8a8a); font-weight: 550; }
     .sx-var select { font: inherit; font-size: 12px; padding: 4px 8px; border-radius: 7px; color: var(--ink, #e6e6e6);
                      background: var(--surface-2, #1d1e22); border: 1px solid var(--border, #2a2b30); cursor: pointer; }
+    .sx-seg { display: inline-flex; overflow: hidden; border: 1px solid var(--border, #2a2b30); border-radius: 999px; }
+    .sx-seg button { font: inherit; font-size: 11.5px; font-variant-numeric: tabular-nums; padding: 3px 10px; cursor: pointer;
+                     background: transparent; border: 0; color: var(--sec, #9a9a9a); transition: color .12s, background .12s; }
+    .sx-seg button:hover { color: var(--ink, #e6e6e6); background: var(--surface-2, #1d1e22); }
+    .sx-seg button.on { color: var(--accent, #e08a00); background: var(--surface-3, #232428); font-weight: 600; }
     .sx-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 26px 0 10px; }
     .sx-chip { font: inherit; font-size: 11.5px; font-weight: 550; padding: 4px 11px; border-radius: 999px; cursor: pointer;
                background: var(--surface, #17181b); border: 1px solid var(--border, #2a2b30); color: var(--sec, #9a9a9a);

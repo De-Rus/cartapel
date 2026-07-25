@@ -300,6 +300,24 @@ impl Variable {
             .and_then(crate::interp::VarType::parse)
             .unwrap_or(crate::interp::VarType::Text)
     }
+    /// `type = "window"` is sugar for the common time-window selector: an
+    /// `int` variable with 7/30/90-day options, "30" default and a "Window"
+    /// label — each overridable by declaring the field yourself.
+    fn normalize(&mut self) {
+        if self.var_type.as_deref() == Some("window") {
+            self.var_type = Some("int".into());
+            if self.options.is_empty() && self.query.is_none() {
+                self.options = vec!["7".into(), "30".into(), "90".into()];
+            }
+            if self.default.is_none() {
+                self.default = Some("30".into());
+            }
+            if self.label.is_none() {
+                self.label = Some("Window".into());
+            }
+        }
+    }
+
     fn validate(&self, name: &str) -> Result<(), String> {
         if self.query.is_some() != self.options.is_empty() {
             return Err(format!(
@@ -1396,7 +1414,8 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
             }
             "variables" => {
                 let vf: VariablesFile = hcl::from_str(&raw).map_err(ctx)?;
-                for (name, v) in vf.variables {
+                for (name, mut v) in vf.variables {
+                    v.normalize();
                     v.validate(&name)
                         .map_err(|e| format!("{}: {e}", path.display()))?;
                     if let Some(prev) = variable_sources.get(&name) {
