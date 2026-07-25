@@ -89,7 +89,6 @@ pub struct StewardConfig {
     pub disable_webhooks: bool,
 }
 
-
 /// Resolve `env:NAME` / `${NAME}` references in a config value to the env var.
 pub fn resolve_env(raw: &str) -> Option<String> {
     if let Some(name) = raw.strip_prefix("env:") {
@@ -297,25 +296,35 @@ impl Variable {
     }
     fn validate(&self, name: &str) -> Result<(), String> {
         if self.query.is_some() != self.options.is_empty() {
-            return Err(format!("variable \"{name}\": set exactly one of `query` or `options`"));
+            return Err(format!(
+                "variable \"{name}\": set exactly one of `query` or `options`"
+            ));
         }
         if let Some(t) = &self.var_type {
             if crate::interp::VarType::parse(t).is_none() {
-                return Err(format!("variable \"{name}\": unknown type `{t}` (text|int|float|ident)"));
+                return Err(format!(
+                    "variable \"{name}\": unknown type `{t}` (text|int|float|ident)"
+                ));
             }
         }
         if let Some(k) = &self.kind {
             if k == "multi" {
-                return Err(format!("variable \"{name}\": kind=multi is not supported yet"));
+                return Err(format!(
+                    "variable \"{name}\": kind=multi is not supported yet"
+                ));
             }
             if k != "single" {
-                return Err(format!("variable \"{name}\": kind must be `single`, got `{k}`"));
+                return Err(format!(
+                    "variable \"{name}\": kind must be `single`, got `{k}`"
+                ));
             }
         }
         if !self.options.is_empty() {
             if let Some(def) = &self.default {
                 if !self.options.contains(def) {
-                    return Err(format!("variable \"{name}\": default `{def}` is not in options"));
+                    return Err(format!(
+                        "variable \"{name}\": default `{def}` is not in options"
+                    ));
                 }
             }
         }
@@ -361,7 +370,9 @@ pub struct NamedSource {
 }
 
 impl NamedSource {
-    pub fn is_postgres(&self) -> bool { self.kind == "postgres" }
+    pub fn is_postgres(&self) -> bool {
+        self.kind == "postgres"
+    }
 }
 
 impl ConfigDir {
@@ -408,23 +419,51 @@ impl TableFrom {
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TableConfig {
-    #[serde(default, skip_serializing_if = "TableFrom::is_empty", serialize_with = "hcl::ser::block")]
+    #[serde(
+        default,
+        skip_serializing_if = "TableFrom::is_empty",
+        serialize_with = "hcl::ser::block"
+    )]
     pub from: TableFrom,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_plural: Option<String>,
-    #[serde(default, skip_serializing_if = "ListConfig::is_empty", serialize_with = "hcl::ser::block")]
+    #[serde(
+        default,
+        skip_serializing_if = "ListConfig::is_empty",
+        serialize_with = "hcl::ser::block"
+    )]
     pub list: ListConfig,
-    #[serde(default, skip_serializing_if = "DisplayConfig::is_empty", serialize_with = "hcl::ser::block")]
+    #[serde(
+        default,
+        skip_serializing_if = "DisplayConfig::is_empty",
+        serialize_with = "hcl::ser::block"
+    )]
     pub display: DisplayConfig,
-    #[serde(default, skip_serializing_if = "DetailConfig::is_empty", serialize_with = "hcl::ser::block")]
+    #[serde(
+        default,
+        skip_serializing_if = "DetailConfig::is_empty",
+        serialize_with = "hcl::ser::block"
+    )]
     pub detail: DetailConfig,
-    #[serde(default, skip_serializing_if = "EditConfig::is_empty", serialize_with = "hcl::ser::block")]
+    #[serde(
+        default,
+        skip_serializing_if = "EditConfig::is_empty",
+        serialize_with = "hcl::ser::block"
+    )]
     pub edit: EditConfig,
-    #[serde(default, skip_serializing_if = "RelationsConfig::is_empty", serialize_with = "hcl::ser::block")]
+    #[serde(
+        default,
+        skip_serializing_if = "RelationsConfig::is_empty",
+        serialize_with = "hcl::ser::block"
+    )]
     pub relations: RelationsConfig,
-    #[serde(default, skip_serializing_if = "TablePermissions::is_default", serialize_with = "hcl::ser::block")]
+    #[serde(
+        default,
+        skip_serializing_if = "TablePermissions::is_default",
+        serialize_with = "hcl::ser::block"
+    )]
     pub permissions: TablePermissions,
     #[serde(
         default,
@@ -594,12 +633,17 @@ pub struct FieldConfig {
     pub display: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub href: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", serialize_with = "ser_opt_color")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "ser_opt_color"
+    )]
     pub color: Option<ColorSpec>,
 }
 
-const FORMAT_VOCAB: &[&str] =
-    &["currency", "percent", "date", "datetime", "number", "bytes", "duration"];
+const FORMAT_VOCAB: &[&str] = &[
+    "currency", "percent", "date", "datetime", "number", "bytes", "duration",
+];
 const COLUMN_FORMAT_VOCAB: &[&str] = &[
     "money", "currency", "percent", "pct", "number", "num", "bytes", "duration", "dur", "date",
     "datetime", "rel",
@@ -654,7 +698,9 @@ pub enum ColorOp {
 pub fn parse_color_when(raw: &str) -> Result<ColorOp, String> {
     let s = raw.trim();
     let num = |rest: &str| -> Result<f64, String> {
-        rest.trim().parse::<f64>().map_err(|_| format!("color rule `{raw}`: expected a number"))
+        rest.trim()
+            .parse::<f64>()
+            .map_err(|_| format!("color rule `{raw}`: expected a number"))
     };
     if let Some(rest) = s.strip_prefix("between:") {
         let (lo, hi) = rest
@@ -727,7 +773,9 @@ impl ColorSpec {
                     .iter()
                     .filter_map(|r| {
                         let mut v = parse_color_when(&r.when).ok()?.normalized();
-                        v.as_object_mut().unwrap().insert("class".into(), serde_json::json!(r.class));
+                        v.as_object_mut()
+                            .unwrap()
+                            .insert("class".into(), serde_json::json!(r.class));
                         Some(v)
                     })
                     .collect();
@@ -752,10 +800,16 @@ where
         fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
             f.write_str("labeled rule blocks")
         }
-        fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Vec<ColorRule>, A::Error> {
+        fn visit_map<A: serde::de::MapAccess<'de>>(
+            self,
+            mut map: A,
+        ) -> Result<Vec<ColorRule>, A::Error> {
             let mut out = Vec::new();
             while let Some((when, body)) = map.next_entry::<String, Body>()? {
-                out.push(ColorRule { when, class: body.class });
+                out.push(ColorRule {
+                    when,
+                    class: body.class,
+                });
             }
             Ok(out)
         }
@@ -855,7 +909,11 @@ pub struct TablePermissions {
 
 impl Default for TablePermissions {
     fn default() -> Self {
-        Self { create: true, delete: true, write: true }
+        Self {
+            create: true,
+            delete: true,
+            write: true,
+        }
     }
 }
 
@@ -1093,7 +1151,10 @@ pub struct ConfigDir {
 impl ConfigDir {
     /// The presentation label of a folder-group, by its folder slug.
     pub fn group_label(&self, slug: &str) -> Option<String> {
-        self.groups.iter().find(|g| g.slug == slug).map(|g| g.label.clone())
+        self.groups
+            .iter()
+            .find(|g| g.slug == slug)
+            .map(|g| g.label.clone())
     }
 
     /// The label of the folder-group a table belongs to, if any.
@@ -1112,13 +1173,21 @@ pub fn reject_duplicate_labels(hcl_text: &str) -> Result<(), String> {
     use hcl_edit::structure::Body;
 
     fn walk(body: &Body) -> Result<(), String> {
-        let mut seen: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
+        let mut seen: std::collections::HashSet<(String, String)> =
+            std::collections::HashSet::new();
         for block in body.blocks() {
             if block.is_labeled() {
                 let ident = block.ident.as_str().to_string();
-                let label = block.labels.iter().map(|l| l.as_str()).collect::<Vec<_>>().join(" ");
+                let label = block
+                    .labels
+                    .iter()
+                    .map(|l| l.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ");
                 if !seen.insert((ident.clone(), label.clone())) {
-                    return Err(format!("duplicate block: {ident} \"{label}\" defined twice"));
+                    return Err(format!(
+                        "duplicate block: {ident} \"{label}\" defined twice"
+                    ));
                 }
             }
             walk(&block.body)?;
@@ -1164,7 +1233,9 @@ fn validate_table_config(tc: &TableConfig) -> Result<(), String> {
             }
         }
         if let Some(color) = &f.color {
-            color.validate().map_err(|e| format!("field \"{name}\": {e}"))?;
+            color
+                .validate()
+                .map_err(|e| format!("field \"{name}\": {e}"))?;
         }
     }
     Ok(())
@@ -1177,12 +1248,18 @@ pub(crate) fn validate_panel_fields(widgets: &[PanelConfig]) -> Result<(), Strin
         for c in &w.columns {
             if let Some(fmt) = &c.format {
                 if !COLUMN_FORMAT_VOCAB.contains(&fmt.as_str()) {
-                    return Err(format!("widget \"{}\", column \"{}\": unknown format `{fmt}`", w.label, c.key));
+                    return Err(format!(
+                        "widget \"{}\", column \"{}\": unknown format `{fmt}`",
+                        w.label, c.key
+                    ));
                 }
             }
             if let Some(d) = &c.display {
                 if !["bar", "heat"].contains(&d.as_str()) {
-                    return Err(format!("widget \"{}\", column \"{}\": unknown display `{d}` (bar|heat)", w.label, c.key));
+                    return Err(format!(
+                        "widget \"{}\", column \"{}\": unknown display `{d}` (bar|heat)",
+                        w.label, c.key
+                    ));
                 }
             }
         }
@@ -1231,7 +1308,8 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                 "auth" if in_base => cfg.auth = hcl::from_str(&raw).map_err(ctx)?,
                 "dashboard" if in_base => {
                     let dc: DashboardConfig = hcl::from_str(&raw).map_err(ctx)?;
-                    validate_panel_fields(&dc.widgets).map_err(|e| format!("{}: {e}", path.display()))?;
+                    validate_panel_fields(&dc.widgets)
+                        .map_err(|e| format!("{}: {e}", path.display()))?;
                     cfg.dashboard = dc;
                 }
                 _ => {
@@ -1288,7 +1366,8 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
             "variables" => {
                 let vf: VariablesFile = hcl::from_str(&raw).map_err(ctx)?;
                 for (name, v) in vf.variables {
-                    v.validate(&name).map_err(|e| format!("{}: {e}", path.display()))?;
+                    v.validate(&name)
+                        .map_err(|e| format!("{}: {e}", path.display()))?;
                     if let Some(prev) = variable_sources.get(&name) {
                         return Err(format!(
                             "duplicate variable \"{name}\": {} and {}",
@@ -1339,7 +1418,10 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                 let module = (!declarative).then(|| {
                     let module_file = p.module.clone().unwrap_or_else(|| format!("{slug}.js"));
                     let folder_rel = parent.strip_prefix(dir).unwrap_or(parent);
-                    folder_rel.join(&module_file).to_string_lossy().replace('\\', "/")
+                    folder_rel
+                        .join(&module_file)
+                        .to_string_lossy()
+                        .replace('\\', "/")
                 });
                 if let Some(prev) = page_slugs.get(&slug) {
                     return Err(format!(
@@ -1396,31 +1478,62 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                             path.display()
                         ));
                     }
-                    validate_panel_fields(&p.widgets).map_err(|e| format!("{}: {e}", path.display()))?;
+                    validate_panel_fields(&p.widgets)
+                        .map_err(|e| format!("{}: {e}", path.display()))?;
                     let module = (!declarative).then(|| {
                         let module_file = p.module.clone().unwrap_or_else(|| format!("{slug}.js"));
                         let folder_rel = parent.strip_prefix(dir).unwrap_or(parent);
-                        folder_rel.join(&module_file).to_string_lossy().replace('\\', "/")
+                        folder_rel
+                            .join(&module_file)
+                            .to_string_lossy()
+                            .replace('\\', "/")
                     });
                     if let Some(prev) = page_slugs.get(&slug) {
-                        return Err(format!("duplicate screen slug \"{slug}\": {} and {}", prev.display(), path.display()));
+                        return Err(format!(
+                            "duplicate screen slug \"{slug}\": {} and {}",
+                            prev.display(),
+                            path.display()
+                        ));
                     }
                     page_slugs.insert(slug.clone(), path.clone());
-                    let page = LoadedPage { slug, group, label: p.label, module, columns: p.columns, widgets: p.widgets, icon: p.icon, roles: p.roles };
+                    let page = LoadedPage {
+                        slug,
+                        group,
+                        label: p.label,
+                        module,
+                        columns: p.columns,
+                        widgets: p.widgets,
+                        icon: p.icon,
+                        roles: p.roles,
+                    };
                     let id = page.id();
                     if let Some(prev) = page_ids.get(&id) {
-                        return Err(format!("duplicate screen id \"{id}\": {} and {}", prev.display(), path.display()));
+                        return Err(format!(
+                            "duplicate screen id \"{id}\": {} and {}",
+                            prev.display(),
+                            path.display()
+                        ));
                     }
                     page_ids.insert(id, path.clone());
                     cfg.pages.push(page);
                 } else {
                     if let Some(prev) = cfg.table_sources.get(&slug) {
-                        return Err(format!("duplicate table config for \"{slug}\": {} and {}", prev.path.display(), path.display()));
+                        return Err(format!(
+                            "duplicate table config for \"{slug}\": {} and {}",
+                            prev.path.display(),
+                            path.display()
+                        ));
                     }
                     let tc: TableConfig = hcl::from_str(&raw).map_err(ctx)?;
                     validate_table_config(&tc).map_err(|e| format!("{}: {e}", path.display()))?;
                     cfg.tables.insert(slug.clone(), tc);
-                    cfg.table_sources.insert(slug, TableSource { path: path.clone(), group });
+                    cfg.table_sources.insert(
+                        slug,
+                        TableSource {
+                            path: path.clone(),
+                            group,
+                        },
+                    );
                 }
             }
             _ => {
@@ -1447,26 +1560,42 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                 let tc: TableConfig = hcl::from_str(&raw).map_err(ctx)?;
                 validate_table_config(&tc).map_err(|e| format!("{}: {e}", path.display()))?;
                 cfg.tables.insert(stem.clone(), tc);
-                cfg.table_sources.insert(stem, TableSource { path: path.clone(), group: folder });
+                cfg.table_sources.insert(
+                    stem,
+                    TableSource {
+                        path: path.clone(),
+                        group: folder,
+                    },
+                );
             }
         }
     }
     // steward.hcl's central `source` blocks join the registry (dup-checked vs sources.hcl).
     for (name, s) in cfg.steward.sources.clone() {
         if let Some(prev) = source_files.get(&name) {
-            return Err(format!("duplicate source \"{name}\": {} and steward.hcl", prev.display()));
+            return Err(format!(
+                "duplicate source \"{name}\": {} and steward.hcl",
+                prev.display()
+            ));
         }
         cfg.sources.insert(name, s);
     }
-    cfg.groups.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.label.cmp(&b.label)));
+    cfg.groups
+        .sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.label.cmp(&b.label)));
     // A table/query pinned to a source must name a real, postgres one — otherwise
     // resolution silently falls back to the primary and reads the wrong database.
     for (table, tc) in &cfg.tables {
         if let Some(alias) = &tc.from.source {
             match cfg.sources.get(alias) {
-                None => return Err(format!("table \"{table}\": from.source \"{alias}\" is not a defined source")),
+                None => {
+                    return Err(format!(
+                        "table \"{table}\": from.source \"{alias}\" is not a defined source"
+                    ))
+                }
                 Some(s) if !s.is_postgres() => {
-                    return Err(format!("table \"{table}\": from.source \"{alias}\" is not a postgres source"))
+                    return Err(format!(
+                        "table \"{table}\": from.source \"{alias}\" is not a postgres source"
+                    ))
                 }
                 _ => {}
             }
@@ -1475,9 +1604,15 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
     for (name, q) in &cfg.queries {
         if let Some(alias) = &q.source {
             match cfg.sources.get(alias) {
-                None => return Err(format!("query \"{name}\": source \"{alias}\" is not a defined source")),
+                None => {
+                    return Err(format!(
+                        "query \"{name}\": source \"{alias}\" is not a defined source"
+                    ))
+                }
                 Some(s) if !s.is_postgres() => {
-                    return Err(format!("query \"{name}\": source \"{alias}\" is not a postgres source"))
+                    return Err(format!(
+                        "query \"{name}\": source \"{alias}\" is not a postgres source"
+                    ))
                 }
                 _ => {}
             }
@@ -1496,10 +1631,14 @@ pub fn validate_role_inheritance(roles: &BTreeMap<String, RoleConfig>) -> Result
         let mut cur = role;
         while let Some(parent) = cur.extends.as_deref() {
             if !roles.contains_key(parent) {
-                return Err(format!("role \"{name}\": extends unknown role \"{parent}\""));
+                return Err(format!(
+                    "role \"{name}\": extends unknown role \"{parent}\""
+                ));
             }
             if seen.contains(&parent) {
-                return Err(format!("role \"{name}\": inheritance cycle through \"{parent}\""));
+                return Err(format!(
+                    "role \"{name}\": inheritance cycle through \"{parent}\""
+                ));
             }
             seen.push(parent);
             cur = &roles[parent];
@@ -1526,11 +1665,15 @@ mod tests {
                 ]
             }
         });
-        let tc: TableConfig = serde_json::from_value(model).expect("builder JSON model deserializes");
+        let tc: TableConfig =
+            serde_json::from_value(model).expect("builder JSON model deserializes");
         assert_eq!(tc.detail.mode.as_deref(), Some("page"));
         assert_eq!(tc.detail.columns, Some(1));
         assert_eq!(tc.detail.stats, vec!["install_count", "rating_avg"]);
-        assert_eq!(tc.detail.sidebar.as_ref().unwrap().fields, vec!["id", "owner_id"]);
+        assert_eq!(
+            tc.detail.sidebar.as_ref().unwrap().fields,
+            vec!["id", "owner_id"]
+        );
         assert_eq!(tc.detail.sections.len(), 2);
         assert_eq!(tc.detail.sections[1].title, "Content");
 
@@ -1683,11 +1826,19 @@ relations {
         assert_eq!(a.detail.mode.as_deref(), Some("drawer"));
         assert_eq!(a.detail.columns, Some(2));
         assert!(a.detail.tabs);
-        assert_eq!(a.detail.sidebar.as_ref().unwrap().fields, vec!["id", "created_at"]);
+        assert_eq!(
+            a.detail.sidebar.as_ref().unwrap().fields,
+            vec!["id", "created_at"]
+        );
         assert_eq!(a.detail.sections[0].span, Some(2));
         assert!(a.detail.sections[0].collapsible);
         match &a.relations.inlines[0] {
-            InlineSpec::Full { columns, can_create, can_delete, .. } => {
+            InlineSpec::Full {
+                columns,
+                can_create,
+                can_delete,
+                ..
+            } => {
                 assert_eq!(columns, &vec!["ts".to_string(), "kind".to_string()]);
                 assert_eq!(*can_create, Some(false));
                 assert_eq!(*can_delete, Some(true));
@@ -1702,13 +1853,21 @@ relations {
             serde_json::to_value(&b).unwrap(),
             "parse -> serialize -> parse must be identity (incl. color rule order)",
         );
-        assert_eq!(out, hcl::to_string(&b).unwrap(), "serialize is a fixed point");
+        assert_eq!(
+            out,
+            hcl::to_string(&b).unwrap(),
+            "serialize is a fixed point"
+        );
     }
 
     #[test]
     fn phase4_load_validation_is_loud() {
         let bad_format = fresh_root("bad-format");
-        std::fs::write(bad_format.join("t.hcl"), "field \"x\" { format = \"bogus\" }\n").unwrap();
+        std::fs::write(
+            bad_format.join("t.hcl"),
+            "field \"x\" { format = \"bogus\" }\n",
+        )
+        .unwrap();
         let err = load(Some(&bad_format)).expect_err("bad format errors");
         assert!(err.contains("unknown format `bogus`"), "{err}");
         let _ = std::fs::remove_dir_all(&bad_format);
@@ -1734,7 +1893,11 @@ relations {
         let _ = std::fs::remove_dir_all(&bad_when);
 
         let bad_strategy = fresh_root("bad-strategy");
-        std::fs::write(bad_strategy.join("t.hcl"), "field \"x\" { color = \"rainbow\" }\n").unwrap();
+        std::fs::write(
+            bad_strategy.join("t.hcl"),
+            "field \"x\" { color = \"rainbow\" }\n",
+        )
+        .unwrap();
         let err = load(Some(&bad_strategy)).expect_err("bad strategy errors");
         assert!(err.contains("unknown color strategy `rainbow`"), "{err}");
         let _ = std::fs::remove_dir_all(&bad_strategy);
@@ -1746,8 +1909,14 @@ relations {
         assert_eq!(parse_color_when(">=5").unwrap(), ColorOp::Gte(5.0));
         assert_eq!(parse_color_when("<-1").unwrap(), ColorOp::Lt(-1.0));
         assert_eq!(parse_color_when("<=2.5").unwrap(), ColorOp::Lte(2.5));
-        assert_eq!(parse_color_when("=stale").unwrap(), ColorOp::Eq("stale".into()));
-        assert_eq!(parse_color_when("between:1,3").unwrap(), ColorOp::Between(1.0, 3.0));
+        assert_eq!(
+            parse_color_when("=stale").unwrap(),
+            ColorOp::Eq("stale".into())
+        );
+        assert_eq!(
+            parse_color_when("between:1,3").unwrap(),
+            ColorOp::Between(1.0, 3.0)
+        );
         assert!(parse_color_when("~~").is_err());
         assert!(parse_color_when(">abc").is_err());
         assert!(parse_color_when("between:1").is_err());
@@ -1872,11 +2041,13 @@ roles  = ["ops"]
         );
 
         assert!(
-            hcl::from_str::<PageConfig>("label = \"X\"\nmodule = \"x.js\"\ngroup = \"Ops\"\n").is_err(),
+            hcl::from_str::<PageConfig>("label = \"X\"\nmodule = \"x.js\"\ngroup = \"Ops\"\n")
+                .is_err(),
             "a stray folder-derived `group` is rejected",
         );
         assert!(
-            hcl::from_str::<PageConfig>("label = \"X\"\nmodule = \"x.js\"\nslug = \"x\"\n").is_err(),
+            hcl::from_str::<PageConfig>("label = \"X\"\nmodule = \"x.js\"\nslug = \"x\"\n")
+                .is_err(),
             "a stray folder-derived `slug` is rejected",
         );
         assert!(
@@ -1918,7 +2089,10 @@ roles  = ["ops"]
             hcl::from_str("type = \"stat\"\nlabel = \"Bots\"\nsql = \"SELECT 1 AS v\"\n")
                 .expect("parse widget without id");
         assert!(without.id.is_none());
-        assert!(!hcl::to_string(&without).unwrap().contains("id"), "absent id is not emitted");
+        assert!(
+            !hcl::to_string(&without).unwrap().contains("id"),
+            "absent id is not emitted"
+        );
 
         let out = hcl::to_string(&with).unwrap();
         let back: PanelConfig = hcl::from_str(&out).unwrap();
@@ -1963,13 +2137,20 @@ panel {
             serde_json::to_value(&dash2).unwrap(),
             "grid layout fields round-trip",
         );
-        assert_eq!(out, hcl::to_string(&dash2).unwrap(), "serialize is a fixed point");
+        assert_eq!(
+            out,
+            hcl::to_string(&dash2).unwrap(),
+            "serialize is a fixed point"
+        );
 
         let bare: PanelConfig =
             hcl::from_str("type = \"stat\"\nlabel = \"X\"\nsql = \"SELECT 1 AS v\"\n").unwrap();
         let bare_out = hcl::to_string(&bare).unwrap();
         assert!(!bare_out.contains("w ="), "absent span is not emitted");
-        assert!(!bare_out.contains("category"), "absent category is not emitted");
+        assert!(
+            !bare_out.contains("category"),
+            "absent category is not emitted"
+        );
     }
 
     #[test]
@@ -2011,7 +2192,10 @@ panel {
         let w = &p.widgets[0];
         assert_eq!(w.columns.len(), 3);
         assert_eq!(w.columns[0].label.as_deref(), Some("Bot"));
-        assert_eq!(w.columns[1].badge.get("active").map(String::as_str), Some("green"));
+        assert_eq!(
+            w.columns[1].badge.get("active").map(String::as_str),
+            Some("green")
+        );
         assert_eq!(w.columns[2].align.as_deref(), Some("r"));
         assert_eq!(w.columns[2].max, Some(220));
         validate_panel_fields(&p.widgets).expect("valid formats");
@@ -2031,7 +2215,10 @@ panel {
             "panel {\n  type = \"table\"\n  label = \"X\"\n  sql = \"SELECT 1\"\n  field {\n    key = \"a\"\n    format = \"bogus\"\n  }\n}\n",
         )
         .unwrap();
-        assert!(validate_panel_fields(&dc.widgets).is_err(), "unknown column format is a load error");
+        assert!(
+            validate_panel_fields(&dc.widgets).is_err(),
+            "unknown column format is a load error"
+        );
     }
 
     #[test]
@@ -2040,10 +2227,7 @@ panel {
             "field \"secret\" { masked = true }\nfield \"secret\" { label = \"Secret\" }\n"
         )
         .is_err());
-        assert!(reject_duplicate_labels(
-            "role \"ops\" { }\nrole \"ops\" { }\n"
-        )
-        .is_err());
+        assert!(reject_duplicate_labels("role \"ops\" { }\nrole \"ops\" { }\n").is_err());
         assert!(reject_duplicate_labels(
             "role \"ops\" {\n  perm \"bots\" { view = true }\n  perm \"bots\" { view = false }\n}\n"
         )
@@ -2060,10 +2244,9 @@ panel {
             "detail {\n  section { title = \"A\" }\n  section { title = \"B\" }\n}\n"
         )
         .is_ok());
-        assert!(reject_duplicate_labels(
-            "group { label = \"A\" }\ngroup { label = \"B\" }\n"
-        )
-        .is_ok());
+        assert!(
+            reject_duplicate_labels("group { label = \"A\" }\ngroup { label = \"B\" }\n").is_ok()
+        );
         assert!(reject_duplicate_labels(
             "field \"a\" { masked = true }\nfield \"b\" { masked = true }\n"
         )
@@ -2084,8 +2267,14 @@ panel {
         }
         // Layout-relative: cover every `_group.hcl` and at least the three root
         // globals, recursively — no magic total that a new table would break.
-        let groups = files.iter().filter(|p| p.file_stem().unwrap() == "_group").count();
-        assert_eq!(groups, 10, "one _group.hcl per folder (9 groups + Overview)");
+        let groups = files
+            .iter()
+            .filter(|p| p.file_stem().unwrap() == "_group")
+            .count();
+        assert_eq!(
+            groups, 10,
+            "one _group.hcl per folder (9 groups + Overview)"
+        );
         for g in ["steward", "auth", "dashboard"] {
             assert!(
                 files.iter().any(|p| p.file_stem().unwrap() == g
@@ -2106,15 +2295,26 @@ panel {
         let cfg = load(Some(dir)).expect("admin configs load");
         assert!(cfg.tables.contains_key("bots"), "bots table config present");
         assert!(!cfg.groups.is_empty(), "folder groups present");
-        assert!(!cfg.tables.contains_key("dashboard"), "folder dashboard.hcl is not a table");
+        assert!(
+            !cfg.tables.contains_key("dashboard"),
+            "folder dashboard.hcl is not a table"
+        );
         assert_eq!(
-            cfg.table_sources.get("bots").and_then(|s| s.group.as_deref()),
+            cfg.table_sources
+                .get("bots")
+                .and_then(|s| s.group.as_deref()),
             Some("bots-live"),
             "bots is sourced from the bots-live folder",
         );
-        assert_eq!(cfg.table_group_label("bots").as_deref(), Some("Bots & live"));
+        assert_eq!(
+            cfg.table_group_label("bots").as_deref(),
+            Some("Bots & live")
+        );
         assert!(cfg.auth.roles.contains_key("ops"), "ops role present");
-        assert!(!cfg.dashboard.widgets.is_empty(), "global dashboard widgets present");
+        assert!(
+            !cfg.dashboard.widgets.is_empty(),
+            "global dashboard widgets present"
+        );
         assert_eq!(cfg.group_label("overview").as_deref(), Some("Overview"));
     }
 
@@ -2130,17 +2330,28 @@ panel {
         .unwrap();
         let cfg = load(Some(&ok)).expect("variables load");
         assert!(cfg.variables.contains_key("venue"));
-        assert_eq!(cfg.variables["days"].resolved_type(), crate::interp::VarType::Int);
+        assert_eq!(
+            cfg.variables["days"].resolved_type(),
+            crate::interp::VarType::Int
+        );
         let _ = std::fs::remove_dir_all(&ok);
 
         let both = fresh_root("vars-both");
-        std::fs::write(both.join("variables.hcl"), "variable \"x\" {\n  query = \"SELECT 1\"\n  options = [\"a\"]\n}\n").unwrap();
+        std::fs::write(
+            both.join("variables.hcl"),
+            "variable \"x\" {\n  query = \"SELECT 1\"\n  options = [\"a\"]\n}\n",
+        )
+        .unwrap();
         let err = load(Some(&both)).expect_err("query+options is contradictory");
         assert!(err.contains("exactly one of"), "{err}");
         let _ = std::fs::remove_dir_all(&both);
 
         let bad_default = fresh_root("vars-def");
-        std::fs::write(bad_default.join("variables.hcl"), "variable \"x\" {\n  options = [\"a\"]\n  default = \"z\"\n}\n").unwrap();
+        std::fs::write(
+            bad_default.join("variables.hcl"),
+            "variable \"x\" {\n  options = [\"a\"]\n  default = \"z\"\n}\n",
+        )
+        .unwrap();
         let err = load(Some(&bad_default)).expect_err("default outside options errors");
         assert!(err.contains("not in options"), "{err}");
         let _ = std::fs::remove_dir_all(&bad_default);
@@ -2156,12 +2367,25 @@ panel {
         std::fs::write(bots.join("screen.hcl"), "label = \"Bots\"\n").unwrap();
         let ops = root.join("ops");
         std::fs::create_dir_all(&ops).unwrap();
-        std::fs::write(ops.join("screen.hcl"), "label = \"Ops\"\nmodule = \"ops.tsx\"\n").unwrap();
+        std::fs::write(
+            ops.join("screen.hcl"),
+            "label = \"Ops\"\nmodule = \"ops.tsx\"\n",
+        )
+        .unwrap();
 
         let cfg = load(Some(&root)).expect("screens load");
-        assert!(cfg.tables.contains_key("bots"), "table-mode screen keyed by its folder");
-        assert!(cfg.pages.iter().any(|p| p.slug == "ops"), "module screen becomes a page");
-        assert!(!cfg.tables.contains_key("ops"), "a page screen is not a table");
+        assert!(
+            cfg.tables.contains_key("bots"),
+            "table-mode screen keyed by its folder"
+        );
+        assert!(
+            cfg.pages.iter().any(|p| p.slug == "ops"),
+            "module screen becomes a page"
+        );
+        assert!(
+            !cfg.tables.contains_key("ops"),
+            "a page screen is not a table"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -2173,7 +2397,11 @@ panel {
         let _ = std::fs::remove_dir_all(&root);
         let grouped = root.join("foo");
         std::fs::create_dir_all(grouped.join("bar")).unwrap();
-        std::fs::write(grouped.join("_group.hcl"), "label = \"Foo group\"\norder = 3\n").unwrap();
+        std::fs::write(
+            grouped.join("_group.hcl"),
+            "label = \"Foo group\"\norder = 3\n",
+        )
+        .unwrap();
         std::fs::write(
             grouped.join("bar").join("page.hcl"),
             "label = \"Bar\"\nmodule = \"bar.js\"\n",
@@ -2187,12 +2415,27 @@ panel {
         .unwrap();
 
         let cfg = load(Some(&root)).expect("temp admin loads");
-        let bar = cfg.pages.iter().find(|p| p.slug == "bar").expect("bar page");
-        assert_eq!(bar.group.as_deref(), Some("foo"), "group = enclosing group folder slug");
+        let bar = cfg
+            .pages
+            .iter()
+            .find(|p| p.slug == "bar")
+            .expect("bar page");
+        assert_eq!(
+            bar.group.as_deref(),
+            Some("foo"),
+            "group = enclosing group folder slug"
+        );
         assert_eq!(cfg.group_label("foo").as_deref(), Some("Foo group"));
 
-        let baz = cfg.pages.iter().find(|p| p.slug == "baz").expect("baz page");
-        assert_eq!(baz.group, None, "page folder directly under root is ungrouped");
+        let baz = cfg
+            .pages
+            .iter()
+            .find(|p| p.slug == "baz")
+            .expect("baz page");
+        assert_eq!(
+            baz.group, None,
+            "page folder directly under root is ungrouped"
+        );
 
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -2206,7 +2449,11 @@ panel {
         let grouped = root.join("overview");
         std::fs::create_dir_all(grouped.join("fleet")).unwrap();
         std::fs::create_dir_all(grouped.join("cache")).unwrap();
-        std::fs::write(grouped.join("_group.hcl"), "label = \"Overview\"\norder = 1\n").unwrap();
+        std::fs::write(
+            grouped.join("_group.hcl"),
+            "label = \"Overview\"\norder = 1\n",
+        )
+        .unwrap();
         std::fs::write(
             grouped.join("fleet").join("page.hcl"),
             "label = \"Fleet\"\nicon = \"satellite\"\nroles = [\"ops\"]\ncolumns = 4\npanel {\n  type = \"stat\"\n  label = \"Bots\"\n  sql = \"SELECT count(*) AS v FROM bots\"\n}\n",
@@ -2219,8 +2466,15 @@ panel {
         .unwrap();
 
         let cfg = load(Some(&root)).expect("temp pages load");
-        assert!(cfg.dashboard.widgets.is_empty(), "global dashboard untouched");
-        let fleet = cfg.pages.iter().find(|p| p.slug == "fleet").expect("fleet page");
+        assert!(
+            cfg.dashboard.widgets.is_empty(),
+            "global dashboard untouched"
+        );
+        let fleet = cfg
+            .pages
+            .iter()
+            .find(|p| p.slug == "fleet")
+            .expect("fleet page");
         assert_eq!(fleet.id(), "overview/fleet");
         assert_eq!(fleet.group.as_deref(), Some("overview"));
         assert_eq!(fleet.roles, vec!["ops"]);
@@ -2228,7 +2482,11 @@ panel {
         assert!(fleet.module.is_none());
         assert_eq!(fleet.columns, Some(4));
         assert_eq!(fleet.widgets.len(), 1);
-        let cache = cfg.pages.iter().find(|p| p.slug == "cache").expect("cache page");
+        let cache = cfg
+            .pages
+            .iter()
+            .find(|p| p.slug == "cache")
+            .expect("cache page");
         assert!(!cache.is_declarative(), "module => scripted");
         assert_eq!(cache.module.as_deref(), Some("overview/cache/cache.tsx"));
 
@@ -2237,7 +2495,10 @@ panel {
             "label = \"Both\"\nmodule = \"x.tsx\"\npanel {\n  type = \"stat\"\n  label = \"X\"\n  sql = \"SELECT 1 AS v\"\n}\n",
         )
         .unwrap();
-        assert!(load(Some(&root)).is_err(), "module + widgets together is a load error");
+        assert!(
+            load(Some(&root)).is_err(),
+            "module + widgets together is a load error"
+        );
 
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -2246,8 +2507,7 @@ panel {
         use std::sync::atomic::{AtomicU32, Ordering};
         static SEQ: AtomicU32 = AtomicU32::new(0);
         let n = SEQ.fetch_add(1, Ordering::SeqCst);
-        let root =
-            std::env::temp_dir().join(format!("steward-{tag}-{}-{n}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("steward-{tag}-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         root
@@ -2266,7 +2526,10 @@ panel {
 
         let err = load(Some(&root)).expect_err("duplicate table identity must error");
         assert!(err.contains("duplicate table config for \"bots\""), "{err}");
-        assert!(err.contains("a/bots.hcl") && err.contains("b/bots.hcl"), "names both paths: {err}");
+        assert!(
+            err.contains("a/bots.hcl") && err.contains("b/bots.hcl"),
+            "names both paths: {err}"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -2289,7 +2552,10 @@ panel {
         let unknown = base("from-unknown");
         std::fs::write(unknown.join("bots.hcl"), "from { source = \"ghost\" }\n").unwrap();
         let err = load(Some(&unknown)).expect_err("unknown source errors");
-        assert!(err.contains("bots") && err.contains("ghost") && err.contains("not a defined source"), "{err}");
+        assert!(
+            err.contains("bots") && err.contains("ghost") && err.contains("not a defined source"),
+            "{err}"
+        );
         let _ = std::fs::remove_dir_all(&unknown);
 
         let http = base("from-http");
@@ -2299,7 +2565,11 @@ panel {
         let _ = std::fs::remove_dir_all(&http);
 
         let ok = base("from-ok");
-        std::fs::write(ok.join("bots.hcl"), "from {\n  source = \"main\"\n  schema = \"markets\"\n  table = \"bots\"\n}\n").unwrap();
+        std::fs::write(
+            ok.join("bots.hcl"),
+            "from {\n  source = \"main\"\n  schema = \"markets\"\n  table = \"bots\"\n}\n",
+        )
+        .unwrap();
         let cfg = load(Some(&ok)).expect("valid from loads");
         let from = &cfg.tables.get("bots").expect("bots table").from;
         assert_eq!(from.source.as_deref(), Some("main"));
@@ -2323,37 +2593,64 @@ panel {
             "panel {\n  type  = \"stat\"\n  label = \"X\"\n  sql   = \"SELECT 1 AS v\"\n}\n",
         )
         .unwrap();
-        std::fs::write(base.join("widgets").join("minibar.js"), "export const m = 1;").unwrap();
+        std::fs::write(
+            base.join("widgets").join("minibar.js"),
+            "export const m = 1;",
+        )
+        .unwrap();
 
         let cfg = load(Some(&root)).expect("globals load from config");
         assert_eq!(cfg.steward.brand.as_deref(), Some("Acme"));
         assert!(cfg.auth.roles.contains_key("ops"));
         assert_eq!(cfg.dashboard.widgets.len(), 1);
-        assert!(!cfg.tables.contains_key("steward"), "config globals are never tables");
+        assert!(
+            !cfg.tables.contains_key("steward"),
+            "config globals are never tables"
+        );
         assert!(cfg.groups.is_empty(), "config is never a sidebar group");
 
         std::fs::write(base.join("stray.hcl"), "label = \"Nope\"\n").unwrap();
         let err = load(Some(&root)).expect_err("a stray .hcl in config must error");
-        assert!(err.contains("misplaced config in reserved config folder"), "{err}");
+        assert!(
+            err.contains("misplaced config in reserved config folder"),
+            "{err}"
+        );
         assert!(err.contains("stray.hcl"), "{err}");
         std::fs::remove_file(base.join("stray.hcl")).unwrap();
 
-        std::fs::write(base.join("queries.hcl"), "query \"x\" { sql = \"SELECT 1\" }\n").unwrap();
+        std::fs::write(
+            base.join("queries.hcl"),
+            "query \"x\" { sql = \"SELECT 1\" }\n",
+        )
+        .unwrap();
         let err = load(Some(&root)).expect_err("config/queries.hcl must error");
-        assert!(err.contains("misplaced config in reserved config folder"), "{err}");
+        assert!(
+            err.contains("misplaced config in reserved config folder"),
+            "{err}"
+        );
         assert!(err.contains("queries.hcl"), "{err}");
         std::fs::remove_file(base.join("queries.hcl")).unwrap();
 
         std::fs::create_dir_all(base.join("sub")).unwrap();
         std::fs::write(base.join("sub").join("page.hcl"), "label = \"Nope\"\n").unwrap();
         let err = load(Some(&root)).expect_err("config/sub/page.hcl must error");
-        assert!(err.contains("misplaced config in reserved config folder"), "{err}");
+        assert!(
+            err.contains("misplaced config in reserved config folder"),
+            "{err}"
+        );
         assert!(err.contains("page.hcl"), "{err}");
         std::fs::remove_file(base.join("sub").join("page.hcl")).unwrap();
 
-        std::fs::write(base.join("widgets").join("_group.hcl"), "label = \"Nope\"\n").unwrap();
+        std::fs::write(
+            base.join("widgets").join("_group.hcl"),
+            "label = \"Nope\"\n",
+        )
+        .unwrap();
         let err = load(Some(&root)).expect_err("config/widgets/_group.hcl must error");
-        assert!(err.contains("misplaced config in reserved config folder"), "{err}");
+        assert!(
+            err.contains("misplaced config in reserved config folder"),
+            "{err}"
+        );
         assert!(err.contains("_group.hcl"), "{err}");
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -2368,7 +2665,10 @@ panel {
         std::fs::write(base.join("_group.hcl"), "label = \"Nope\"\n").unwrap();
 
         let err = load(Some(&root)).expect_err("config/_group.hcl must error");
-        assert!(err.contains("misplaced config in reserved config folder"), "{err}");
+        assert!(
+            err.contains("misplaced config in reserved config folder"),
+            "{err}"
+        );
         assert!(err.contains("_group.hcl"), "{err}");
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -2383,12 +2683,20 @@ panel {
         let a = root.join("grp");
         std::fs::create_dir_all(a.join("ops")).unwrap();
         std::fs::write(a.join("_group.hcl"), "label = \"Grp A\"\n").unwrap();
-        std::fs::write(a.join("ops").join("page.hcl"), "label = \"A\"\nmodule = \"a.js\"\n").unwrap();
+        std::fs::write(
+            a.join("ops").join("page.hcl"),
+            "label = \"A\"\nmodule = \"a.js\"\n",
+        )
+        .unwrap();
 
         let b = root.join("outer").join("grp");
         std::fs::create_dir_all(b.join("ops")).unwrap();
         std::fs::write(b.join("_group.hcl"), "label = \"Grp B\"\n").unwrap();
-        std::fs::write(b.join("ops").join("page.hcl"), "label = \"B\"\nmodule = \"b.js\"\n").unwrap();
+        std::fs::write(
+            b.join("ops").join("page.hcl"),
+            "label = \"B\"\nmodule = \"b.js\"\n",
+        )
+        .unwrap();
 
         // Two groups sharing a slug is itself a loud error now (it forked the
         // sidebar) and fires before the page-id collision it used to cause.
@@ -2406,12 +2714,20 @@ panel {
         let a = root.join("overview");
         std::fs::create_dir_all(a.join("ops")).unwrap();
         std::fs::write(a.join("_group.hcl"), "label = \"Overview\"\n").unwrap();
-        std::fs::write(a.join("ops").join("page.hcl"), "label = \"A\"\nmodule = \"a.js\"\n").unwrap();
+        std::fs::write(
+            a.join("ops").join("page.hcl"),
+            "label = \"A\"\nmodule = \"a.js\"\n",
+        )
+        .unwrap();
 
         let b = root.join("other");
         std::fs::create_dir_all(b.join("ops")).unwrap();
         std::fs::write(b.join("_group.hcl"), "label = \"Other\"\n").unwrap();
-        std::fs::write(b.join("ops").join("page.hcl"), "label = \"B\"\nmodule = \"b.js\"\n").unwrap();
+        std::fs::write(
+            b.join("ops").join("page.hcl"),
+            "label = \"B\"\nmodule = \"b.js\"\n",
+        )
+        .unwrap();
 
         let err = load(Some(&root)).expect_err("duplicate page slug must error");
         assert!(err.contains("duplicate page slug \"ops\""), "{err}");
@@ -2435,7 +2751,10 @@ panel {
 
         let cfg = load(Some(&root)).expect("load ignores the symlink");
         assert!(cfg.tables.contains_key("safe"), "real files still load");
-        assert!(!cfg.tables.contains_key("evil"), "symlinked-out file is not traversed");
+        assert!(
+            !cfg.tables.contains_key("evil"),
+            "symlinked-out file is not traversed"
+        );
         let _ = std::fs::remove_dir_all(&root);
         let _ = std::fs::remove_dir_all(&outside);
     }
@@ -2447,7 +2766,11 @@ panel {
         let root = fresh_root("queries");
         let ops = root.join("overview").join("ops");
         std::fs::create_dir_all(&ops).unwrap();
-        std::fs::write(root.join("overview").join("_group.hcl"), "label = \"Overview\"\n").unwrap();
+        std::fs::write(
+            root.join("overview").join("_group.hcl"),
+            "label = \"Overview\"\n",
+        )
+        .unwrap();
         std::fs::write(
             ops.join("queries.hcl"),
             "query \"ops_fleet\" {\n  sql   = \"SELECT 1\"\n  roles = [\"ops\"]\n}\n",
@@ -2455,9 +2778,15 @@ panel {
         .unwrap();
 
         let cfg = load(Some(&root)).expect("load");
-        assert!(cfg.queries.contains_key("ops_fleet"), "query merged into registry");
+        assert!(
+            cfg.queries.contains_key("ops_fleet"),
+            "query merged into registry"
+        );
         assert_eq!(cfg.queries["ops_fleet"].roles, vec!["ops"]);
-        assert!(!cfg.tables.contains_key("queries"), "queries.hcl is not a table config");
+        assert!(
+            !cfg.tables.contains_key("queries"),
+            "queries.hcl is not a table config"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -2468,12 +2797,23 @@ panel {
         let root = fresh_root("dup-query");
         std::fs::create_dir_all(root.join("a")).unwrap();
         std::fs::create_dir_all(root.join("b")).unwrap();
-        std::fs::write(root.join("a").join("queries.hcl"), "query \"ops_fleet\" { sql = \"SELECT 1\" }\n").unwrap();
-        std::fs::write(root.join("b").join("queries.hcl"), "query \"ops_fleet\" { sql = \"SELECT 2\" }\n").unwrap();
+        std::fs::write(
+            root.join("a").join("queries.hcl"),
+            "query \"ops_fleet\" { sql = \"SELECT 1\" }\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("b").join("queries.hcl"),
+            "query \"ops_fleet\" { sql = \"SELECT 2\" }\n",
+        )
+        .unwrap();
 
         let err = load(Some(&root)).expect_err("duplicate query name must error");
         assert!(err.contains("duplicate query \"ops_fleet\""), "{err}");
-        assert!(err.contains("a/queries.hcl") && err.contains("b/queries.hcl"), "names both paths: {err}");
+        assert!(
+            err.contains("a/queries.hcl") && err.contains("b/queries.hcl"),
+            "names both paths: {err}"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -2485,21 +2825,49 @@ panel {
         let root = fresh_root("page-module");
         let ops = root.join("overview").join("ops");
         std::fs::create_dir_all(&ops).unwrap();
-        std::fs::write(root.join("overview").join("_group.hcl"), "label = \"Overview\"\n").unwrap();
+        std::fs::write(
+            root.join("overview").join("_group.hcl"),
+            "label = \"Overview\"\n",
+        )
+        .unwrap();
         std::fs::write(ops.join("page.hcl"), "label = \"Operations\"\n").unwrap();
         let cfg = load(Some(&root)).expect("load");
-        let page = cfg.pages.iter().find(|p| p.slug == "ops").expect("ops page");
-        assert_eq!(page.module.as_deref(), Some("overview/ops/ops.js"), "convention default");
+        let page = cfg
+            .pages
+            .iter()
+            .find(|p| p.slug == "ops")
+            .expect("ops page");
+        assert_eq!(
+            page.module.as_deref(),
+            Some("overview/ops/ops.js"),
+            "convention default"
+        );
         let _ = std::fs::remove_dir_all(&root);
 
         let root2 = fresh_root("page-module-explicit");
         let ops2 = root2.join("overview").join("ops");
         std::fs::create_dir_all(&ops2).unwrap();
-        std::fs::write(root2.join("overview").join("_group.hcl"), "label = \"Overview\"\n").unwrap();
-        std::fs::write(ops2.join("page.hcl"), "label = \"Operations\"\nmodule = \"ops.js\"\n").unwrap();
+        std::fs::write(
+            root2.join("overview").join("_group.hcl"),
+            "label = \"Overview\"\n",
+        )
+        .unwrap();
+        std::fs::write(
+            ops2.join("page.hcl"),
+            "label = \"Operations\"\nmodule = \"ops.js\"\n",
+        )
+        .unwrap();
         let cfg2 = load(Some(&root2)).expect("load");
-        let page2 = cfg2.pages.iter().find(|p| p.slug == "ops").expect("ops page");
-        assert_eq!(page2.module.as_deref(), Some("overview/ops/ops.js"), "explicit module, admin-relative");
+        let page2 = cfg2
+            .pages
+            .iter()
+            .find(|p| p.slug == "ops")
+            .expect("ops page");
+        assert_eq!(
+            page2.module.as_deref(),
+            Some("overview/ops/ops.js"),
+            "explicit module, admin-relative"
+        );
         let _ = std::fs::remove_dir_all(&root2);
     }
 
@@ -2550,7 +2918,11 @@ panel {
         fn rename(stem: &str, v: Value, forward: bool) -> Value {
             let Value::Object(mut m) = v else { return v };
             for (singular, plural) in pairs(stem) {
-                let (from, to) = if forward { (plural, singular) } else { (singular, plural) };
+                let (from, to) = if forward {
+                    (plural, singular)
+                } else {
+                    (singular, plural)
+                };
                 rename_path(&mut m, from, to);
             }
             if stem == "auth" {
@@ -2558,8 +2930,11 @@ panel {
                 if let Some(Value::Object(roles)) = m.get_mut(key) {
                     for (_n, role) in roles.iter_mut() {
                         if let Value::Object(rb) = role {
-                            let (from, to) =
-                                if forward { ("perms", "perm") } else { ("perm", "perms") };
+                            let (from, to) = if forward {
+                                ("perms", "perm")
+                            } else {
+                                ("perm", "perms")
+                            };
                             swap(rb, from, to);
                         }
                     }

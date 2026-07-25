@@ -54,9 +54,9 @@ pub async fn action_handler(
             let mut binds = Binds::new();
             let mut sets = Vec::new();
             for (col_name, tv) in &action.set {
-                let col = dbt
-                    .column(col_name)
-                    .ok_or_else(|| AppError::bad(format!("action sets unknown column {col_name}")))?;
+                let col = dbt.column(col_name).ok_or_else(|| {
+                    AppError::bad(format!("action sets unknown column {col_name}"))
+                })?;
                 let expr = value_expr(col, tv, &mut binds)?;
                 sets.push(format!("{} = {expr}", ident(col_name)));
             }
@@ -70,7 +70,11 @@ pub async fn action_handler(
                 &pk_name,
                 &pks,
                 binds,
-                format!("UPDATE {} SET {}", state.qualified_table(&table), sets.join(", ")),
+                format!(
+                    "UPDATE {} SET {}",
+                    state.qualified_table(&table),
+                    sets.join(", ")
+                ),
             )
             .await?
         }
@@ -121,7 +125,10 @@ pub async fn action_handler(
                 let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())
                     .map_err(|e| AppError::internal(e.to_string()))?;
                 mac.update(&body_bytes);
-                req = req.header("x-steward-signature", hex::encode(mac.finalize().into_bytes()));
+                req = req.header(
+                    "x-steward-signature",
+                    hex::encode(mac.finalize().into_bytes()),
+                );
             }
             let resp = req
                 .send()
@@ -138,7 +145,9 @@ pub async fn action_handler(
             if !(200..300).contains(&status) {
                 return Err(AppError::bad(format!("webhook returned {status}")));
             }
-            return Ok(Json(json!({ "affected": pks.len(), "webhook_status": status })));
+            return Ok(Json(
+                json!({ "affected": pks.len(), "webhook_status": status }),
+            ));
         }
     };
 
@@ -166,15 +175,14 @@ async fn run_bulk(
         let n = binds.push(Some(pk.clone()));
         placeholders.push(format!("${n}"));
     }
-    let mut where_sql = format!(
-        "{}::text IN ({})",
-        ident(pk_name),
-        placeholders.join(", ")
-    );
+    let mut where_sql = format!("{}::text IN ({})", ident(pk_name), placeholders.join(", "));
     if let Some(rf) = state.row_filter(user, table) {
         where_sql = format!("{where_sql} AND ({rf})");
     }
     let sql = format!("{head} WHERE {where_sql}");
-    let result = binds.query(&sql).execute(state.pool_for_table(table)).await?;
+    let result = binds
+        .query(&sql)
+        .execute(state.pool_for_table(table))
+        .await?;
     Ok(result.rows_affected())
 }

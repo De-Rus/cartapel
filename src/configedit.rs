@@ -104,7 +104,11 @@ pub async fn get_config(
     if state.resolve_table(&table).is_none() {
         return Err(AppError::not_found(format!("unknown table {table}")));
     }
-    let writable = state.config_dir.as_deref().map(dir_writable).unwrap_or(false);
+    let writable = state
+        .config_dir
+        .as_deref()
+        .map(dir_writable)
+        .unwrap_or(false);
 
     // The effective config drives the visual editor's `model`; the raw HCL text
     // (from disk when present, else generated) drives the raw editor.
@@ -169,7 +173,9 @@ pub async fn put_config(
     // introspection-derived starter template.
     let hcl_text = match (body.hcl, body.model) {
         (Some(_), Some(_)) => {
-            return Err(AppError::bad("send exactly one of `hcl` or `model`, not both"))
+            return Err(AppError::bad(
+                "send exactly one of `hcl` or `model`, not both",
+            ))
         }
         (None, None) => {
             if is_create && body.group.is_some() {
@@ -188,10 +194,14 @@ pub async fn put_config(
     };
 
     let Some(dir) = state.config_dir.clone() else {
-        return Ok(Json(json!({ "ok": false, "writable": false, "hcl": hcl_text })));
+        return Ok(Json(
+            json!({ "ok": false, "writable": false, "hcl": hcl_text }),
+        ));
     };
     if !dir_writable(&dir) {
-        return Ok(Json(json!({ "ok": false, "writable": false, "hcl": hcl_text })));
+        return Ok(Json(
+            json!({ "ok": false, "writable": false, "hcl": hcl_text }),
+        ));
     }
 
     if let Some(group) = body.group.as_deref().filter(|_| is_create) {
@@ -201,7 +211,9 @@ pub async fn put_config(
     {
         let _guard = state.config_write_lock.lock().unwrap();
         write_and_reload(&state, &dir, &table, &hcl_text)?;
-        state.store.config_version_add(&table, &hcl_text, &user.email, None)?;
+        state
+            .store
+            .config_version_add(&table, &hcl_text, &user.email, None)?;
     }
 
     state.store.audit(
@@ -269,13 +281,25 @@ async fn create_in_group(
         let _guard = state.config_write_lock.lock().unwrap();
         let mut ops = Vec::new();
         if in_screens {
-            ops.push(FsOp::Mkdir { path: group_dir.join(stem) });
+            ops.push(FsOp::Mkdir {
+                path: group_dir.join(stem),
+            });
         }
-        ops.push(FsOp::Write { path: table_path, contents: hcl_text.to_string() });
-        ops.push(FsOp::Write { path: group_path, contents: group_hcl.clone() });
+        ops.push(FsOp::Write {
+            path: table_path,
+            contents: hcl_text.to_string(),
+        });
+        ops.push(FsOp::Write {
+            path: group_path,
+            contents: group_hcl.clone(),
+        });
         commit_batch_and_reload(state, dir, ops)?;
-        state.store.config_version_add(table, hcl_text, &user.email, None)?;
-        state.store.config_version_add(&group_key, &group_hcl, &user.email, None)?;
+        state
+            .store
+            .config_version_add(table, hcl_text, &user.email, None)?;
+        state
+            .store
+            .config_version_add(&group_key, &group_hcl, &user.email, None)?;
     }
 
     state.store.audit(
@@ -348,8 +372,10 @@ pub async fn discover(
         .filter(|(k, _)| !RESERVED_STEMS.iter().any(|r| r.eq_ignore_ascii_case(k)))
         .collect();
 
-    let schemas: std::collections::HashSet<&str> =
-        unconfigured.iter().map(|(_, t)| t.schema.as_str()).collect();
+    let schemas: std::collections::HashSet<&str> = unconfigured
+        .iter()
+        .map(|(_, t)| t.schema.as_str())
+        .collect();
     let multi_schema = schemas.len() > 1;
     let prefix_of = |name: &str| {
         name.split('_')
@@ -370,7 +396,12 @@ pub async fn discover(
     )
     .fetch_all(&state.pg)
     .await
-    .map(|rs| rs.into_iter().filter(|(_, _, r)| *r >= 0).map(|(s, n, r)| (format!("{s}.{n}"), r)).collect())
+    .map(|rs| {
+        rs.into_iter()
+            .filter(|(_, _, r)| *r >= 0)
+            .map(|(s, n, r)| (format!("{s}.{n}"), r))
+            .collect()
+    })
     .unwrap_or_default();
 
     let tables: Vec<Value> = unconfigured
@@ -438,7 +469,10 @@ pub async fn apply_setup(
             return Err(AppError::bad(format!("duplicate group slug '{}'", g.slug)));
         }
         if cfg.groups.iter().any(|eg| eg.slug == g.slug) {
-            return Err(AppError::conflict(format!("group '{}' already exists", g.slug)));
+            return Err(AppError::conflict(format!(
+                "group '{}' already exists",
+                g.slug
+            )));
         }
     }
     let mut ops: Vec<FsOp> = Vec::new();
@@ -457,7 +491,9 @@ pub async fn apply_setup(
         for t in &g.tables {
             let stem = safe_stem(t)?;
             if cfg.tables.contains_key(stem) {
-                return Err(AppError::conflict(format!("'{stem}' is already configured")));
+                return Err(AppError::conflict(format!(
+                    "'{stem}' is already configured"
+                )));
             }
             if state.db.find(None, stem).is_none() {
                 return Err(AppError::bad(format!("unknown table '{stem}'")));
@@ -472,13 +508,21 @@ pub async fn apply_setup(
         };
         let group_hcl = hcl::to_string(&group_cfg)
             .map_err(|e| AppError::internal(format!("serialize group: {e}")))?;
-        ops.push(FsOp::Mkdir { path: base.join(&slug) });
-        ops.push(FsOp::Write { path: base.join(&slug).join("_group.hcl"), contents: group_hcl.clone() });
+        ops.push(FsOp::Mkdir {
+            path: base.join(&slug),
+        });
+        ops.push(FsOp::Write {
+            path: base.join(&slug).join("_group.hcl"),
+            contents: group_hcl.clone(),
+        });
         files.insert(format!("{slug}/_group.hcl"), json!(group_hcl));
         versions.push((format!("_group/{slug}"), group_hcl));
         for t in &g.tables {
             let stem = safe_stem(t)?.to_string();
-            ops.push(FsOp::Write { path: base.join(&slug).join(format!("{stem}.hcl")), contents: String::new() });
+            ops.push(FsOp::Write {
+                path: base.join(&slug).join(format!("{stem}.hcl")),
+                contents: String::new(),
+            });
             files.insert(format!("{slug}/{stem}.hcl"), json!(""));
             versions.push((stem, String::new()));
             count += 1;
@@ -487,13 +531,17 @@ pub async fn apply_setup(
     drop(cfg);
 
     let Some(dir) = dir_opt.filter(|_| writable) else {
-        return Ok(Json(json!({ "ok": false, "writable": false, "files": files })));
+        return Ok(Json(
+            json!({ "ok": false, "writable": false, "files": files }),
+        ));
     };
     {
         let _guard = state.config_write_lock.lock().unwrap();
         commit_batch_and_reload(&state, &dir, ops)?;
         for (key, hcl) in &versions {
-            state.store.config_version_add(key, hcl, &user.email, None)?;
+            state
+                .store
+                .config_version_add(key, hcl, &user.email, None)?;
         }
     }
     state.store.audit(
@@ -503,7 +551,9 @@ pub async fn apply_setup(
         "setup:apply",
         Some(&json!({ "groups": plan.groups.len(), "tables": count })),
     );
-    Ok(Json(json!({ "ok": true, "reloaded": true, "tables": count })))
+    Ok(Json(
+        json!({ "ok": true, "reloaded": true, "tables": count }),
+    ))
 }
 
 /// Resolve `{table}.hcl` and atomically commit + hot-reload it.
@@ -530,7 +580,10 @@ pub(crate) fn commit_and_reload(
     let previous = std::fs::read_to_string(path).ok();
 
     let tmp_dir = path.parent().unwrap_or(dir);
-    let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "config.hcl".into());
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "config.hcl".into());
     let tmp = tmp_dir.join(format!(".{name}.tmp"));
     std::fs::write(&tmp, hcl).map_err(|e| AppError::internal(format!("write config: {e}")))?;
     std::fs::rename(&tmp, path).map_err(|e| AppError::internal(format!("commit config: {e}")))?;
@@ -544,7 +597,9 @@ pub(crate) fn commit_and_reload(
                 let _ = std::fs::remove_file(path);
             }
         }
-        return Err(AppError::bad(format!("config reload failed, reverted: {e}")));
+        return Err(AppError::bad(format!(
+            "config reload failed, reverted: {e}"
+        )));
     }
     Ok(())
 }
@@ -604,7 +659,9 @@ pub(crate) fn confine(dir: &FsPath, p: &FsPath) -> Result<PathBuf, AppError> {
     if let Some(first) = rel.components().next() {
         let name = first.as_os_str().to_string_lossy();
         if name.starts_with('_') || name == crate::config::RESERVED_DIR {
-            return Err(AppError::bad("reserved config folder is not a valid target"));
+            return Err(AppError::bad(
+                "reserved config folder is not a valid target",
+            ));
         }
     }
     Ok(resolved)
@@ -616,10 +673,20 @@ enum Undo {
     // `prior` is a byte snapshot, not text: `read_to_string` loses non-UTF-8
     // files (returns `None`, indistinguishable from absent) and would delete
     // them on rollback. `None` here means the path did not exist at capture.
-    RestoreFile { path: PathBuf, prior: Option<Vec<u8>> },
-    MoveBack { from: PathBuf, to: PathBuf },
-    RemoveCreatedDir { path: PathBuf },
-    RecreateDir { path: PathBuf },
+    RestoreFile {
+        path: PathBuf,
+        prior: Option<Vec<u8>>,
+    },
+    MoveBack {
+        from: PathBuf,
+        to: PathBuf,
+    },
+    RemoveCreatedDir {
+        path: PathBuf,
+    },
+    RecreateDir {
+        path: PathBuf,
+    },
 }
 
 /// Byte snapshot of `path` for the undo journal: `Some(bytes)` when the file
@@ -633,7 +700,9 @@ fn capture_prior(path: &FsPath) -> Option<Vec<u8>> {
 }
 
 fn write_atomic(path: &FsPath, contents: &str) -> Result<(), AppError> {
-    let parent = path.parent().ok_or_else(|| AppError::bad("write path has no parent"))?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| AppError::bad("write path has no parent"))?;
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -657,13 +726,23 @@ pub(crate) fn commit_batch_and_reload(
     let mut confined: Vec<FsOp> = Vec::with_capacity(ops.len());
     for op in ops {
         let c = match op {
-            FsOp::Write { path, contents } => FsOp::Write { path: confine(dir, &path)?, contents },
-            FsOp::Move { from, to } => {
-                FsOp::Move { from: confine(dir, &from)?, to: confine(dir, &to)? }
-            }
-            FsOp::Mkdir { path } => FsOp::Mkdir { path: confine(dir, &path)? },
-            FsOp::Remove { path } => FsOp::Remove { path: confine(dir, &path)? },
-            FsOp::Rmdir { path } => FsOp::Rmdir { path: confine(dir, &path)? },
+            FsOp::Write { path, contents } => FsOp::Write {
+                path: confine(dir, &path)?,
+                contents,
+            },
+            FsOp::Move { from, to } => FsOp::Move {
+                from: confine(dir, &from)?,
+                to: confine(dir, &to)?,
+            },
+            FsOp::Mkdir { path } => FsOp::Mkdir {
+                path: confine(dir, &path)?,
+            },
+            FsOp::Remove { path } => FsOp::Remove {
+                path: confine(dir, &path)?,
+            },
+            FsOp::Rmdir { path } => FsOp::Rmdir {
+                path: confine(dir, &path)?,
+            },
         };
         confined.push(c);
     }
@@ -675,7 +754,10 @@ pub(crate) fn commit_batch_and_reload(
             FsOp::Write { path, contents } => {
                 let prior = capture_prior(path);
                 write_atomic(path, contents).map(|()| {
-                    journal.push(Undo::RestoreFile { path: path.clone(), prior });
+                    journal.push(Undo::RestoreFile {
+                        path: path.clone(),
+                        prior,
+                    });
                 })
             }
             // Move must never clobber: `fs::rename` silently overwrites an
@@ -683,11 +765,19 @@ pub(crate) fn commit_batch_and_reload(
             // safety lives in the primitive itself, not just the callers.
             FsOp::Move { from, to } => {
                 if to.exists() {
-                    Err(AppError::bad(format!("move destination '{}' exists", to.display())))
+                    Err(AppError::bad(format!(
+                        "move destination '{}' exists",
+                        to.display()
+                    )))
                 } else {
                     std::fs::rename(from, to)
                         .map_err(|e| AppError::internal(format!("move: {e}")))
-                        .map(|()| journal.push(Undo::MoveBack { from: from.clone(), to: to.clone() }))
+                        .map(|()| {
+                            journal.push(Undo::MoveBack {
+                                from: from.clone(),
+                                to: to.clone(),
+                            })
+                        })
                 }
             }
             FsOp::Mkdir { path } => {
@@ -710,7 +800,12 @@ pub(crate) fn commit_batch_and_reload(
                 let prior = capture_prior(path);
                 std::fs::remove_file(path)
                     .map_err(|e| AppError::internal(format!("remove: {e}")))
-                    .map(|()| journal.push(Undo::RestoreFile { path: path.clone(), prior }))
+                    .map(|()| {
+                        journal.push(Undo::RestoreFile {
+                            path: path.clone(),
+                            prior,
+                        })
+                    })
             }
             FsOp::Rmdir { path } => std::fs::remove_dir(path)
                 .map_err(|e| AppError::internal(format!("rmdir: {e}")))
@@ -801,7 +896,11 @@ pub(crate) fn port_legacy_roles(state: &AppState) {
         return;
     }
 
-    let writable = state.config_dir.as_deref().map(dir_writable).unwrap_or(false);
+    let writable = state
+        .config_dir
+        .as_deref()
+        .map(dir_writable)
+        .unwrap_or(false);
     let Some(dir) = state.config_dir.clone().filter(|_| writable) else {
         warn_orphaned_roles(state, &orphans, &skipped);
         return;
@@ -822,12 +921,21 @@ pub(crate) fn port_legacy_roles(state: &AppState) {
         let _ = std::fs::create_dir_all(dir.join("config"));
         let path = dir.join("config").join("auth.hcl");
         if let Err(e) = commit_and_reload(state, &path, &dir, &hcl) {
-            tracing::warn!("porting legacy roles into config/auth.hcl failed, kept DB table: {}", e.1);
+            tracing::warn!(
+                "porting legacy roles into config/auth.hcl failed, kept DB table: {}",
+                e.1
+            );
             return;
         }
-        let _ = state.store.config_version_add("config/auth", &hcl, "steward-migration", None);
+        let _ = state
+            .store
+            .config_version_add("config/auth", &hcl, "steward-migration", None);
         let names: Vec<&str> = orphans.iter().map(|(n, _)| n.as_str()).collect();
-        tracing::info!("ported {} legacy DB role(s) into config/auth.hcl: {:?}", names.len(), names);
+        tracing::info!(
+            "ported {} legacy DB role(s) into config/auth.hcl: {:?}",
+            names.len(),
+            names
+        );
     }
 
     if skipped.is_empty() {
@@ -849,7 +957,10 @@ fn warn_orphaned_roles(
     let names: Vec<&str> = orphans.iter().map(|(n, _)| n.as_str()).collect();
     let mut affected_roles: Vec<&str> = names.clone();
     affected_roles.extend(skipped.iter().map(String::as_str));
-    let users = state.store.list_users().unwrap_or(serde_json::Value::Array(vec![]));
+    let users = state
+        .store
+        .list_users()
+        .unwrap_or(serde_json::Value::Array(vec![]));
     let affected: Vec<String> = users
         .as_array()
         .map(|arr| {
@@ -918,9 +1029,15 @@ pub async fn publish_config_version(
     hcl::from_str::<TableConfig>(&hcl_text)
         .map_err(|e| AppError::bad(format!("stored config no longer valid: {e}")))?;
 
-    let writable = state.config_dir.as_deref().map(dir_writable).unwrap_or(false);
+    let writable = state
+        .config_dir
+        .as_deref()
+        .map(dir_writable)
+        .unwrap_or(false);
     if !writable {
-        return Ok(Json(json!({ "ok": false, "writable": false, "hcl": hcl_text })));
+        return Ok(Json(
+            json!({ "ok": false, "writable": false, "hcl": hcl_text }),
+        ));
     }
     let dir = state.config_dir.clone().unwrap();
 
@@ -983,7 +1100,9 @@ pub(crate) mod test_support {
             );
         }
         let cfg = crate::config::load(dir.as_deref()).unwrap();
-        let pg = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://x").unwrap();
+        let pg = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://x")
+            .unwrap();
         Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
@@ -1006,10 +1125,16 @@ pub(crate) mod test_support {
     }
 
     pub fn admin() -> CurrentUser {
-        CurrentUser { email: "a@x.io".into(), role: "admin".into() }
+        CurrentUser {
+            email: "a@x.io".into(),
+            role: "admin".into(),
+        }
     }
     pub fn viewer() -> CurrentUser {
-        CurrentUser { email: "v@x.io".into(), role: "viewer".into() }
+        CurrentUser {
+            email: "v@x.io".into(),
+            role: "viewer".into(),
+        }
     }
 }
 
@@ -1033,7 +1158,10 @@ mod tests {
                 let mut m = std::collections::BTreeMap::new();
                 m.insert(
                     "active".into(),
-                    crate::config::CustomFilter { label: "Active".into(), sql: "active".into() },
+                    crate::config::CustomFilter {
+                        label: "Active".into(),
+                        sql: "active".into(),
+                    },
                 );
                 m
             },
@@ -1048,7 +1176,10 @@ mod tests {
         let text = generate_hcl(&tc);
         let parsed: TableConfig = hcl::from_str(&text).expect("re-parse generated hcl");
         assert_eq!(parsed.label.as_deref(), Some("Bots"));
-        assert_eq!(parsed.list.columns, vec!["id".to_string(), "name".to_string()]);
+        assert_eq!(
+            parsed.list.columns,
+            vec!["id".to_string(), "name".to_string()]
+        );
         assert_eq!(parsed.list.sort.as_deref(), Some("-id"));
         assert!(parsed.list.filter_defs.contains_key("active"));
         // Serialize → parse → serialize is idempotent, and structurally identical.
@@ -1128,10 +1259,23 @@ action "pause" {
     #[test]
     fn safe_stem_rejects_reserved_stems() {
         for stem in RESERVED_STEMS {
-            assert!(safe_stem(stem).is_err(), "reserved stem {stem:?} must be rejected");
+            assert!(
+                safe_stem(stem).is_err(),
+                "reserved stem {stem:?} must be rejected"
+            );
         }
-        for stem in ["groups", "dashboard", "discover", "versions", "Groups", "VERSIONS"] {
-            assert!(safe_stem(stem).is_err(), "route-shadowing stem {stem:?} must be rejected");
+        for stem in [
+            "groups",
+            "dashboard",
+            "discover",
+            "versions",
+            "Groups",
+            "VERSIONS",
+        ] {
+            assert!(
+                safe_stem(stem).is_err(),
+                "route-shadowing stem {stem:?} must be rejected"
+            );
         }
     }
 
@@ -1149,7 +1293,11 @@ action "pause" {
         let state = state_with_dir(Some(dir.clone()));
         assert_eq!(state.cfg().steward.brand.as_deref(), Some("Good"));
 
-        std::fs::write(dir.join("config").join("steward.hcl"), "this is @@@ not hcl =\n").unwrap();
+        std::fs::write(
+            dir.join("config").join("steward.hcl"),
+            "this is @@@ not hcl =\n",
+        )
+        .unwrap();
         let err = state.reload_config();
         assert!(err.is_err(), "bad config must fail reload");
         // Live config is untouched — auth/branding never degrade on a bad file.
@@ -1165,23 +1313,36 @@ action "pause" {
             Path("bots".into()),
         )
         .await;
-        assert!(matches!(g, Err(AppError(axum::http::StatusCode::FORBIDDEN, _))));
+        assert!(matches!(
+            g,
+            Err(AppError(axum::http::StatusCode::FORBIDDEN, _))
+        ));
 
         let p = put_config(
             axum::extract::State(state),
             viewer(),
             Path("bots".into()),
-            Json(PutConfig { hcl: Some(String::new()), model: None, group: None }),
+            Json(PutConfig {
+                hcl: Some(String::new()),
+                model: None,
+                group: None,
+            }),
         )
         .await;
-        assert!(matches!(p, Err(AppError(axum::http::StatusCode::FORBIDDEN, _))));
+        assert!(matches!(
+            p,
+            Err(AppError(axum::http::StatusCode::FORBIDDEN, _))
+        ));
     }
 
     #[tokio::test]
     async fn get_unknown_table_is_404() {
         let state = state_with_dir(Some(tmp_dir()));
         let g = get_config(axum::extract::State(state), admin(), Path("ghost".into())).await;
-        assert!(matches!(g, Err(AppError(axum::http::StatusCode::NOT_FOUND, _))));
+        assert!(matches!(
+            g,
+            Err(AppError(axum::http::StatusCode::NOT_FOUND, _))
+        ));
     }
 
     #[tokio::test]
@@ -1190,10 +1351,14 @@ action "pause" {
         let state = state_with_dir(Some(dir.clone()));
 
         // No file yet → generated fallback, dir reported writable.
-        let g = get_config(axum::extract::State(state.clone()), admin(), Path("bots".into()))
-            .await
-            .unwrap()
-            .0;
+        let g = get_config(
+            axum::extract::State(state.clone()),
+            admin(),
+            Path("bots".into()),
+        )
+        .await
+        .unwrap()
+        .0;
         assert_eq!(g["writable"], json!(true));
         assert!(g["hcl"].as_str().is_some());
         assert!(g["model"].is_object(), "get returns a structured model");
@@ -1203,7 +1368,11 @@ action "pause" {
             axum::extract::State(state.clone()),
             admin(),
             Path("bots".into()),
-            Json(PutConfig { hcl: Some("label = \"Robots\"\n".into()), model: None, group: None }),
+            Json(PutConfig {
+                hcl: Some("label = \"Robots\"\n".into()),
+                model: None,
+                group: None,
+            }),
         )
         .await
         .unwrap()
@@ -1213,7 +1382,11 @@ action "pause" {
         assert!(dir.join("bots.hcl").exists());
         // The live config picked up the edit without a restart.
         assert_eq!(
-            state.cfg().tables.get("bots").and_then(|t| t.label.as_deref()),
+            state
+                .cfg()
+                .tables
+                .get("bots")
+                .and_then(|t| t.label.as_deref()),
             Some("Robots")
         );
     }
@@ -1228,7 +1401,11 @@ action "pause" {
             axum::extract::State(state.clone()),
             admin(),
             Path("bots".into()),
-            Json(PutConfig { hcl: None, model: Some(serde_json::from_value(model).unwrap()), group: None }),
+            Json(PutConfig {
+                hcl: None,
+                model: Some(serde_json::from_value(model).unwrap()),
+                group: None,
+            }),
         )
         .await
         .unwrap()
@@ -1236,9 +1413,16 @@ action "pause" {
         assert_eq!(p["ok"], json!(true));
         // The model path wrote pretty labeled-block HCL to disk.
         let on_disk = std::fs::read_to_string(dir.join("bots.hcl")).unwrap();
-        assert!(on_disk.contains("filter_def \"active\""), "labeled block emitted:\n{on_disk}");
+        assert!(
+            on_disk.contains("filter_def \"active\""),
+            "labeled block emitted:\n{on_disk}"
+        );
         assert_eq!(
-            state.cfg().tables.get("bots").and_then(|t| t.label.as_deref()),
+            state
+                .cfg()
+                .tables
+                .get("bots")
+                .and_then(|t| t.label.as_deref()),
             Some("Bots")
         );
     }
@@ -1250,19 +1434,33 @@ action "pause" {
             axum::extract::State(state.clone()),
             admin(),
             Path("bots".into()),
-            Json(PutConfig { hcl: Some("label = \"x\"\n".into()), model: Some(sample()), group: None }),
+            Json(PutConfig {
+                hcl: Some("label = \"x\"\n".into()),
+                model: Some(sample()),
+                group: None,
+            }),
         )
         .await;
-        assert!(matches!(both, Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))));
+        assert!(matches!(
+            both,
+            Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))
+        ));
 
         let neither = put_config(
             axum::extract::State(state),
             admin(),
             Path("bots".into()),
-            Json(PutConfig { hcl: None, model: None, group: None }),
+            Json(PutConfig {
+                hcl: None,
+                model: None,
+                group: None,
+            }),
         )
         .await;
-        assert!(matches!(neither, Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))));
+        assert!(matches!(
+            neither,
+            Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))
+        ));
     }
 
     #[tokio::test]
@@ -1273,10 +1471,17 @@ action "pause" {
             axum::extract::State(state),
             admin(),
             Path("bots".into()),
-            Json(PutConfig { hcl: Some("bogus_field = 1\n".into()), model: None, group: None }),
+            Json(PutConfig {
+                hcl: Some("bogus_field = 1\n".into()),
+                model: None,
+                group: None,
+            }),
         )
         .await;
-        assert!(matches!(p, Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))));
+        assert!(matches!(
+            p,
+            Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))
+        ));
         assert!(!dir.join("bots.hcl").exists());
     }
 
@@ -1298,24 +1503,35 @@ action "pause" {
             }),
         )
         .await;
-        assert!(matches!(p, Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))));
+        assert!(matches!(
+            p,
+            Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))
+        ));
         assert!(!dir.join("bots.hcl").exists());
     }
 
     #[tokio::test]
     async fn no_config_dir_reports_not_writable() {
         let state = state_with_dir(None);
-        let g = get_config(axum::extract::State(state.clone()), admin(), Path("bots".into()))
-            .await
-            .unwrap()
-            .0;
+        let g = get_config(
+            axum::extract::State(state.clone()),
+            admin(),
+            Path("bots".into()),
+        )
+        .await
+        .unwrap()
+        .0;
         assert_eq!(g["writable"], json!(false));
 
         let p = put_config(
             axum::extract::State(state),
             admin(),
             Path("bots".into()),
-            Json(PutConfig { hcl: Some("label = \"x\"\n".into()), model: None, group: None }),
+            Json(PutConfig {
+                hcl: Some("label = \"x\"\n".into()),
+                model: None,
+                group: None,
+            }),
         )
         .await
         .unwrap()
@@ -1330,7 +1546,11 @@ action "pause" {
             axum::extract::State(state.clone()),
             admin(),
             Path("bots".into()),
-            Json(PutConfig { hcl: Some(hcl.into()), model: None, group: None }),
+            Json(PutConfig {
+                hcl: Some(hcl.into()),
+                model: None,
+                group: None,
+            }),
         )
         .await
         .unwrap();
@@ -1342,20 +1562,28 @@ action "pause" {
         put(&state, "label = \"One\"\n").await;
         put(&state, "label = \"Two\"\n").await;
 
-        let out = list_config_versions(axum::extract::State(state.clone()), admin(), Path("bots".into()))
-            .await
-            .unwrap()
-            .0;
+        let out = list_config_versions(
+            axum::extract::State(state.clone()),
+            admin(),
+            Path("bots".into()),
+        )
+        .await
+        .unwrap()
+        .0;
         let rows = out["versions"].as_array().unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0]["published"], json!(true));
         assert_eq!(rows[1]["published"], json!(false));
 
         let id = rows[1]["id"].as_i64().unwrap();
-        let v = get_config_version(axum::extract::State(state), admin(), Path(("bots".into(), id)))
-            .await
-            .unwrap()
-            .0;
+        let v = get_config_version(
+            axum::extract::State(state),
+            admin(),
+            Path(("bots".into(), id)),
+        )
+        .await
+        .unwrap()
+        .0;
         assert_eq!(v["hcl"], json!("label = \"One\"\n"));
     }
 
@@ -1365,13 +1593,26 @@ action "pause" {
         let state = state_with_dir(Some(dir.clone()));
         put(&state, "label = \"One\"\n").await;
         put(&state, "label = \"Two\"\n").await;
-        assert_eq!(state.cfg().tables.get("bots").and_then(|t| t.label.as_deref()), Some("Two"));
+        assert_eq!(
+            state
+                .cfg()
+                .tables
+                .get("bots")
+                .and_then(|t| t.label.as_deref()),
+            Some("Two")
+        );
 
-        let out = list_config_versions(axum::extract::State(state.clone()), admin(), Path("bots".into()))
-            .await
-            .unwrap()
-            .0;
-        let old_id = out["versions"].as_array().unwrap()[1]["id"].as_i64().unwrap();
+        let out = list_config_versions(
+            axum::extract::State(state.clone()),
+            admin(),
+            Path("bots".into()),
+        )
+        .await
+        .unwrap()
+        .0;
+        let old_id = out["versions"].as_array().unwrap()[1]["id"]
+            .as_i64()
+            .unwrap();
 
         let p = publish_config_version(
             axum::extract::State(state.clone()),
@@ -1384,8 +1625,18 @@ action "pause" {
         assert_eq!(p["ok"], json!(true));
         assert_eq!(p["reloaded"], json!(true));
         // file + live config rolled back
-        assert_eq!(std::fs::read_to_string(dir.join("bots.hcl")).unwrap(), "label = \"One\"\n");
-        assert_eq!(state.cfg().tables.get("bots").and_then(|t| t.label.as_deref()), Some("One"));
+        assert_eq!(
+            std::fs::read_to_string(dir.join("bots.hcl")).unwrap(),
+            "label = \"One\"\n"
+        );
+        assert_eq!(
+            state
+                .cfg()
+                .tables
+                .get("bots")
+                .and_then(|t| t.label.as_deref()),
+            Some("One")
+        );
 
         let out = list_config_versions(axum::extract::State(state), admin(), Path("bots".into()))
             .await
@@ -1402,7 +1653,10 @@ action "pause" {
         let state = state_with_dir(Some(dir.clone()));
         put(&state, "label = \"One\"\n").await;
         // Inject a version that no longer parses (bypasses the put validation).
-        let bad = state.store.config_version_add("bots", "bogus_field = 1\n", "a@x.io", None).unwrap();
+        let bad = state
+            .store
+            .config_version_add("bots", "bogus_field = 1\n", "a@x.io", None)
+            .unwrap();
 
         let r = publish_config_version(
             axum::extract::State(state.clone()),
@@ -1410,27 +1664,61 @@ action "pause" {
             Path(("bots".into(), bad)),
         )
         .await;
-        assert!(matches!(r, Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))));
+        assert!(matches!(
+            r,
+            Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))
+        ));
         // On-disk file untouched (still the good one).
-        assert_eq!(std::fs::read_to_string(dir.join("bots.hcl")).unwrap(), "label = \"One\"\n");
+        assert_eq!(
+            std::fs::read_to_string(dir.join("bots.hcl")).unwrap(),
+            "label = \"One\"\n"
+        );
     }
 
     #[tokio::test]
     async fn version_endpoints_are_admin_only() {
         let state = state_with_dir(Some(tmp_dir()));
-        let l = list_config_versions(axum::extract::State(state.clone()), viewer(), Path("bots".into())).await;
-        assert!(matches!(l, Err(AppError(axum::http::StatusCode::FORBIDDEN, _))));
-        let g = get_config_version(axum::extract::State(state.clone()), viewer(), Path(("bots".into(), 1))).await;
-        assert!(matches!(g, Err(AppError(axum::http::StatusCode::FORBIDDEN, _))));
-        let p = publish_config_version(axum::extract::State(state), viewer(), Path(("bots".into(), 1))).await;
-        assert!(matches!(p, Err(AppError(axum::http::StatusCode::FORBIDDEN, _))));
+        let l = list_config_versions(
+            axum::extract::State(state.clone()),
+            viewer(),
+            Path("bots".into()),
+        )
+        .await;
+        assert!(matches!(
+            l,
+            Err(AppError(axum::http::StatusCode::FORBIDDEN, _))
+        ));
+        let g = get_config_version(
+            axum::extract::State(state.clone()),
+            viewer(),
+            Path(("bots".into(), 1)),
+        )
+        .await;
+        assert!(matches!(
+            g,
+            Err(AppError(axum::http::StatusCode::FORBIDDEN, _))
+        ));
+        let p = publish_config_version(
+            axum::extract::State(state),
+            viewer(),
+            Path(("bots".into(), 1)),
+        )
+        .await;
+        assert!(matches!(
+            p,
+            Err(AppError(axum::http::StatusCode::FORBIDDEN, _))
+        ));
     }
 
     #[tokio::test]
     async fn versions_unknown_table_is_404() {
         let state = state_with_dir(Some(tmp_dir()));
-        let l = list_config_versions(axum::extract::State(state), admin(), Path("ghost".into())).await;
-        assert!(matches!(l, Err(AppError(axum::http::StatusCode::NOT_FOUND, _))));
+        let l =
+            list_config_versions(axum::extract::State(state), admin(), Path("ghost".into())).await;
+        assert!(matches!(
+            l,
+            Err(AppError(axum::http::StatusCode::NOT_FOUND, _))
+        ));
     }
 
     /// A table config sourced from a group folder writes back to THAT folder file
@@ -1441,11 +1729,18 @@ action "pause" {
         let dir = tmp_dir();
         let group = dir.join("mygroup");
         std::fs::create_dir_all(&group).unwrap();
-        std::fs::write(group.join("_group.hcl"), "label = \"My group\"\norder = 1\n").unwrap();
+        std::fs::write(
+            group.join("_group.hcl"),
+            "label = \"My group\"\norder = 1\n",
+        )
+        .unwrap();
         std::fs::write(group.join("foo.hcl"), "label = \"Foo\"\n").unwrap();
 
         let state = state_with_tables(Some(dir.clone()), &["foo"]);
-        assert_eq!(state.cfg().table_group_label("foo").as_deref(), Some("My group"));
+        assert_eq!(
+            state.cfg().table_group_label("foo").as_deref(),
+            Some("My group")
+        );
         assert_eq!(
             state.cfg().table_sources.get("foo").map(|s| s.path.clone()),
             Some(group.join("foo.hcl")),
@@ -1457,7 +1752,11 @@ action "pause" {
             axum::extract::State(state.clone()),
             admin(),
             Path("foo".into()),
-            Json(PutConfig { hcl: None, model: Some(model), group: None }),
+            Json(PutConfig {
+                hcl: None,
+                model: Some(model),
+                group: None,
+            }),
         )
         .await
         .unwrap()
@@ -1465,9 +1764,15 @@ action "pause" {
         assert_eq!(p["ok"], json!(true));
 
         let folder_file = std::fs::read_to_string(group.join("foo.hcl")).unwrap();
-        assert!(folder_file.contains("Foo edited"), "folder file rewritten:\n{folder_file}");
+        assert!(
+            folder_file.contains("Foo edited"),
+            "folder file rewritten:\n{folder_file}"
+        );
         assert!(!dir.join("foo.hcl").exists(), "must not create a root file");
-        assert_eq!(state.cfg().table_group_label("foo").as_deref(), Some("My group"));
+        assert_eq!(
+            state.cfg().table_group_label("foo").as_deref(),
+            Some("My group")
+        );
 
         // A second save + publish of the first version still targets the folder file.
         let mut model2 = TableConfig::default();
@@ -1476,7 +1781,11 @@ action "pause" {
             axum::extract::State(state.clone()),
             admin(),
             Path("foo".into()),
-            Json(PutConfig { hcl: None, model: Some(model2), group: None }),
+            Json(PutConfig {
+                hcl: None,
+                model: Some(model2),
+                group: None,
+            }),
         )
         .await
         .unwrap();
@@ -1489,7 +1798,9 @@ action "pause" {
         .await
         .unwrap()
         .0;
-        let first_id = versions["versions"].as_array().unwrap()
+        let first_id = versions["versions"]
+            .as_array()
+            .unwrap()
             .iter()
             .min_by_key(|r| r["id"].as_i64().unwrap())
             .unwrap()["id"]
@@ -1505,9 +1816,15 @@ action "pause" {
         .unwrap();
 
         let republished = std::fs::read_to_string(group.join("foo.hcl")).unwrap();
-        assert!(republished.contains("Foo edited"), "publish rewrote the folder file");
+        assert!(
+            republished.contains("Foo edited"),
+            "publish rewrote the folder file"
+        );
         assert!(!dir.join("foo.hcl").exists(), "publish never wrote to root");
-        assert_eq!(state.cfg().table_group_label("foo").as_deref(), Some("My group"));
+        assert_eq!(
+            state.cfg().table_group_label("foo").as_deref(),
+            Some("My group")
+        );
     }
 
     /// A tracked source path that escapes the config dir is never written to:
@@ -1521,12 +1838,19 @@ action "pause" {
         let mut cfg = crate::config::load(Some(&dir)).unwrap();
         cfg.table_sources.insert(
             "bots".into(),
-            TableSource { path: PathBuf::from("/etc/steward-escape.hcl"), group: None },
+            TableSource {
+                path: PathBuf::from("/etc/steward-escape.hcl"),
+                group: None,
+            },
         );
         state.cfg.store(Arc::new(cfg));
 
         let resolved = config_path(&state, &dir, "bots").unwrap();
-        assert_eq!(resolved, dir.join("bots.hcl"), "escaping path falls back to root");
+        assert_eq!(
+            resolved,
+            dir.join("bots.hcl"),
+            "escaping path falls back to root"
+        );
     }
 
     #[tokio::test]
@@ -1535,20 +1859,32 @@ action "pause" {
         std::fs::write(dir.join("bots.hcl"), "").unwrap();
         let state = state_with_dir(Some(dir.clone()));
         assert!(state.cfg().auth.roles.get("legacy").is_none());
-        state.store.seed_legacy_role("legacy", r#"{"tables":{"bots":"read"}}"#);
+        state
+            .store
+            .seed_legacy_role("legacy", r#"{"tables":{"bots":"read"}}"#);
 
         port_legacy_roles(&state);
 
         let on_disk = std::fs::read_to_string(dir.join("config").join("auth.hcl")).unwrap();
-        assert!(on_disk.contains("role \"legacy\""), "ported role written:\n{on_disk}");
-        assert!(state.cfg().auth.roles.contains_key("legacy"), "ported role went live");
+        assert!(
+            on_disk.contains("role \"legacy\""),
+            "ported role written:\n{on_disk}"
+        );
+        assert!(
+            state.cfg().auth.roles.contains_key("legacy"),
+            "ported role went live"
+        );
         assert!(
             state.store.take_legacy_roles().0.is_empty(),
             "legacy table dropped after port",
         );
 
         let versions = state.store.config_versions_list("config/auth").unwrap();
-        assert_eq!(versions["versions"].as_array().unwrap().len(), 1, "one auth version snapshot");
+        assert_eq!(
+            versions["versions"].as_array().unwrap().len(),
+            1,
+            "one auth version snapshot"
+        );
     }
 
     #[tokio::test]
@@ -1556,7 +1892,10 @@ action "pause" {
         let dir = tmp_dir();
         let state = state_with_dir(Some(dir.clone()));
         port_legacy_roles(&state);
-        assert!(!dir.join("config").join("auth.hcl").exists(), "nothing written when no legacy table");
+        assert!(
+            !dir.join("config").join("auth.hcl").exists(),
+            "nothing written when no legacy table"
+        );
         assert!(state.cfg().auth.roles.is_empty());
     }
 
@@ -1565,15 +1904,28 @@ action "pause" {
         let dir = tmp_dir();
         std::fs::write(dir.join("bots.hcl"), "").unwrap();
         let state = state_with_dir(Some(dir.clone()));
-        state.store.seed_legacy_role("good", r#"{"tables":{"bots":"read"}}"#);
-        state.store.seed_legacy_role("broken", r#"{"tables":{"bots":42}}"#);
+        state
+            .store
+            .seed_legacy_role("good", r#"{"tables":{"bots":"read"}}"#);
+        state
+            .store
+            .seed_legacy_role("broken", r#"{"tables":{"bots":42}}"#);
 
         port_legacy_roles(&state);
 
         let on_disk = std::fs::read_to_string(dir.join("config").join("auth.hcl")).unwrap();
-        assert!(on_disk.contains("role \"good\""), "good role ported:\n{on_disk}");
-        assert!(!on_disk.contains("role \"broken\""), "unparseable role not ported");
-        assert!(state.cfg().auth.roles.contains_key("good"), "good role went live");
+        assert!(
+            on_disk.contains("role \"good\""),
+            "good role ported:\n{on_disk}"
+        );
+        assert!(
+            !on_disk.contains("role \"broken\""),
+            "unparseable role not ported"
+        );
+        assert!(
+            state.cfg().auth.roles.contains_key("good"),
+            "good role went live"
+        );
         assert!(
             !state.store.take_legacy_roles().0.is_empty()
                 || !state.store.take_legacy_roles().1.is_empty(),
@@ -1585,7 +1937,9 @@ action "pause" {
     async fn port_legacy_roles_never_writes_admin() {
         let dir = tmp_dir();
         let state = state_with_dir(Some(dir.clone()));
-        state.store.seed_legacy_role("admin", r#"{"tables":{"bots":"write"}}"#);
+        state
+            .store
+            .seed_legacy_role("admin", r#"{"tables":{"bots":"write"}}"#);
 
         port_legacy_roles(&state);
 
@@ -1595,7 +1949,10 @@ action "pause" {
         );
         let hcl_path = dir.join("config").join("auth.hcl");
         if let Ok(on_disk) = std::fs::read_to_string(&hcl_path) {
-            assert!(!on_disk.contains("role \"admin\""), "admin role never on disk:\n{on_disk}");
+            assert!(
+                !on_disk.contains("role \"admin\""),
+                "admin role never on disk:\n{on_disk}"
+            );
         }
     }
 
@@ -1610,16 +1967,31 @@ action "pause" {
             &state,
             &dir,
             vec![
-                FsOp::Mkdir { path: dir.join("h") },
-                FsOp::Write { path: dir.join("h").join("_group.hcl"), contents: "label = \"H\"\n".into() },
-                FsOp::Write { path: dir.join("bots.hcl"), contents: "label = \"Bots\"\n".into() },
+                FsOp::Mkdir {
+                    path: dir.join("h"),
+                },
+                FsOp::Write {
+                    path: dir.join("h").join("_group.hcl"),
+                    contents: "label = \"H\"\n".into(),
+                },
+                FsOp::Write {
+                    path: dir.join("bots.hcl"),
+                    contents: "label = \"Bots\"\n".into(),
+                },
             ],
         )
         .unwrap();
         assert!(dir.join("h").join("_group.hcl").exists());
         assert!(dir.join("bots.hcl").exists());
         assert!(state.cfg().groups.iter().any(|g| g.slug == "h"));
-        assert_eq!(state.cfg().tables.get("bots").and_then(|t| t.label.as_deref()), Some("Bots"));
+        assert_eq!(
+            state
+                .cfg()
+                .tables
+                .get("bots")
+                .and_then(|t| t.label.as_deref()),
+            Some("Bots")
+        );
     }
 
     #[tokio::test]
@@ -1632,17 +2004,34 @@ action "pause" {
             &state,
             &dir,
             vec![
-                FsOp::Mkdir { path: dir.join("newgroup") },
-                FsOp::Write { path: dir.join("newgroup").join("_group.hcl"), contents: "label = \"N\"\n".into() },
-                FsOp::Write { path: dir.join("bots.hcl"), contents: "label = \"Edited\"\n".into() },
+                FsOp::Mkdir {
+                    path: dir.join("newgroup"),
+                },
+                FsOp::Write {
+                    path: dir.join("newgroup").join("_group.hcl"),
+                    contents: "label = \"N\"\n".into(),
+                },
+                FsOp::Write {
+                    path: dir.join("bots.hcl"),
+                    contents: "label = \"Edited\"\n".into(),
+                },
                 // A malformed file makes reload_config fail → the WHOLE batch reverts.
-                FsOp::Write { path: dir.join("broken.hcl"), contents: "this is @@@ not hcl =\n".into() },
+                FsOp::Write {
+                    path: dir.join("broken.hcl"),
+                    contents: "this is @@@ not hcl =\n".into(),
+                },
             ],
         );
         assert!(err.is_err());
         assert!(err.unwrap_err().1.contains("reverted"));
-        assert!(!dir.join("newgroup").exists(), "created dir removed on revert");
-        assert!(!dir.join("broken.hcl").exists(), "created file removed on revert");
+        assert!(
+            !dir.join("newgroup").exists(),
+            "created dir removed on revert"
+        );
+        assert!(
+            !dir.join("broken.hcl").exists(),
+            "created file removed on revert"
+        );
         assert_eq!(
             std::fs::read_to_string(dir.join("bots.hcl")).unwrap(),
             "label = \"Original\"\n",
@@ -1666,7 +2055,10 @@ action "pause" {
         let err = commit_batch_and_reload(
             &state,
             &dir,
-            vec![FsOp::Move { from: dir.join("g").join("foo.hcl"), to: dir.join("h").join("bar.hcl") }],
+            vec![FsOp::Move {
+                from: dir.join("g").join("foo.hcl"),
+                to: dir.join("h").join("bar.hcl"),
+            }],
         );
         assert!(err.is_err());
         assert!(err.unwrap_err().1.contains("reverted"));
@@ -1694,12 +2086,22 @@ action "pause" {
             &state,
             &dir,
             vec![
-                FsOp::Write { path: blob.clone(), contents: "clobbered".into() },
-                FsOp::Write { path: dir.join("broken.hcl"), contents: "this is @@@ not hcl =\n".into() },
+                FsOp::Write {
+                    path: blob.clone(),
+                    contents: "clobbered".into(),
+                },
+                FsOp::Write {
+                    path: dir.join("broken.hcl"),
+                    contents: "this is @@@ not hcl =\n".into(),
+                },
             ],
         );
         assert!(err.is_err());
-        assert_eq!(std::fs::read(&blob).unwrap(), original, "non-UTF-8 bytes restored, not deleted");
+        assert_eq!(
+            std::fs::read(&blob).unwrap(),
+            original,
+            "non-UTF-8 bytes restored, not deleted"
+        );
         assert!(!dir.join("broken.hcl").exists());
     }
 
@@ -1713,14 +2115,27 @@ action "pause" {
             &state,
             &dir,
             vec![
-                FsOp::Mkdir { path: dir.join("a").join("b").join("c") },
-                FsOp::Mkdir { path: dir.join("existing").join("child") },
-                FsOp::Write { path: dir.join("broken.hcl"), contents: "this is @@@ not hcl =\n".into() },
+                FsOp::Mkdir {
+                    path: dir.join("a").join("b").join("c"),
+                },
+                FsOp::Mkdir {
+                    path: dir.join("existing").join("child"),
+                },
+                FsOp::Write {
+                    path: dir.join("broken.hcl"),
+                    contents: "this is @@@ not hcl =\n".into(),
+                },
             ],
         );
         assert!(err.is_err());
-        assert!(!dir.join("a").exists(), "every nested dir the batch created is removed");
-        assert!(!dir.join("existing").join("child").exists(), "created leaf removed");
+        assert!(
+            !dir.join("a").exists(),
+            "every nested dir the batch created is removed"
+        );
+        assert!(
+            !dir.join("existing").join("child").exists(),
+            "created leaf removed"
+        );
         assert!(dir.join("existing").exists(), "pre-existing dir kept");
     }
 
@@ -1742,9 +2157,16 @@ action "pause" {
         std::fs::write(dir.join("bots.hcl"), "label = \"Bots\"\n").unwrap();
         let state = state_with_tables(Some(dir.clone()), &["bots", "orders"]);
 
-        let out = discover(axum::extract::State(state), admin()).await.unwrap().0;
-        let names: Vec<&str> = out["tables"].as_array().unwrap()
-            .iter().map(|t| t["name"].as_str().unwrap()).collect();
+        let out = discover(axum::extract::State(state), admin())
+            .await
+            .unwrap()
+            .0;
+        let names: Vec<&str> = out["tables"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["name"].as_str().unwrap())
+            .collect();
         assert!(names.contains(&"orders"), "unconfigured table listed");
         assert!(!names.contains(&"bots"), "configured table excluded");
     }
@@ -1753,27 +2175,45 @@ action "pause" {
     async fn create_with_group_lands_file_in_folder() {
         let dir = tmp_dir();
         std::fs::create_dir_all(dir.join("trading")).unwrap();
-        std::fs::write(dir.join("trading").join("_group.hcl"), "label = \"Trading\"\norder = 1\n").unwrap();
+        std::fs::write(
+            dir.join("trading").join("_group.hcl"),
+            "label = \"Trading\"\norder = 1\n",
+        )
+        .unwrap();
         let state = state_with_tables(Some(dir.clone()), &["bots"]);
 
         let out = put_config(
             axum::extract::State(state.clone()),
             admin(),
             Path("bots".into()),
-            Json(PutConfig { hcl: None, model: None, group: Some("trading".into())  }),
+            Json(PutConfig {
+                hcl: None,
+                model: None,
+                group: Some("trading".into()),
+            }),
         )
         .await
         .unwrap()
         .0;
         assert_eq!(out["ok"], json!(true));
-        assert!(dir.join("trading").join("bots.hcl").exists(), "starter landed in group folder");
+        assert!(
+            dir.join("trading").join("bots.hcl").exists(),
+            "starter landed in group folder"
+        );
         assert!(!dir.join("bots.hcl").exists(), "no root file");
         assert_eq!(
-            state.cfg().table_sources.get("bots").and_then(|s| s.group.as_deref()),
+            state
+                .cfg()
+                .table_sources
+                .get("bots")
+                .and_then(|s| s.group.as_deref()),
             Some("trading"),
         );
         let group_hcl = std::fs::read_to_string(dir.join("trading").join("_group.hcl")).unwrap();
-        assert!(group_hcl.contains("bots"), "stem appended to table_order:\n{group_hcl}");
+        assert!(
+            group_hcl.contains("bots"),
+            "stem appended to table_order:\n{group_hcl}"
+        );
     }
 
     #[tokio::test]
@@ -1784,9 +2224,16 @@ action "pause" {
             axum::extract::State(state),
             admin(),
             Path("bots".into()),
-            Json(PutConfig { hcl: None, model: None, group: Some("ghost".into())  }),
+            Json(PutConfig {
+                hcl: None,
+                model: None,
+                group: Some("ghost".into()),
+            }),
         )
         .await;
-        assert!(matches!(r, Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))));
+        assert!(matches!(
+            r,
+            Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))
+        ));
     }
 }

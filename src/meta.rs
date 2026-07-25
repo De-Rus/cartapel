@@ -1,6 +1,6 @@
 use crate::config::{InlineSpec, TableConfig};
 use crate::introspect::{DbColumn, DbTable, Kind};
-use crate::state::{AppState, AppError, CurrentUser};
+use crate::state::{AppError, AppState, CurrentUser};
 use axum::extract::State;
 use axum::Json;
 use futures::future::Either;
@@ -17,7 +17,8 @@ const OPTIONS_LIMIT: usize = 30;
 /// burst on the first `/meta` load starves it. Gate every enum query here so at
 /// most this many touch the pool at once.
 pub const ENUM_OPTIONS_CONCURRENCY: usize = 4;
-static ENUM_OPTIONS_GATE: LazyLock<Semaphore> = LazyLock::new(|| Semaphore::new(ENUM_OPTIONS_CONCURRENCY));
+static ENUM_OPTIONS_GATE: LazyLock<Semaphore> =
+    LazyLock::new(|| Semaphore::new(ENUM_OPTIONS_CONCURRENCY));
 
 /// The effective (owned) config for a table — its `{table}.hcl` merged onto
 /// defaults, or plain defaults when unconfigured. Owned because the underlying
@@ -58,8 +59,23 @@ pub fn default_widget(col: &DbColumn) -> &'static str {
 /// when one exists; otherwise the pk — a random first text column (status,
 /// country…) makes a worse title than the id.
 fn default_display_title(dbt: &DbTable, label: &str) -> String {
-    for pref in ["name", "title", "full_name", "display_name", "subject", "symbol", "email", "username", "slug", "label"] {
-        if dbt.columns.iter().any(|c| c.name == pref && c.kind == Kind::Text) {
+    for pref in [
+        "name",
+        "title",
+        "full_name",
+        "display_name",
+        "subject",
+        "symbol",
+        "email",
+        "username",
+        "slug",
+        "label",
+    ] {
+        if dbt
+            .columns
+            .iter()
+            .any(|c| c.name == pref && c.kind == Kind::Text)
+        {
             return format!("{{{pref}}}");
         }
     }
@@ -72,7 +88,11 @@ fn default_display_title(dbt: &DbTable, label: &str) -> String {
 
 pub fn fk_label_col(child: &DbTable) -> String {
     for pref in ["name", "title", "symbol", "email", "label"] {
-        if child.columns.iter().any(|c| c.name == pref && c.kind == Kind::Text) {
+        if child
+            .columns
+            .iter()
+            .any(|c| c.name == pref && c.kind == Kind::Text)
+        {
             return pref.to_string();
         }
     }
@@ -129,8 +149,7 @@ pub fn computed_columns<'a>(dbt: &DbTable, cfg: &'a TableConfig) -> Vec<(&'a Str
 }
 
 fn is_listable_column(dbt: &DbTable, cfg: &TableConfig, name: &str) -> bool {
-    dbt.column(name).is_some()
-        || cfg.fields.get(name).is_some_and(|f| f.sql.is_some())
+    dbt.column(name).is_some() || cfg.fields.get(name).is_some_and(|f| f.sql.is_some())
 }
 
 /// The row-producing SELECT expression, folding computed columns into the jsonb.
@@ -252,7 +271,13 @@ async fn enum_options(state: &AppState, user: &CurrentUser, table: &str, col: &s
     value
 }
 
-async fn filter_meta(state: &AppState, user: &CurrentUser, key: &str, dbt: &DbTable, cfg: &TableConfig) -> Vec<Value> {
+async fn filter_meta(
+    state: &AppState,
+    user: &CurrentUser,
+    key: &str,
+    dbt: &DbTable,
+    cfg: &TableConfig,
+) -> Vec<Value> {
     let masked = state.masked_columns(user, key);
     let entry_futs = cfg.list.filters.iter().filter_map(|name| {
         if let Some(def) = cfg.list.filter_defs.get(name) {
@@ -294,7 +319,11 @@ fn detail_sections(dbt: &DbTable, cfg: &TableConfig) -> Vec<Value> {
         .columns
         .iter()
         .map(|c| c.name.clone())
-        .chain(computed_columns(dbt, cfg).into_iter().map(|(n, _)| n.clone()))
+        .chain(
+            computed_columns(dbt, cfg)
+                .into_iter()
+                .map(|(n, _)| n.clone()),
+        )
         .collect();
     let known = |f: &String| all.contains(f);
 
@@ -307,7 +336,12 @@ fn detail_sections(dbt: &DbTable, cfg: &TableConfig) -> Vec<Value> {
     let mut sections: Vec<Sec> = Vec::new();
     for s in &cfg.detail.sections {
         let fields: Vec<String> = s.fields.iter().filter(|f| known(f)).cloned().collect();
-        sections.push(Sec { title: s.title.clone(), fields, span: s.span, collapsible: s.collapsible });
+        sections.push(Sec {
+            title: s.title.clone(),
+            fields,
+            span: s.span,
+            collapsible: s.collapsible,
+        });
     }
     for name in &all {
         if let Some(group) = cfg.fields.get(name).and_then(|f| f.group.clone()) {
@@ -316,7 +350,12 @@ fn detail_sections(dbt: &DbTable, cfg: &TableConfig) -> Vec<Value> {
                     sec.fields.push(name.clone());
                 }
             } else {
-                sections.push(Sec { title: group, fields: vec![name.clone()], span: None, collapsible: false });
+                sections.push(Sec {
+                    title: group,
+                    fields: vec![name.clone()],
+                    span: None,
+                    collapsible: false,
+                });
             }
         }
     }
@@ -326,7 +365,12 @@ fn detail_sections(dbt: &DbTable, cfg: &TableConfig) -> Vec<Value> {
     let placed: Vec<String> = sections.iter().flat_map(|s| s.fields.clone()).collect();
     let leftover: Vec<String> = all.into_iter().filter(|c| !placed.contains(c)).collect();
     if !leftover.is_empty() {
-        sections.push(Sec { title: "Other".into(), fields: leftover, span: None, collapsible: false });
+        sections.push(Sec {
+            title: "Other".into(),
+            fields: leftover,
+            span: None,
+            collapsible: false,
+        });
     }
     sections
         .into_iter()
@@ -334,7 +378,13 @@ fn detail_sections(dbt: &DbTable, cfg: &TableConfig) -> Vec<Value> {
         .collect()
 }
 
-fn column_meta(state: &AppState, user: &CurrentUser, key: &str, dbt: &DbTable, cfg: &TableConfig) -> Vec<Value> {
+fn column_meta(
+    state: &AppState,
+    user: &CurrentUser,
+    key: &str,
+    dbt: &DbTable,
+    cfg: &TableConfig,
+) -> Vec<Value> {
     let masked = state.masked_columns(user, key);
     let mut out: Vec<Value> = dbt
         .columns
@@ -438,7 +488,9 @@ fn apply_presentation(m: &mut Value, fc: Option<&crate::config::FieldConfig>) {
 fn filter_ops(kind: Kind) -> Vec<&'static str> {
     match kind {
         Kind::Int | Kind::Float | Kind::Datetime | Kind::Date => {
-            vec!["eq", "ne", "gt", "gte", "lt", "lte", "in", "between", "isnull"]
+            vec![
+                "eq", "ne", "gt", "gte", "lt", "lte", "in", "between", "isnull",
+            ]
         }
         Kind::Text | Kind::Uuid => vec!["eq", "ne", "contains", "in", "isnull"],
         Kind::Bool => vec!["eq", "isnull"],
@@ -475,7 +527,9 @@ fn auto_inline_specs(state: &AppState, parent_key: &str, parent_phys: &str) -> V
 
 pub fn resolve_inlines(state: &AppState, user: &CurrentUser, table: &str) -> Vec<ResolvedInline> {
     let cfg = table_config(state, table);
-    let Some(dbt) = state.resolve_table(table) else { return vec![] };
+    let Some(dbt) = state.resolve_table(table) else {
+        return vec![];
+    };
     let specs = if !cfg.relations.inlines.is_empty() || cfg.relations.auto == Some(false) {
         cfg.relations.inlines.clone()
     } else {
@@ -485,11 +539,25 @@ pub fn resolve_inlines(state: &AppState, user: &CurrentUser, table: &str) -> Vec
     for spec in &specs {
         let (child, fk_col, label, columns, want_create, want_delete) = match spec {
             InlineSpec::Table(t) => (t.clone(), None, None, Vec::new(), None, None),
-            InlineSpec::Full { table, fk_col, label, columns, can_create, can_delete } => {
-                (table.clone(), fk_col.clone(), label.clone(), columns.clone(), *can_create, *can_delete)
-            }
+            InlineSpec::Full {
+                table,
+                fk_col,
+                label,
+                columns,
+                can_create,
+                can_delete,
+            } => (
+                table.clone(),
+                fk_col.clone(),
+                label.clone(),
+                columns.clone(),
+                *can_create,
+                *can_delete,
+            ),
         };
-        let Some(child_t) = state.resolve_table(&child) else { continue };
+        let Some(child_t) = state.resolve_table(&child) else {
+            continue;
+        };
         let fk_col = fk_col
             .or_else(|| {
                 child_t
@@ -617,14 +685,23 @@ pub(crate) fn derive_nav_groups(
         if members.is_empty() {
             continue;
         }
-        let rank = |t: &str| g.table_order.iter().position(|n| n == t).unwrap_or(usize::MAX);
+        let rank = |t: &str| {
+            g.table_order
+                .iter()
+                .position(|n| n == t)
+                .unwrap_or(usize::MAX)
+        };
         members.sort_by(|a, b| rank(a).cmp(&rank(b)).then_with(|| a.cmp(b)));
         for m in &members {
             placed.insert(m);
         }
         out.push(json!({ "slug": g.slug, "label": g.label, "icon": g.icon, "nav": g.nav, "tables": members }));
     }
-    let leftover: Vec<&str> = order.iter().copied().filter(|t| !placed.contains(*t)).collect();
+    let leftover: Vec<&str> = order
+        .iter()
+        .copied()
+        .filter(|t| !placed.contains(*t))
+        .collect();
     if !leftover.is_empty() {
         out.push(json!({ "slug": Value::Null, "label": "Ungrouped", "icon": Value::Null, "nav": Value::Null, "tables": leftover }));
     }
@@ -670,15 +747,27 @@ mod nav_tests {
             return;
         }
         let cfg = crate::config::load(Some(dir)).expect("load admin");
-        let admin = CurrentUser { email: "a@x.io".into(), role: "admin".into() };
+        let admin = CurrentUser {
+            email: "a@x.io".into(),
+            role: "admin".into(),
+        };
         let pages = pages_meta(&cfg, &admin);
         let cache = pages
             .iter()
             .find(|p| p["slug"] == "cache")
             .expect("cache page emitted");
-        assert_eq!(cache["id"], "overview/cache", "id is group-qualified, folder-derived");
-        assert_eq!(cache["group"], "Overview", "group is the LABEL, not the slug");
-        assert_eq!(cache["module"], "screens/overview/cache/cache.tsx", "module is the admin-relative path");
+        assert_eq!(
+            cache["id"], "overview/cache",
+            "id is group-qualified, folder-derived"
+        );
+        assert_eq!(
+            cache["group"], "Overview",
+            "group is the LABEL, not the slug"
+        );
+        assert_eq!(
+            cache["module"], "screens/overview/cache/cache.tsx",
+            "module is the admin-relative path"
+        );
         assert_eq!(cache["roles"], serde_json::json!(["ops"]));
     }
 
@@ -708,19 +797,45 @@ mod nav_tests {
             roles: vec!["ops".into()],
         });
 
-        let ops = CurrentUser { email: "o@x.io".into(), role: "ops".into() };
+        let ops = CurrentUser {
+            email: "o@x.io".into(),
+            role: "ops".into(),
+        };
         let seen = pages_meta(&cfg, &ops);
         assert_eq!(seen.len(), 1);
-        assert_eq!(seen[0]["id"], "overview/fleet", "id is group-qualified, folder-derived");
-        assert_eq!(seen[0]["group"], "Overview", "group is the LABEL, not the slug");
+        assert_eq!(
+            seen[0]["id"], "overview/fleet",
+            "id is group-qualified, folder-derived"
+        );
+        assert_eq!(
+            seen[0]["group"], "Overview",
+            "group is the LABEL, not the slug"
+        );
         assert_eq!(seen[0]["declarative"], true);
-        assert_eq!(seen[0]["module"], serde_json::Value::Null, "declarative page has no module");
+        assert_eq!(
+            seen[0]["module"],
+            serde_json::Value::Null,
+            "declarative page has no module"
+        );
 
-        let viewer = CurrentUser { email: "v@x.io".into(), role: "viewer".into() };
-        assert!(pages_meta(&cfg, &viewer).is_empty(), "role-gated page hidden");
+        let viewer = CurrentUser {
+            email: "v@x.io".into(),
+            role: "viewer".into(),
+        };
+        assert!(
+            pages_meta(&cfg, &viewer).is_empty(),
+            "role-gated page hidden"
+        );
 
-        let admin = CurrentUser { email: "a@x.io".into(), role: "admin".into() };
-        assert_eq!(pages_meta(&cfg, &admin).len(), 1, "admin sees role-gated page");
+        let admin = CurrentUser {
+            email: "a@x.io".into(),
+            role: "admin".into(),
+        };
+        assert_eq!(
+            pages_meta(&cfg, &admin).len(),
+            1,
+            "admin sees role-gated page"
+        );
     }
 
     /// The nav derived from the shipped `admin/**` folders matches the intended
@@ -738,23 +853,102 @@ mod nav_tests {
 
         // (label, icon, member set). Overview is empty → absent from the nav.
         let expected: &[(&str, &str, &[&str])] = &[
-            ("Bots & live", "bot", &["bots", "bot_signals", "bot_notifications", "bot_symbol_cursor", "bot_journal"]),
-            ("Paper trading", "file-text", &["paper_account", "paper_position", "paper_order", "paper_fill", "paper_funding", "paper_equity"]),
-            ("Market data", "trending-up", &["instruments", "exchanges", "universes", "funding_rates", "md_symbol_hits", "logos"]),
-            ("Stock prices & ingest", "database", &["stock_snapshot", "stock_backfill", "ingest_runs"]),
-            ("Fundamentals · SEC", "landmark", &["companies", "company_tickers", "concepts", "facts", "ratios"]),
+            (
+                "Bots & live",
+                "bot",
+                &[
+                    "bots",
+                    "bot_signals",
+                    "bot_notifications",
+                    "bot_symbol_cursor",
+                    "bot_journal",
+                ],
+            ),
+            (
+                "Paper trading",
+                "file-text",
+                &[
+                    "paper_account",
+                    "paper_position",
+                    "paper_order",
+                    "paper_fill",
+                    "paper_funding",
+                    "paper_equity",
+                ],
+            ),
+            (
+                "Market data",
+                "trending-up",
+                &[
+                    "instruments",
+                    "exchanges",
+                    "universes",
+                    "funding_rates",
+                    "md_symbol_hits",
+                    "logos",
+                ],
+            ),
+            (
+                "Stock prices & ingest",
+                "database",
+                &["stock_snapshot", "stock_backfill", "ingest_runs"],
+            ),
+            (
+                "Fundamentals · SEC",
+                "landmark",
+                &[
+                    "companies",
+                    "company_tickers",
+                    "concepts",
+                    "facts",
+                    "ratios",
+                ],
+            ),
             ("Watchlists", "star", &["watchlists", "watchlist_items"]),
-            ("User data", "user", &["user_scripts", "script_favorites", "chart_layouts", "chart_drawings", "user_settings"]),
-            ("Billing & entitlements", "credit-card", &["subscriptions", "subscription_events", "entitlement_overrides", "ai_chat_usage"]),
-            ("Marketplace", "shopping-bag", &["marketplace_scripts", "marketplace_installs", "marketplace_ratings", "marketplace_favorites", "users"]),
+            (
+                "User data",
+                "user",
+                &[
+                    "user_scripts",
+                    "script_favorites",
+                    "chart_layouts",
+                    "chart_drawings",
+                    "user_settings",
+                ],
+            ),
+            (
+                "Billing & entitlements",
+                "credit-card",
+                &[
+                    "subscriptions",
+                    "subscription_events",
+                    "entitlement_overrides",
+                    "ai_chat_usage",
+                ],
+            ),
+            (
+                "Marketplace",
+                "shopping-bag",
+                &[
+                    "marketplace_scripts",
+                    "marketplace_installs",
+                    "marketplace_ratings",
+                    "marketplace_favorites",
+                    "users",
+                ],
+            ),
         ];
 
         assert_eq!(nav.len(), expected.len(), "group count + order:\n{nav:#?}");
         for (got, (label, icon, members)) in nav.iter().zip(expected) {
             assert_eq!(got["label"], *label, "group label + order");
             assert_eq!(got["icon"], *icon, "group icon");
-            let got_members: Vec<&str> =
-                got["tables"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+            let got_members: Vec<&str> = got["tables"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_str().unwrap())
+                .collect();
             assert_eq!(got_members, members.to_vec(), "members of {label} in order");
         }
     }
@@ -776,14 +970,21 @@ mod nav_tests {
         for t in ["a", "b", "c"] {
             sources.insert(
                 t.into(),
-                TableSource { path: std::path::PathBuf::new(), group: Some("g".into()) },
+                TableSource {
+                    path: std::path::PathBuf::new(),
+                    group: Some("g".into()),
+                },
             );
         }
         let order = ["a", "b", "c"];
         let nav = derive_nav_groups(&groups, &sources, &order);
 
-        let members: Vec<&str> =
-            nav[0]["tables"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+        let members: Vec<&str> = nav[0]["tables"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
         assert_eq!(members, vec!["c", "a", "b"]);
     }
 }
@@ -822,15 +1023,34 @@ mod relation_tests {
     }
 
     fn table(name: &str, columns: Vec<DbColumn>) -> DbTable {
-        DbTable { name: name.into(), schema: "public".into(), source: String::new(), is_view: false, pk: Some("id".into()), columns }
+        DbTable {
+            name: name.into(),
+            schema: "public".into(),
+            source: String::new(),
+            is_view: false,
+            pk: Some("id".into()),
+            columns,
+        }
     }
 
     /// `orders.bot_id` → `bots` (exposed), `orders.hidden_id` → `secret` (NOT exposed).
     fn schema() -> Schema {
         let mut s = Schema::default();
-        s.tables.insert("orders".into(), table("orders", vec![id_col(), fk_col("bot_id", "bots"), fk_col("hidden_id", "secret")]));
-        s.tables.insert("bots".into(), table("bots", vec![id_col()]));
-        s.tables.insert("secret".into(), table("secret", vec![id_col()]));
+        s.tables.insert(
+            "orders".into(),
+            table(
+                "orders",
+                vec![
+                    id_col(),
+                    fk_col("bot_id", "bots"),
+                    fk_col("hidden_id", "secret"),
+                ],
+            ),
+        );
+        s.tables
+            .insert("bots".into(), table("bots", vec![id_col()]));
+        s.tables
+            .insert("secret".into(), table("secret", vec![id_col()]));
         s
     }
 
@@ -842,7 +1062,9 @@ mod relation_tests {
     }
 
     fn state(cfg: ConfigDir) -> Arc<AppState> {
-        let pg = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://x").unwrap();
+        let pg = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://x")
+            .unwrap();
         Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
@@ -866,25 +1088,42 @@ mod relation_tests {
 
     fn relation<'a>(cols: &'a [serde_json::Value], name: &str) -> Option<(&'a str, &'a str)> {
         let c = cols.iter().find(|c| c["name"] == name)?;
-        Some((c.get("ref_table")?.as_str()?, c.get("ref_column")?.as_str()?))
+        Some((
+            c.get("ref_table")?.as_str()?,
+            c.get("ref_column")?.as_str()?,
+        ))
     }
 
     #[tokio::test]
     async fn introspected_fk_emits_relation_when_target_exposed_and_viewable() {
         let state = state(cfg());
-        let admin = CurrentUser { email: "a@x.io".into(), role: "admin".into() };
+        let admin = CurrentUser {
+            email: "a@x.io".into(),
+            role: "admin".into(),
+        };
         let dbt = state.db.tables.get("orders").unwrap();
         let cols = column_meta(&state, &admin, "orders", dbt, &TableConfig::default());
-        assert_eq!(relation(&cols, "bot_id"), Some(("bots", "id")), "exposed+viewable target links");
+        assert_eq!(
+            relation(&cols, "bot_id"),
+            Some(("bots", "id")),
+            "exposed+viewable target links"
+        );
     }
 
     #[tokio::test]
     async fn fk_to_unexposed_target_emits_no_relation() {
         let state = state(cfg());
-        let admin = CurrentUser { email: "a@x.io".into(), role: "admin".into() };
+        let admin = CurrentUser {
+            email: "a@x.io".into(),
+            role: "admin".into(),
+        };
         let dbt = state.db.tables.get("orders").unwrap();
         let cols = column_meta(&state, &admin, "orders", dbt, &TableConfig::default());
-        assert_eq!(relation(&cols, "hidden_id"), None, "target 'secret' is not configured");
+        assert_eq!(
+            relation(&cols, "hidden_id"),
+            None,
+            "target 'secret' is not configured"
+        );
     }
 
     #[tokio::test]
@@ -894,23 +1133,37 @@ mod relation_tests {
         role.tables.insert("orders".into(), "read".into());
         c.auth.roles.insert("viewer".into(), role);
         let state = state(c);
-        let viewer = CurrentUser { email: "v@x.io".into(), role: "viewer".into() };
+        let viewer = CurrentUser {
+            email: "v@x.io".into(),
+            role: "viewer".into(),
+        };
         let dbt = state.db.tables.get("orders").unwrap();
         let cols = column_meta(&state, &viewer, "orders", dbt, &TableConfig::default());
-        assert_eq!(relation(&cols, "bot_id"), None, "viewer can't view bots → no drill-through link");
+        assert_eq!(
+            relation(&cols, "bot_id"),
+            None,
+            "viewer can't view bots → no drill-through link"
+        );
     }
 
     #[tokio::test]
     async fn config_target_wins_over_introspected_fk() {
         let state = state(cfg());
-        let admin = CurrentUser { email: "a@x.io".into(), role: "admin".into() };
+        let admin = CurrentUser {
+            email: "a@x.io".into(),
+            role: "admin".into(),
+        };
         let mut tc = TableConfig::default();
         let mut fc = crate::config::FieldConfig::default();
         fc.params.insert("target".into(), serde_json::json!("bots"));
         tc.fields.insert("bot_id".into(), fc);
         let dbt = state.db.tables.get("orders").unwrap();
         let cols = column_meta(&state, &admin, "orders", dbt, &tc);
-        assert_eq!(relation(&cols, "bot_id"), Some(("bots", "id")), "config target resolves + pk default");
+        assert_eq!(
+            relation(&cols, "bot_id"),
+            Some(("bots", "id")),
+            "config target resolves + pk default"
+        );
     }
 }
 
@@ -960,14 +1213,11 @@ pub async fn meta_handler(
     State(state): State<Arc<AppState>>,
     user: CurrentUser,
 ) -> Result<Json<Value>, AppError> {
-    let table_futs = state
-        .visible_tables(&user)
-        .into_iter()
-        .map(|t| {
-            let state = state.clone();
-            let user = user.clone();
-            async move { table_meta(&state, &user, &t).await }
-        });
+    let table_futs = state.visible_tables(&user).into_iter().map(|t| {
+        let state = state.clone();
+        let user = user.clone();
+        async move { table_meta(&state, &user, &t).await }
+    });
     let tables: Vec<Value> = futures::future::join_all(table_futs)
         .await
         .into_iter()
@@ -1010,7 +1260,9 @@ async fn variables_meta(state: &AppState, user: &CurrentUser) -> Vec<Value> {
     };
     let mut out = Vec::new();
     for (name, var) in vars {
-        let options = crate::vars::option_pairs(state, &var).await.unwrap_or_default();
+        let options = crate::vars::option_pairs(state, &var)
+            .await
+            .unwrap_or_default();
         out.push(json!({
             "name": name,
             "label": var.label.clone().unwrap_or_else(|| name.clone()),
@@ -1029,7 +1281,10 @@ async fn variables_meta(state: &AppState, user: &CurrentUser) -> Vec<Value> {
 /// per-query, so this can never fail. Warms the admin view (no row filter) — the
 /// broadest, most-shared cache keys.
 pub async fn warm_options_cache(state: &AppState) {
-    let user = CurrentUser { email: String::new(), role: "admin".into() };
+    let user = CurrentUser {
+        email: String::new(),
+        role: "admin".into(),
+    };
     let futs = state.visible_tables(&user).into_iter().map(|t| {
         let user = &user;
         async move {

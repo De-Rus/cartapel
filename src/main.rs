@@ -31,7 +31,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 #[derive(Parser)]
-#[command(name = "steward", version, about = "Admin panel for your existing Postgres — one binary, code-first config.")]
+#[command(
+    name = "steward",
+    version,
+    about = "Admin panel for your existing Postgres — one binary, code-first config."
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -101,7 +105,10 @@ enum UserCommand {
 /// Precedence: `STEWARD_SECRET_KEY` env → config `steward.secret_key`
 /// (env-interpolated). Each candidate is trimmed and required non-empty;
 /// with none set, steward refuses to start.
-fn resolve_secret_key(env: Option<String>, cfg: &config::StewardConfig) -> Result<[u8; 32], String> {
+fn resolve_secret_key(
+    env: Option<String>,
+    cfg: &config::StewardConfig,
+) -> Result<[u8; 32], String> {
     let candidate = env
         .as_deref()
         .map(str::trim)
@@ -136,7 +143,9 @@ fn is_transaction_pooler(db: &str, env_override: bool) -> bool {
 async fn connect_pg(url: &str) -> sqlx::PgPool {
     let tx_pooler = is_transaction_pooler(
         url,
-        std::env::var("STEWARD_DB_TX_POOL").map(|v| v == "1").unwrap_or(false),
+        std::env::var("STEWARD_DB_TX_POOL")
+            .map(|v| v == "1")
+            .unwrap_or(false),
     );
     let mut opts: PgConnectOptions = url.parse().expect("parse database url");
     if tx_pooler {
@@ -162,7 +171,10 @@ async fn connect_pg(url: &str) -> sqlx::PgPool {
     match pool_opts.connect_with(opts).await {
         Ok(pool) => pool,
         Err(e) => {
-            let host = url.parse::<PgConnectOptions>().map(|o| format!("{}:{}", o.get_host(), o.get_port())).unwrap_or_default();
+            let host = url
+                .parse::<PgConnectOptions>()
+                .map(|o| format!("{}:{}", o.get_host(), o.get_port()))
+                .unwrap_or_default();
             die(&format!(
                 "cannot connect to postgres at {host}: {e}\n  · is the database reachable from here?\n  · transaction poolers (e.g. Supabase :6543) are auto-detected; force with STEWARD_DB_TX_POOL=1"
             ));
@@ -178,7 +190,9 @@ fn die(msg: &str) -> ! {
 fn gen_password() -> String {
     const CHARS: &[u8] = b"abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let mut rng = rand::thread_rng();
-    (0..20).map(|_| CHARS[rng.gen_range(0..CHARS.len())] as char).collect()
+    (0..20)
+        .map(|_| CHARS[rng.gen_range(0..CHARS.len())] as char)
+        .collect()
 }
 
 #[tokio::main]
@@ -192,20 +206,38 @@ async fn main() {
 
     let cli = Cli::parse();
     match cli.command {
-        Command::User { command: UserCommand::Add { email, role, password, data } } => {
+        Command::User {
+            command:
+                UserCommand::Add {
+                    email,
+                    role,
+                    password,
+                    data,
+                },
+        } => {
             let store = store::Store::open(&data).expect("open steward data dir");
             let (password, generated) = match password {
                 Some(p) => (p, false),
                 None => (gen_password(), true),
             };
-            store.add_user(&email.to_lowercase(), &password, &role).expect("add user");
+            store
+                .add_user(&email.to_lowercase(), &password, &role)
+                .expect("add user");
             if generated {
                 println!("user {email} ({role}) — generated password: {password}");
             } else {
                 println!("user {email} ({role}) updated");
             }
         }
-        Command::Serve { db, schema, config, data, base_path, listen, secure_cookies } => {
+        Command::Serve {
+            db,
+            schema,
+            config,
+            data,
+            base_path,
+            listen,
+            secure_cookies,
+        } => {
             serve(db, schema, config, data, base_path, listen, secure_cookies).await;
         }
         Command::Check { config, db, schema } => {
@@ -312,25 +344,29 @@ async fn check(config: &std::path::Path, db: Option<String>, schema: Option<Stri
 /// just re-runs an idempotent load after them.
 fn watch_config(state: Arc<AppState>) {
     use notify::Watcher;
-    let Some(dir) = state.config_dir.clone() else { return };
-    let (tx, rx) = std::sync::mpsc::channel::<()>();
-    let mut watcher = match notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
-        if let Ok(ev) = res {
-            let relevant = ev.paths.iter().any(|p| {
-                p.extension().is_some_and(|e| e == "hcl")
-                    || p.extension().is_some_and(|e| e == "tsx" || e == "ts" || e == "js")
-            });
-            if relevant {
-                let _ = tx.send(());
-            }
-        }
-    }) {
-        Ok(w) => w,
-        Err(e) => {
-            tracing::warn!("config watcher unavailable: {e}");
-            return;
-        }
+    let Some(dir) = state.config_dir.clone() else {
+        return;
     };
+    let (tx, rx) = std::sync::mpsc::channel::<()>();
+    let mut watcher =
+        match notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+            if let Ok(ev) = res {
+                let relevant = ev.paths.iter().any(|p| {
+                    p.extension().is_some_and(|e| e == "hcl")
+                        || p.extension()
+                            .is_some_and(|e| e == "tsx" || e == "ts" || e == "js")
+                });
+                if relevant {
+                    let _ = tx.send(());
+                }
+            }
+        }) {
+            Ok(w) => w,
+            Err(e) => {
+                tracing::warn!("config watcher unavailable: {e}");
+                return;
+            }
+        };
     if let Err(e) = watcher.watch(&dir, notify::RecursiveMode::Recursive) {
         tracing::warn!("config watcher failed to start: {e}");
         return;
@@ -384,7 +420,8 @@ async fn serve(
 
     let store = store::Store::open(&data).expect("open steward data dir");
 
-    let mut pools: std::collections::HashMap<String, sqlx::PgPool> = std::collections::HashMap::new();
+    let mut pools: std::collections::HashMap<String, sqlx::PgPool> =
+        std::collections::HashMap::new();
     pools.insert(primary_alias.clone(), connect_pg(&db).await);
     for (alias, src) in cfg.sources.iter() {
         if !src.is_postgres() || alias == &primary_alias {
@@ -396,7 +433,8 @@ async fn serve(
     }
     let pg = pools[&primary_alias].clone();
     if store.user_count().unwrap_or(0) == 0 {
-        let email = std::env::var("STEWARD_ADMIN_EMAIL").unwrap_or_else(|_| "admin@localhost".into());
+        let email =
+            std::env::var("STEWARD_ADMIN_EMAIL").unwrap_or_else(|_| "admin@localhost".into());
         let (password, generated) = match std::env::var("STEWARD_ADMIN_PASSWORD") {
             Ok(p) if !p.is_empty() => (p, false),
             _ => (gen_password(), true),
@@ -407,7 +445,9 @@ async fn serve(
             .ok()
             .filter(|r| !r.is_empty())
             .unwrap_or_else(|| "admin".into());
-        store.add_user(&email.to_lowercase(), &password, &role).expect("bootstrap user");
+        store
+            .add_user(&email.to_lowercase(), &password, &role)
+            .expect("bootstrap user");
         if generated {
             tracing::warn!("bootstrapped {role} user {email} with password: {password}");
         } else {
@@ -415,27 +455,42 @@ async fn serve(
         }
     }
 
-    let mut dbs: std::collections::HashMap<String, introspect::Schema> = std::collections::HashMap::new();
-    let mut db_schema = introspect::introspect(&pg, &schemas).await.expect("introspect schema");
+    let mut dbs: std::collections::HashMap<String, introspect::Schema> =
+        std::collections::HashMap::new();
+    let mut db_schema = introspect::introspect(&pg, &schemas)
+        .await
+        .expect("introspect schema");
     for t in db_schema.tables.values_mut() {
         t.source = primary_alias.clone();
     }
     if db_schema.tables.is_empty() {
         tracing::warn!("schemas {schemas:?} have no tables");
     } else {
-        tracing::info!("introspected {} tables from schemas {schemas:?}", db_schema.tables.len());
+        tracing::info!(
+            "introspected {} tables from schemas {schemas:?}",
+            db_schema.tables.len()
+        );
     }
     dbs.insert(primary_alias.clone(), db_schema.clone());
     for (alias, src) in cfg.sources.iter() {
         if !src.is_postgres() || alias == &primary_alias {
             continue;
         }
-        let sch = if src.schemas.is_empty() { vec!["public".into()] } else { src.schemas.clone() };
-        let mut s = introspect::introspect(&pools[alias], &sch).await.expect("introspect source");
+        let sch = if src.schemas.is_empty() {
+            vec!["public".into()]
+        } else {
+            src.schemas.clone()
+        };
+        let mut s = introspect::introspect(&pools[alias], &sch)
+            .await
+            .expect("introspect source");
         for t in s.tables.values_mut() {
             t.source = alias.clone();
         }
-        tracing::info!("source {alias}: introspected {} tables from {sch:?}", s.tables.len());
+        tracing::info!(
+            "source {alias}: introspected {} tables from {sch:?}",
+            s.tables.len()
+        );
         dbs.insert(alias.clone(), s);
     }
 
@@ -443,18 +498,29 @@ async fn serve(
         let src = tc.from.source.as_deref();
         let phys = tc.from.table.as_deref().unwrap_or(table);
         let found = match src {
-            Some(alias) => dbs.get(alias).map(|s| s.find(tc.from.schema.as_deref(), phys).is_some()).unwrap_or(false),
+            Some(alias) => dbs
+                .get(alias)
+                .map(|s| s.find(tc.from.schema.as_deref(), phys).is_some())
+                .unwrap_or(false),
             None => db_schema.find(tc.from.schema.as_deref(), phys).is_some(),
         };
         if !found {
             match src {
-                Some(alias) => tracing::warn!("config file {table}.hcl → source \"{alias}\" has no matching table"),
-                None => tracing::warn!("config file {table}.hcl has no matching table in schemas {schemas:?}"),
+                Some(alias) => tracing::warn!(
+                    "config file {table}.hcl → source \"{alias}\" has no matching table"
+                ),
+                None => tracing::warn!(
+                    "config file {table}.hcl has no matching table in schemas {schemas:?}"
+                ),
             }
         }
     }
 
-    let brand = cfg.steward.brand.clone().unwrap_or_else(|| "steward".into());
+    let brand = cfg
+        .steward
+        .brand
+        .clone()
+        .unwrap_or_else(|| "steward".into());
     let secret_key = resolve_secret_key(std::env::var("STEWARD_SECRET_KEY").ok(), &cfg.steward)
         .unwrap_or_else(|e| {
             tracing::error!("{e}");
@@ -480,7 +546,9 @@ async fn serve(
             .expect("build http client"),
         secure_cookies,
         secret_key,
-        webhook_secret: std::env::var("STEWARD_WEBHOOK_SECRET").ok().filter(|s| !s.is_empty()),
+        webhook_secret: std::env::var("STEWARD_WEBHOOK_SECRET")
+            .ok()
+            .filter(|s| !s.is_empty()),
         options_cache: Default::default(),
         login_limiter: Default::default(),
         config_write_lock: Default::default(),
@@ -499,8 +567,14 @@ async fn serve(
         .route("/dash/*id", get(dashboard::page_widgets_handler))
         .route("/audit", get(auth::audit_handler))
         .route("/search", get(search::search_handler))
-        .route("/views", get(views::list_views_handler).post(views::create_view_handler))
-        .route("/views/:id", axum::routing::delete(views::delete_view_handler))
+        .route(
+            "/views",
+            get(views::list_views_handler).post(views::create_view_handler),
+        )
+        .route(
+            "/views/:id",
+            axum::routing::delete(views::delete_view_handler),
+        )
         .route("/users", get(access::users_list).post(access::users_create))
         .route(
             "/users/:id",
@@ -511,7 +585,10 @@ async fn serve(
             "/roles/:name",
             axum::routing::patch(access::roles_update).delete(access::roles_delete),
         )
-        .route("/t/:table", get(rows::list_handler).post(rows::create_handler))
+        .route(
+            "/t/:table",
+            get(rows::list_handler).post(rows::create_handler),
+        )
         .route("/t/:table/bulk", post(rows::bulk_handler))
         .route(
             "/t/:table/import",
@@ -526,8 +603,14 @@ async fn serve(
                 .delete(rows::delete_handler),
         )
         .route("/t/:table/r/:pk/audit", get(rows::row_audit_handler))
-        .route("/t/:table/r/:pk/revert/:audit_id", post(rows::revert_handler))
-        .route("/t/:table/r/:pk/inline/:child", get(rows::inline_page_handler))
+        .route(
+            "/t/:table/r/:pk/revert/:audit_id",
+            post(rows::revert_handler),
+        )
+        .route(
+            "/t/:table/r/:pk/inline/:child",
+            get(rows::inline_page_handler),
+        )
         .route("/t/:table/options/:col", get(rows::options_handler))
         .route(
             "/t/:table/image/:col/:pk",
@@ -545,13 +628,19 @@ async fn serve(
             "/config/groups/:slug",
             axum::routing::patch(groupsedit::patch_group).delete(groupsedit::delete_group),
         )
-        .route("/config/groups/:slug/rename", post(groupsedit::rename_group))
+        .route(
+            "/config/groups/:slug/rename",
+            post(groupsedit::rename_group),
+        )
         .route(
             "/config/dashboard",
             get(globaledit::get_dashboard).put(globaledit::put_dashboard),
         )
         .route("/config/dashboard/preview", post(globaledit::preview_panel))
-        .route("/config/dashboard/versions", get(globaledit::list_dashboard_versions))
+        .route(
+            "/config/dashboard/versions",
+            get(globaledit::list_dashboard_versions),
+        )
         .route(
             "/config/dashboard/versions/:id",
             get(globaledit::get_dashboard_version),
@@ -564,8 +653,14 @@ async fn serve(
             "/config/:table",
             get(configedit::get_config).put(configedit::put_config),
         )
-        .route("/config/:table/versions", get(configedit::list_config_versions))
-        .route("/config/:table/versions/:id", get(configedit::get_config_version))
+        .route(
+            "/config/:table/versions",
+            get(configedit::list_config_versions),
+        )
+        .route(
+            "/config/:table/versions/:id",
+            get(configedit::get_config_version),
+        )
         .route(
             "/config/:table/versions/:id/publish",
             post(configedit::publish_config_version),
@@ -646,7 +741,8 @@ mod secret_tests {
 
     #[test]
     fn env_takes_precedence_over_config() {
-        let key = resolve_secret_key(Some("env-key".into()), &cfg_with_key(Some("cfg-key"))).unwrap();
+        let key =
+            resolve_secret_key(Some("env-key".into()), &cfg_with_key(Some("cfg-key"))).unwrap();
         assert_eq!(key, <[u8; 32]>::from(Sha256::digest(b"env-key")));
     }
 

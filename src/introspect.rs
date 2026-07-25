@@ -57,9 +57,14 @@ impl Schema {
     /// the key. Without a schema, the first table of that name wins.
     pub fn find(&self, schema: Option<&str>, name: &str) -> Option<&DbTable> {
         if let Some(sch) = schema {
-            return self.tables.values().find(|t| t.name == name && t.schema == sch);
+            return self
+                .tables
+                .values()
+                .find(|t| t.name == name && t.schema == sch);
         }
-        self.tables.get(name).or_else(|| self.tables.values().find(|t| t.name == name))
+        self.tables
+            .get(name)
+            .or_else(|| self.tables.values().find(|t| t.name == name))
     }
 }
 
@@ -153,23 +158,39 @@ pub async fn introspect(pool: &PgPool, schemas: &[String]) -> Result<Schema, sql
 
     let mut single_pk: BTreeMap<(String, String), Option<String>> = BTreeMap::new();
     for r in &pks {
-        let key = (r.get::<String, _>("table_schema"), r.get::<String, _>("table_name"));
+        let key = (
+            r.get::<String, _>("table_schema"),
+            r.get::<String, _>("table_name"),
+        );
         let col: String = r.get("column_name");
         let n: i64 = r.get("n");
         let entry = single_pk.entry(key).or_insert(None);
         *entry = if n == 1 { Some(col) } else { None };
     }
     for r in &uniques {
-        let key = (r.get::<String, _>("table_schema"), r.get::<String, _>("table_name"));
+        let key = (
+            r.get::<String, _>("table_schema"),
+            r.get::<String, _>("table_name"),
+        );
         let col: String = r.get("column_name");
-        single_pk.entry(key).or_insert(Some(col.clone())).get_or_insert(col);
+        single_pk
+            .entry(key)
+            .or_insert(Some(col.clone()))
+            .get_or_insert(col);
     }
 
     let mut fk_map: BTreeMap<(String, String, String), (String, String)> = BTreeMap::new();
     for r in &fks {
-        let f_key = key_of(&r.get::<String, _>("f_schema"), &r.get::<String, _>("f_table"));
+        let f_key = key_of(
+            &r.get::<String, _>("f_schema"),
+            &r.get::<String, _>("f_table"),
+        );
         fk_map.insert(
-            (r.get("table_schema"), r.get("table_name"), r.get("column_name")),
+            (
+                r.get("table_schema"),
+                r.get("table_name"),
+                r.get("column_name"),
+            ),
             (f_key, r.get("f_col")),
         );
     }
@@ -189,11 +210,16 @@ pub async fn introspect(pool: &PgPool, schemas: &[String]) -> Result<Schema, sql
             schema: sch.clone(),
             source: String::new(),
             is_view,
-            pk: single_pk.get(&(sch.clone(), table.clone())).cloned().flatten(),
+            pk: single_pk
+                .get(&(sch.clone(), table.clone()))
+                .cloned()
+                .flatten(),
             columns: Vec::new(),
         });
         entry.columns.push(DbColumn {
-            fk: fk_map.get(&(sch.clone(), table.clone(), name.clone())).cloned(),
+            fk: fk_map
+                .get(&(sch.clone(), table.clone(), name.clone()))
+                .cloned(),
             name,
             udt,
             elem_udt,
@@ -210,22 +236,45 @@ mod tests {
     use super::*;
 
     fn t(name: &str, schema: &str) -> DbTable {
-        DbTable { name: name.into(), schema: schema.into(), source: String::new(), is_view: false, pk: None, columns: vec![] }
+        DbTable {
+            name: name.into(),
+            schema: schema.into(),
+            source: String::new(),
+            is_view: false,
+            pk: None,
+            columns: vec![],
+        }
     }
 
     #[test]
     fn find_resolves_by_name_and_optional_schema() {
         let mut s = Schema::default();
         s.tables.insert("bots".into(), t("bots", "markets"));
-        s.tables.insert("public.orders".into(), t("orders", "public"));
+        s.tables
+            .insert("public.orders".into(), t("orders", "public"));
         s.tables.insert("shop.orders".into(), t("orders", "shop"));
 
-        assert_eq!(s.find(None, "bots").map(|d| d.schema.as_str()), Some("markets"));
-        assert_eq!(s.find(Some("markets"), "bots").map(|d| d.schema.as_str()), Some("markets"));
-        assert!(s.find(Some("public"), "bots").is_none(), "schema pin must not match a different schema");
+        assert_eq!(
+            s.find(None, "bots").map(|d| d.schema.as_str()),
+            Some("markets")
+        );
+        assert_eq!(
+            s.find(Some("markets"), "bots").map(|d| d.schema.as_str()),
+            Some("markets")
+        );
+        assert!(
+            s.find(Some("public"), "bots").is_none(),
+            "schema pin must not match a different schema"
+        );
 
-        assert_eq!(s.find(Some("shop"), "orders").map(|d| d.schema.as_str()), Some("shop"));
-        assert_eq!(s.find(Some("public"), "orders").map(|d| d.schema.as_str()), Some("public"));
+        assert_eq!(
+            s.find(Some("shop"), "orders").map(|d| d.schema.as_str()),
+            Some("shop")
+        );
+        assert_eq!(
+            s.find(Some("public"), "orders").map(|d| d.schema.as_str()),
+            Some("public")
+        );
         assert!(s.find(None, "missing").is_none());
     }
 }

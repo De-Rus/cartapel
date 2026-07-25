@@ -37,7 +37,8 @@ pub struct AppState {
     /// every outstanding session cookie.
     pub secret_key: [u8; 32],
     pub webhook_secret: Option<String>,
-    pub options_cache: Mutex<HashMap<(String, String, Option<String>), (Instant, serde_json::Value)>>,
+    pub options_cache:
+        Mutex<HashMap<(String, String, Option<String>), (Instant, serde_json::Value)>>,
     pub login_limiter: Mutex<HashMap<String, (u32, Instant)>>,
     /// Serializes the read-modify-write of the on-disk config files so two
     /// concurrent admin writes can't clobber each other (last rename wins =
@@ -48,9 +49,17 @@ pub struct AppState {
 
 fn secret_shaped(name: &str) -> bool {
     let n = name.to_ascii_lowercase();
-    ["token", "secret", "password", "passwd", "api_key", "apikey", "private_key"]
-        .iter()
-        .any(|k| n.contains(k))
+    [
+        "token",
+        "secret",
+        "password",
+        "passwd",
+        "api_key",
+        "apikey",
+        "private_key",
+    ]
+    .iter()
+    .any(|k| n.contains(k))
 }
 
 #[derive(Debug)]
@@ -94,7 +103,17 @@ impl From<sqlx::Error> for AppError {
                 let code = db.code();
                 let known = matches!(
                     code.as_deref(),
-                    Some("23502" | "23505" | "23503" | "23514" | "22P02" | "22001" | "22003" | "22007" | "22008")
+                    Some(
+                        "23502"
+                            | "23505"
+                            | "23503"
+                            | "23514"
+                            | "22P02"
+                            | "22001"
+                            | "22003"
+                            | "22007"
+                            | "22008"
+                    )
                 );
                 if known {
                     AppError::bad(db.message())
@@ -152,7 +171,8 @@ pub struct TablePerms {
 impl AppState {
     /// HMAC-SHA256 a message under [`AppState::secret_key`], hex-encoded.
     pub fn sign(&self, msg: &[u8]) -> String {
-        let mut mac = <Hmac<Sha256>>::new_from_slice(&self.secret_key).expect("hmac accepts any key length");
+        let mut mac =
+            <Hmac<Sha256>>::new_from_slice(&self.secret_key).expect("hmac accepts any key length");
         mac.update(msg);
         hex::encode(mac.finalize().into_bytes())
     }
@@ -162,7 +182,8 @@ impl AppState {
         let Ok(sig_bytes) = hex::decode(sig) else {
             return false;
         };
-        let mut mac = <Hmac<Sha256>>::new_from_slice(&self.secret_key).expect("hmac accepts any key length");
+        let mut mac =
+            <Hmac<Sha256>>::new_from_slice(&self.secret_key).expect("hmac accepts any key length");
         mac.update(msg);
         mac.verify_slice(&sig_bytes).is_ok()
     }
@@ -197,7 +218,9 @@ impl AppState {
             if seen.contains(&parent) {
                 break;
             }
-            let Some(p) = cfg.auth.roles.get(parent) else { break };
+            let Some(p) = cfg.auth.roles.get(parent) else {
+                break;
+            };
             seen.push(parent);
             chain.push(p);
             cur = p;
@@ -267,7 +290,11 @@ impl AppState {
             }
         }
         let cfg = self.cfg();
-        let caps = cfg.tables.get(table).map(|t| t.permissions.clone()).unwrap_or_default();
+        let caps = cfg
+            .tables
+            .get(table)
+            .map(|t| t.permissions.clone())
+            .unwrap_or_default();
         let read_only_table = self
             .db
             .tables
@@ -425,7 +452,11 @@ impl AppState {
     /// Resolve a table for a data endpoint. Unconfigured tables (no `.hcl`) are not
     /// part of the admin, so they 404 exactly as a nonexistent table would — even
     /// by direct URL. Configured tables then pass through the per-role view gate.
-    pub fn readable_table(&self, user: &CurrentUser, table: &str) -> Result<&crate::introspect::DbTable, AppError> {
+    pub fn readable_table(
+        &self,
+        user: &CurrentUser,
+        table: &str,
+    ) -> Result<&crate::introspect::DbTable, AppError> {
         if !self.cfg().tables.contains_key(table) {
             return Err(AppError::not_found(format!("unknown table {table}")));
         }

@@ -16,7 +16,11 @@ const MAX_PP: u32 = 500;
 const INLINE_CAP: i64 = 50;
 const APPROX_THRESHOLD: i64 = 500_000;
 
-fn table_of<'a>(state: &'a AppState, user: &CurrentUser, table: &str) -> Result<&'a DbTable, AppError> {
+fn table_of<'a>(
+    state: &'a AppState,
+    user: &CurrentUser,
+    table: &str,
+) -> Result<&'a DbTable, AppError> {
     state.readable_table(user, table)
 }
 
@@ -38,7 +42,12 @@ struct ListQuery {
 /// column, else its expression when `sortable`. `None` = a display-only computed
 /// field (or an unknown column), which the caller rejects. A `sort_by` target the
 /// user has masked is refused — otherwise ordering would leak a hidden value.
-fn computed_sort_expr(dbt: &DbTable, cfg: &crate::config::TableConfig, masked: &[String], col: &str) -> Option<String> {
+fn computed_sort_expr(
+    dbt: &DbTable,
+    cfg: &crate::config::TableConfig,
+    masked: &[String],
+    col: &str,
+) -> Option<String> {
     let f = cfg.fields.get(col)?;
     let sql = f.sql.as_ref()?;
     if let Some(sb) = &f.sort_by {
@@ -78,7 +87,9 @@ fn build_list_query(
     }
 
     for (key, raw) in params {
-        let Some(keyname) = key.strip_prefix("f_") else { continue };
+        let Some(keyname) = key.strip_prefix("f_") else {
+            continue;
+        };
         let (name, op) = split_op(keyname);
         if op.is_none() {
             if let Some(def) = cfg.list.filter_defs.get(name) {
@@ -146,10 +157,16 @@ fn build_list_query(
         format!("ORDER BY {}", terms.join(", "))
     };
 
-    Ok(ListQuery { where_sql, binds, order_sql })
+    Ok(ListQuery {
+        where_sql,
+        binds,
+        order_sql,
+    })
 }
 
-const FILTER_OPS: &[&str] = &["gte", "lte", "gt", "lt", "ne", "contains", "in", "between", "isnull"];
+const FILTER_OPS: &[&str] = &[
+    "gte", "lte", "gt", "lt", "ne", "contains", "in", "between", "isnull",
+];
 
 fn split_op(key: &str) -> (&str, Option<&'static str>) {
     for op in FILTER_OPS {
@@ -229,9 +246,15 @@ fn operator_clause(
             clauses.push(format!("{}::text ILIKE ${n}", ident(name)));
         }
         "in" => {
-            let parts: Vec<&str> = raw.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
+            let parts: Vec<&str> = raw
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .collect();
             if parts.is_empty() {
-                return Err(AppError::bad(format!("{name}__in needs at least one value")));
+                return Err(AppError::bad(format!(
+                    "{name}__in needs at least one value"
+                )));
             }
             let placeholders: Vec<String> = parts
                 .iter()
@@ -251,7 +274,10 @@ fn operator_clause(
             }
             let na = binds.push(Some(a.to_string()));
             let nb = binds.push(Some(b.to_string()));
-            clauses.push(format!("{} BETWEEN ${na}::{cast} AND ${nb}::{cast}", ident(name)));
+            clauses.push(format!(
+                "{} BETWEEN ${na}::{cast} AND ${nb}::{cast}",
+                ident(name)
+            ));
         }
         cmp => {
             let sqlop = match cmp {
@@ -281,7 +307,9 @@ fn fk_label_pairs(state: &AppState, user: &CurrentUser, key: &str, dbt: &DbTable
         if masked.contains(&c.name) {
             continue;
         }
-        let Ok(child) = state.readable_table(user, ft) else { continue };
+        let Ok(child) = state.readable_table(user, ft) else {
+            continue;
+        };
         if child.source != dbt.source {
             continue;
         }
@@ -348,7 +376,11 @@ pub async fn list_handler(
 ) -> Result<Json<Value>, AppError> {
     let dbt = table_of(&state, &user, &table)?;
     let lq = build_list_query(&state, &user, &table, dbt, &params)?;
-    let page: u32 = params.get("page").and_then(|p| p.parse().ok()).unwrap_or(1).max(1);
+    let page: u32 = params
+        .get("page")
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(1)
+        .max(1);
     let pp: u32 = params
         .get("pp")
         .and_then(|p| p.parse().ok())
@@ -373,7 +405,10 @@ pub async fn list_handler(
             .await
             .map(|r| r.get::<i64, _>("n"))
     };
-    let approx_req = params.get("approx").map(|v| v == "1" || v == "true").unwrap_or(false);
+    let approx_req = params
+        .get("approx")
+        .map(|v| v == "1" || v == "true")
+        .unwrap_or(false);
     let (total, approx) = if lq.where_sql.is_empty() {
         let est: i64 = sqlx::query(
             "SELECT GREATEST(reltuples, 0)::bigint AS n FROM pg_class WHERE oid = $1::regclass",
@@ -401,7 +436,9 @@ pub async fn list_handler(
         (page as i64 - 1) * pp as i64,
     )
     .await?;
-    Ok(Json(json!({ "rows": rows, "total": total, "page": page, "pp": pp, "approx": approx })))
+    Ok(Json(
+        json!({ "rows": rows, "total": total, "page": page, "pp": pp, "approx": approx }),
+    ))
 }
 
 async fn fetch_one(
@@ -524,7 +561,9 @@ async fn attach_fk_labels(
     row: &mut Value,
 ) -> Result<(), AppError> {
     let pairs = fk_label_pairs(state, user, key, dbt);
-    let Some(pk_col) = dbt.pk.as_ref().and_then(|p| dbt.column(p)) else { return Ok(()) };
+    let Some(pk_col) = dbt.pk.as_ref().and_then(|p| dbt.column(p)) else {
+        return Ok(());
+    };
     if pairs.is_empty() {
         return Ok(());
     }
@@ -535,7 +574,11 @@ async fn attach_fk_labels(
         pairs.join(", "),
         state.qualified_of(dbt)
     );
-    let labels: Value = binds.query(&sql).fetch_one(state.pool_of(dbt)).await?.get("r");
+    let labels: Value = binds
+        .query(&sql)
+        .fetch_one(state.pool_of(dbt))
+        .await?
+        .get("r");
     if let (Some(obj), Some(extra)) = (row.as_object_mut(), labels.as_object()) {
         for (k, v) in extra {
             obj.insert(k.clone(), v.clone());
@@ -555,9 +598,14 @@ pub async fn detail_handler(
 
     let mut inlines = Vec::new();
     for ri in resolve_inlines(&state, &user, &table) {
-        let Ok(child_t) = table_of(&state, &user, &ri.child) else { continue };
-        let Some(fk_c) = child_t.column(&ri.fk_col) else { continue };
-        let (rows, total) = fetch_inline_page(&state, &user, &ri.child, child_t, fk_c, &pk, 1).await?;
+        let Ok(child_t) = table_of(&state, &user, &ri.child) else {
+            continue;
+        };
+        let Some(fk_c) = child_t.column(&ri.fk_col) else {
+            continue;
+        };
+        let (rows, total) =
+            fetch_inline_page(&state, &user, &ri.child, child_t, fk_c, &pk, 1).await?;
         inlines.push(inline_json(&ri, rows, total));
     }
     Ok(Json(json!({ "row": row, "inlines": inlines })))
@@ -576,10 +624,17 @@ pub async fn inline_page_handler(
     let fk_c = child_t
         .column(&ri.fk_col)
         .ok_or_else(|| AppError::bad(format!("inline {child} has no column {}", ri.fk_col)))?;
-    let page: u32 = params.get("page").and_then(|p| p.parse().ok()).unwrap_or(1).max(1);
-    let (rows, total) = fetch_inline_page(&state, &user, &ri.child, child_t, fk_c, &pk, page).await?;
+    let page: u32 = params
+        .get("page")
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(1)
+        .max(1);
+    let (rows, total) =
+        fetch_inline_page(&state, &user, &ri.child, child_t, fk_c, &pk, page).await?;
     let mut out = inline_json(&ri, rows, total);
-    out.as_object_mut().unwrap().insert("page".into(), json!(page));
+    out.as_object_mut()
+        .unwrap()
+        .insert("page".into(), json!(page));
     Ok(Json(out))
 }
 
@@ -688,7 +743,11 @@ async fn apply_update(
         Err(e) => return Err(e.into()),
     };
     let mut after: Value = row.get("r");
-    present_row(&mut after, &state.masked_columns(user, table), &binary_cols(dbt));
+    present_row(
+        &mut after,
+        &state.masked_columns(user, table),
+        &binary_cols(dbt),
+    );
 
     let mut diff = Map::new();
     for (col, _) in &changes {
@@ -697,10 +756,13 @@ async fn apply_update(
             json!({ "from": before.get(col), "to": after.get(col) }),
         );
     }
-    let audit_id =
-        state
-            .store
-            .audit(&user.email, table, Some(pk), action, Some(&Value::Object(diff)));
+    let audit_id = state.store.audit(
+        &user.email,
+        table,
+        Some(pk),
+        action,
+        Some(&Value::Object(diff)),
+    );
     Ok(Json(json!({ "row": after, "audit_id": audit_id })))
 }
 
@@ -748,7 +810,16 @@ pub async fn revert_handler(
         set.insert(col.clone(), from);
         guard.insert(col.clone(), to);
     }
-    apply_update(&state, &user, &table, &pk, &json!({ "set": set }), "revert", Some(&guard)).await
+    apply_update(
+        &state,
+        &user,
+        &table,
+        &pk,
+        &json!({ "set": set }),
+        "revert",
+        Some(&guard),
+    )
+    .await
 }
 
 const MAX_BULK_PKS: usize = 5000;
@@ -796,7 +867,11 @@ pub async fn bulk_handler(
         let n = binds.push(Some(pk.clone()));
         placeholders.push(format!("${n}"));
     }
-    let mut where_sql = format!("{}::text IN ({})", ident(&pk_col.name), placeholders.join(", "));
+    let mut where_sql = format!(
+        "{}::text IN ({})",
+        ident(&pk_col.name),
+        placeholders.join(", ")
+    );
     if let Some(rf) = state.row_filter(&user, &table) {
         where_sql = format!("{where_sql} AND ({rf})");
     }
@@ -805,9 +880,16 @@ pub async fn bulk_handler(
         state.qualified_of(dbt),
         sets.join(", ")
     );
-    let affected = binds.query(&sql).execute(state.pool_of(dbt)).await?.rows_affected();
+    let affected = binds
+        .query(&sql)
+        .execute(state.pool_of(dbt))
+        .await?
+        .rows_affected();
 
-    let diff: Map<String, Value> = changes.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    let diff: Map<String, Value> = changes
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
     state.store.audit(
         &user.email,
         &table,
@@ -845,19 +927,26 @@ pub async fn create_handler(
     );
     let row = binds.query(&sql).fetch_one(state.pool_of(dbt)).await?;
     let mut after: Value = row.get("r");
-    present_row(&mut after, &state.masked_columns(&user, &table), &binary_cols(dbt));
-    let pk_str = dbt
-        .pk
-        .as_ref()
-        .and_then(|p| after.get(p))
-        .map(|v| match v {
-            Value::String(s) => s.clone(),
-            other => other.to_string(),
-        });
-    state
-        .store
-        .audit(&user.email, &table, pk_str.as_deref(), "create", Some(&json!({ "row": after })));
-    Ok((axum::http::StatusCode::CREATED, Json(json!({ "row": after }))))
+    present_row(
+        &mut after,
+        &state.masked_columns(&user, &table),
+        &binary_cols(dbt),
+    );
+    let pk_str = dbt.pk.as_ref().and_then(|p| after.get(p)).map(|v| match v {
+        Value::String(s) => s.clone(),
+        other => other.to_string(),
+    });
+    state.store.audit(
+        &user.email,
+        &table,
+        pk_str.as_deref(),
+        "create",
+        Some(&json!({ "row": after })),
+    );
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(json!({ "row": after })),
+    ))
 }
 
 pub async fn delete_handler(
@@ -878,9 +967,13 @@ pub async fn delete_handler(
     }
     let sql = format!("DELETE FROM {} WHERE {where_sql}", state.qualified_of(dbt));
     binds.query(&sql).execute(state.pool_of(dbt)).await?;
-    state
-        .store
-        .audit(&user.email, &table, Some(&pk), "delete", Some(&json!({ "row": before })));
+    state.store.audit(
+        &user.email,
+        &table,
+        Some(&pk),
+        "delete",
+        Some(&json!({ "row": before })),
+    );
     Ok(Json(json!({})))
 }
 
@@ -975,9 +1068,7 @@ fn build_import_row(
     let mut exprs = Vec::new();
     let mut nonpk: Vec<String> = Vec::new();
     for (k, v) in rec {
-        let col = dbt
-            .column(k)
-            .ok_or_else(|| format!("unknown column {k}"))?;
+        let col = dbt.column(k).ok_or_else(|| format!("unknown column {k}"))?;
         let is_pk = Some(k) == dbt.pk.as_ref();
         if masked.contains(k)
             || cfg.edit.readonly.contains(k)
@@ -1042,7 +1133,11 @@ pub async fn import_handler(
     let upsert = match mode {
         "insert" => false,
         "upsert" => true,
-        other => return Err(AppError::bad(format!("mode must be insert or upsert, got {other}"))),
+        other => {
+            return Err(AppError::bad(format!(
+                "mode must be insert or upsert, got {other}"
+            )))
+        }
     };
     if upsert && !perms.update {
         return Err(AppError::forbidden("no write access for upsert"));
@@ -1090,10 +1185,16 @@ pub async fn import_handler(
                 }
             }
         }
-        other => return Err(AppError::bad(format!("format must be csv or json, got {other}"))),
+        other => {
+            return Err(AppError::bad(format!(
+                "format must be csv or json, got {other}"
+            )))
+        }
     }
     if records.len() > MAX_IMPORT_ROWS {
-        return Err(AppError::bad(format!("import exceeds {MAX_IMPORT_ROWS} rows")));
+        return Err(AppError::bad(format!(
+            "import exceeds {MAX_IMPORT_ROWS} rows"
+        )));
     }
 
     let cfg = table_config(&state, &table);
@@ -1124,10 +1225,14 @@ pub async fn import_handler(
                 continue;
             }
         };
-        sqlx::query("SAVEPOINT steward_import").execute(&mut *tx).await?;
+        sqlx::query("SAVEPOINT steward_import")
+            .execute(&mut *tx)
+            .await?;
         match binds.query(&sql).fetch_optional(&mut *tx).await {
             Ok(Some(row)) => {
-                sqlx::query("RELEASE SAVEPOINT steward_import").execute(&mut *tx).await?;
+                sqlx::query("RELEASE SAVEPOINT steward_import")
+                    .execute(&mut *tx)
+                    .await?;
                 if row.get::<bool, _>("inserted") {
                     inserted += 1;
                 } else {
@@ -1135,11 +1240,15 @@ pub async fn import_handler(
                 }
             }
             Ok(None) => {
-                sqlx::query("RELEASE SAVEPOINT steward_import").execute(&mut *tx).await?;
+                sqlx::query("RELEASE SAVEPOINT steward_import")
+                    .execute(&mut *tx)
+                    .await?;
                 errors.push(json!({ "row": i, "message": "row exists but not permitted" }));
             }
             Err(e) => {
-                sqlx::query("ROLLBACK TO SAVEPOINT steward_import").execute(&mut *tx).await?;
+                sqlx::query("ROLLBACK TO SAVEPOINT steward_import")
+                    .execute(&mut *tx)
+                    .await?;
                 let msg = match &e {
                     sqlx::Error::Database(db) => {
                         tracing::warn!("import row {i} rejected: {}", db.message());
@@ -1210,7 +1319,13 @@ fn csv_escape(s: &str) -> String {
 
 pub fn rows_to_csv(cols: &[String], rows: &[Value]) -> String {
     let mut out = String::new();
-    out.push_str(&cols.iter().map(|c| csv_escape(c)).collect::<Vec<_>>().join(","));
+    out.push_str(
+        &cols
+            .iter()
+            .map(|c| csv_escape(c))
+            .collect::<Vec<_>>()
+            .join(","),
+    );
     out.push('\n');
     for row in rows {
         let line: Vec<String> = cols
@@ -1295,10 +1410,16 @@ mod tests {
         assert_eq!(split_op("price"), ("price", None));
         assert_eq!(split_op("price__gt"), ("price", Some("gt")));
         assert_eq!(split_op("price__gte"), ("price", Some("gte")));
-        assert_eq!(split_op("created_at__between"), ("created_at", Some("between")));
+        assert_eq!(
+            split_op("created_at__between"),
+            ("created_at", Some("between"))
+        );
         assert_eq!(split_op("name__contains"), ("name", Some("contains")));
         assert_eq!(split_op("id__in"), ("id", Some("in")));
-        assert_eq!(split_op("deleted_at__isnull"), ("deleted_at", Some("isnull")));
+        assert_eq!(
+            split_op("deleted_at__isnull"),
+            ("deleted_at", Some("isnull"))
+        );
         // suffix with empty base is not an operator
         assert_eq!(split_op("__gt"), ("__gt", None));
     }
@@ -1354,7 +1475,12 @@ mod tests {
 
     #[test]
     fn csv_shaping_masks_bytes_and_json() {
-        let cols = vec!["id".to_string(), "secret".to_string(), "blob".to_string(), "meta".to_string()];
+        let cols = vec![
+            "id".to_string(),
+            "secret".to_string(),
+            "blob".to_string(),
+            "meta".to_string(),
+        ];
         let rows = vec![json!({
             "id": 7,
             "secret": "a3f\u{2026}",
@@ -1477,8 +1603,10 @@ mod tests {
             can_delete: None,
         }];
         cfg.tables.insert("bots".into(), bots);
-        cfg.tables.insert("bot_signals".into(), TableConfig::default());
-        cfg.tables.insert("instruments".into(), TableConfig::default());
+        cfg.tables
+            .insert("bot_signals".into(), TableConfig::default());
+        cfg.tables
+            .insert("instruments".into(), TableConfig::default());
         cfg
     }
 
@@ -1490,16 +1618,28 @@ mod tests {
     async fn from_table_rename_resolves_physical_but_keeps_config_by_slug() {
         let mut cfg = inline_cfg();
         let mut active = TableConfig::default();
-        active.from = TableFrom { source: None, schema: Some("public".into()), table: Some("bots".into()) };
+        active.from = TableFrom {
+            source: None,
+            schema: Some("public".into()),
+            table: Some("bots".into()),
+        };
         active.label = Some("Active bots".into());
         cfg.tables.insert("active_bots".into(), active);
         let state = inline_state(cfg);
 
-        let dbt = state.resolve_table("active_bots").expect("slug resolves to physical table");
+        let dbt = state
+            .resolve_table("active_bots")
+            .expect("slug resolves to physical table");
         assert_eq!(dbt.name, "bots", "SQL target is the physical table");
         assert_eq!(state.qualified_of(dbt), "\"public\".\"bots\"");
-        assert_eq!(table_config(&state, "active_bots").label.as_deref(), Some("Active bots"));
-        assert!(table_config(&state, "bots").label.is_none(), "config stays keyed by slug, not physical name");
+        assert_eq!(
+            table_config(&state, "active_bots").label.as_deref(),
+            Some("Active bots")
+        );
+        assert!(
+            table_config(&state, "bots").label.is_none(),
+            "config stays keyed by slug, not physical name"
+        );
     }
 
     /// A `from { schema }` pin that names a schema the table is not in must fail
@@ -1508,10 +1648,17 @@ mod tests {
     async fn from_schema_mismatch_fails_closed() {
         let mut cfg = inline_cfg();
         let mut bad = TableConfig::default();
-        bad.from = TableFrom { source: None, schema: Some("nope".into()), table: Some("bots".into()) };
+        bad.from = TableFrom {
+            source: None,
+            schema: Some("nope".into()),
+            table: Some("bots".into()),
+        };
         cfg.tables.insert("bad".into(), bad);
         let state = inline_state(cfg);
-        assert!(state.resolve_table("bad").is_none(), "wrong schema pin must not resolve");
+        assert!(
+            state.resolve_table("bad").is_none(),
+            "wrong schema pin must not resolve"
+        );
     }
 
     #[test]
@@ -1523,24 +1670,61 @@ mod tests {
             source: String::new(),
             is_view: false,
             pk: Some("id".into()),
-            columns: vec![col("id", "int8", Kind::Int), col("market_cap", "float8", Kind::Float)],
+            columns: vec![
+                col("id", "int8", Kind::Int),
+                col("market_cap", "float8", Kind::Float),
+            ],
         };
         let mut cfg = TableConfig::default();
-        cfg.fields.insert("pe".into(), FieldConfig { sql: Some("price / eps".into()), sortable: true, ..Default::default() });
-        cfg.fields.insert("pe_by".into(), FieldConfig { sql: Some("price / eps".into()), sort_by: Some("market_cap".into()), ..Default::default() });
-        cfg.fields.insert("pe_ro".into(), FieldConfig { sql: Some("price / eps".into()), ..Default::default() });
+        cfg.fields.insert(
+            "pe".into(),
+            FieldConfig {
+                sql: Some("price / eps".into()),
+                sortable: true,
+                ..Default::default()
+            },
+        );
+        cfg.fields.insert(
+            "pe_by".into(),
+            FieldConfig {
+                sql: Some("price / eps".into()),
+                sort_by: Some("market_cap".into()),
+                ..Default::default()
+            },
+        );
+        cfg.fields.insert(
+            "pe_ro".into(),
+            FieldConfig {
+                sql: Some("price / eps".into()),
+                ..Default::default()
+            },
+        );
 
         let none: &[String] = &[];
-        assert_eq!(computed_sort_expr(&dbt, &cfg, none, "pe").as_deref(), Some("(price / eps)"));
-        assert_eq!(computed_sort_expr(&dbt, &cfg, none, "pe_by"), Some(ident("market_cap")));
-        assert!(computed_sort_expr(&dbt, &cfg, none, "pe_ro").is_none(), "display-only computed is not sortable");
+        assert_eq!(
+            computed_sort_expr(&dbt, &cfg, none, "pe").as_deref(),
+            Some("(price / eps)")
+        );
+        assert_eq!(
+            computed_sort_expr(&dbt, &cfg, none, "pe_by"),
+            Some(ident("market_cap"))
+        );
+        assert!(
+            computed_sort_expr(&dbt, &cfg, none, "pe_ro").is_none(),
+            "display-only computed is not sortable"
+        );
         assert!(computed_sort_expr(&dbt, &cfg, none, "unknown").is_none());
         let masked = vec!["market_cap".to_string()];
-        assert!(computed_sort_expr(&dbt, &cfg, &masked, "pe_by").is_none(), "sort_by a masked column is refused (no ordering leak)");
+        assert!(
+            computed_sort_expr(&dbt, &cfg, &masked, "pe_by").is_none(),
+            "sort_by a masked column is refused (no ordering leak)"
+        );
     }
 
     fn inline_state(cfg: ConfigDir) -> Arc<AppState> {
-        let pg = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://x").unwrap();
+        let pg = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://x")
+            .unwrap();
         Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
@@ -1566,11 +1750,17 @@ mod tests {
         let mut cfg = (*state.cfg()).clone();
         cfg.auth.roles.insert(name.into(), def);
         state.cfg.store(Arc::new(cfg));
-        CurrentUser { email: "u@x.io".into(), role: name.into() }
+        CurrentUser {
+            email: "u@x.io".into(),
+            role: name.into(),
+        }
     }
 
     fn admin() -> CurrentUser {
-        CurrentUser { email: "a@x.io".into(), role: "admin".into() }
+        CurrentUser {
+            email: "a@x.io".into(),
+            role: "admin".into(),
+        }
     }
 
     #[test]
@@ -1591,7 +1781,10 @@ mod tests {
         assert_eq!(ok.fk_col, "bot_id");
 
         let err = resolve_configured_inline(&state, &user, "bots", "instruments");
-        assert!(err.is_err(), "a table that is not a declared inline must be rejected");
+        assert!(
+            err.is_err(),
+            "a table that is not a declared inline must be rejected"
+        );
     }
 
     #[tokio::test]
@@ -1600,13 +1793,20 @@ mod tests {
         let mut def = RoleConfig::default();
         def.tables.insert("bots".into(), "read".into());
         def.tables.insert("bot_signals".into(), "read".into());
-        def.masked.insert("bot_signals".into(), vec!["secret".into()]);
-        def.row_filter.insert("bot_signals".into(), "kind = 'buy'".into());
+        def.masked
+            .insert("bot_signals".into(), vec!["secret".into()]);
+        def.row_filter
+            .insert("bot_signals".into(), "kind = 'buy'".into());
         let user = role_user(&state, "viewer", def);
 
         resolve_configured_inline(&state, &user, "bots", "bot_signals").unwrap();
-        assert_eq!(state.row_filter(&user, "bot_signals").as_deref(), Some("kind = 'buy'"));
-        assert!(state.masked_columns(&user, "bot_signals").contains(&"secret".to_string()));
+        assert_eq!(
+            state.row_filter(&user, "bot_signals").as_deref(),
+            Some("kind = 'buy'")
+        );
+        assert!(state
+            .masked_columns(&user, "bot_signals")
+            .contains(&"secret".to_string()));
     }
 
     #[tokio::test]
@@ -1618,14 +1818,20 @@ mod tests {
         writer.tables.insert("bot_signals".into(), "write".into());
         let wuser = role_user(&state, "writer", writer);
         let ri = resolve_configured_inline(&state, &wuser, "bots", "bot_signals").unwrap();
-        assert!(ri.can_create && ri.can_delete, "write on child → create+delete affordances");
+        assert!(
+            ri.can_create && ri.can_delete,
+            "write on child → create+delete affordances"
+        );
 
         let mut reader = RoleConfig::default();
         reader.tables.insert("bots".into(), "write".into());
         reader.tables.insert("bot_signals".into(), "read".into());
         let ruser = role_user(&state, "reader", reader);
         let ri = resolve_configured_inline(&state, &ruser, "bots", "bot_signals").unwrap();
-        assert!(!ri.can_create && !ri.can_delete, "read-only child → no create/delete affordances");
+        assert!(
+            !ri.can_create && !ri.can_delete,
+            "read-only child → no create/delete affordances"
+        );
     }
 
     #[tokio::test]

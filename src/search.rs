@@ -17,7 +17,10 @@ pub async fn search_handler(
     user: CurrentUser,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Json<Value>, AppError> {
-    let q = params.get("q").map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let q = params
+        .get("q")
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
     let Some(q) = q else {
         return Ok(Json(json!({ "results": [] })));
     };
@@ -32,7 +35,9 @@ pub async fn search_handler(
         if results.len() >= TOTAL_CAP || started.elapsed() > BUDGET {
             break;
         }
-        let Ok(dbt) = state.readable_table(&user, &table) else { continue };
+        let Ok(dbt) = state.readable_table(&user, &table) else {
+            continue;
+        };
         let Some(pk) = dbt.pk.clone() else { continue };
         let cfg = table_config(&state, &table);
         let masked = state.masked_columns(&user, &table);
@@ -44,7 +49,11 @@ pub async fn search_handler(
             continue;
         }
         let title_col = fk_label_col(dbt);
-        let title_col = if masked.contains(&title_col) { pk.clone() } else { title_col };
+        let title_col = if masked.contains(&title_col) {
+            pk.clone()
+        } else {
+            title_col
+        };
 
         if pkish {
             let mut b = Binds::new();
@@ -61,8 +70,14 @@ pub async fn search_handler(
             );
             let hit: Option<(Option<String>, Option<String>)> = async {
                 let mut tx = state.pool_of(dbt).begin().await.ok()?;
-                sqlx::query("SET TRANSACTION READ ONLY").execute(&mut *tx).await.ok()?;
-                sqlx::query("SET LOCAL statement_timeout = '2000ms'").execute(&mut *tx).await.ok()?;
+                sqlx::query("SET TRANSACTION READ ONLY")
+                    .execute(&mut *tx)
+                    .await
+                    .ok()?;
+                sqlx::query("SET LOCAL statement_timeout = '2000ms'")
+                    .execute(&mut *tx)
+                    .await
+                    .ok()?;
                 let mut qq = sqlx::query_as::<_, (Option<String>, Option<String>)>(&sql);
                 for v in &b.values {
                     qq = qq.bind(v.as_deref());
@@ -76,7 +91,9 @@ pub async fn search_handler(
             if let Some((Some(pkv), titlev)) = hit {
                 if seen.insert((table.clone(), pkv.clone())) {
                     let label = cfg.label.clone().unwrap_or_else(|| humanize(&table));
-                    results.push(json!({ "table": table, "label": label, "pk": pkv, "title": titlev }));
+                    results.push(
+                        json!({ "table": table, "label": label, "pk": pkv, "title": titlev }),
+                    );
                 }
             }
         }
@@ -100,8 +117,14 @@ pub async fn search_handler(
 
         let hits: Vec<(Option<String>, Option<String>)> = async {
             let mut tx = state.pool_of(dbt).begin().await.ok()?;
-            sqlx::query("SET TRANSACTION READ ONLY").execute(&mut *tx).await.ok()?;
-            sqlx::query("SET LOCAL statement_timeout = '2000ms'").execute(&mut *tx).await.ok()?;
+            sqlx::query("SET TRANSACTION READ ONLY")
+                .execute(&mut *tx)
+                .await
+                .ok()?;
+            sqlx::query("SET LOCAL statement_timeout = '2000ms'")
+                .execute(&mut *tx)
+                .await
+                .ok()?;
             let mut q = sqlx::query_as::<_, (Option<String>, Option<String>)>(&sql);
             for v in &binds.values {
                 q = q.bind(v.as_deref());

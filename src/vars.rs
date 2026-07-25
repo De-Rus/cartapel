@@ -21,10 +21,16 @@ fn visible(var: &Variable, user: &CurrentUser) -> bool {
 
 /// Read the option VALUES of a `query`-backed variable (first column), read-only.
 async fn option_values(state: &AppState, var: &Variable) -> Result<Vec<String>, AppError> {
-    let Some(sql) = &var.query else { return Ok(var.options.clone()) };
+    let Some(sql) = &var.query else {
+        return Ok(var.options.clone());
+    };
     let mut tx = state.pool_for(var.source.as_deref()).begin().await?;
-    sqlx::query("SET TRANSACTION READ ONLY").execute(&mut *tx).await?;
-    sqlx::query("SET LOCAL statement_timeout = '8000ms'").execute(&mut *tx).await?;
+    sqlx::query("SET TRANSACTION READ ONLY")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SET LOCAL statement_timeout = '8000ms'")
+        .execute(&mut *tx)
+        .await?;
     let wrapped = format!("SELECT row_to_json(sub.*) AS r FROM ({sql}) sub LIMIT 1000");
     let rows = sqlx::query(&wrapped).fetch_all(&mut *tx).await?;
     let _ = tx.rollback().await;
@@ -54,8 +60,12 @@ pub async fn option_pairs(state: &AppState, var: &Variable) -> Result<Vec<Value>
     }
     let sql = var.query.as_ref().unwrap();
     let mut tx = state.pool_for(var.source.as_deref()).begin().await?;
-    sqlx::query("SET TRANSACTION READ ONLY").execute(&mut *tx).await?;
-    sqlx::query("SET LOCAL statement_timeout = '8000ms'").execute(&mut *tx).await?;
+    sqlx::query("SET TRANSACTION READ ONLY")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SET LOCAL statement_timeout = '8000ms'")
+        .execute(&mut *tx)
+        .await?;
     let wrapped = format!("SELECT row_to_json(sub.*) AS r FROM ({sql}) sub LIMIT 1000");
     let rows = sqlx::query(&wrapped).fetch_all(&mut *tx).await?;
     let _ = tx.rollback().await;
@@ -96,12 +106,16 @@ pub async fn resolve(
         let value = match supplied {
             Some(v) => {
                 if !var.options.is_empty() && !var.options.contains(&v) {
-                    return Err(AppError::bad(format!("variable {name}: {v:?} is not an allowed value")));
+                    return Err(AppError::bad(format!(
+                        "variable {name}: {v:?} is not an allowed value"
+                    )));
                 }
                 if ty == VarType::Ident && var.options.is_empty() {
                     let set = option_values(state, var).await?;
                     if !set.contains(&v) {
-                        return Err(AppError::bad(format!("variable {name}: {v:?} is not an allowed value")));
+                        return Err(AppError::bad(format!(
+                            "variable {name}: {v:?} is not an allowed value"
+                        )));
                     }
                 }
                 v

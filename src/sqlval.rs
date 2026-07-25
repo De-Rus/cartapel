@@ -56,7 +56,10 @@ pub fn value_expr(col: &DbColumn, value: &Value, binds: &mut Binds) -> Result<St
                 "(SELECT coalesce(array_agg(v.value::{elem}), '{{}}'::{elem}[]) FROM jsonb_array_elements_text(${n}::jsonb) v)"
             ))
         }
-        Kind::Binary => Err(AppError::bad(format!("{} is binary and not editable", col.name))),
+        Kind::Binary => Err(AppError::bad(format!(
+            "{} is binary and not editable",
+            col.name
+        ))),
         _ => {
             let text = match value {
                 Value::String(s) => s.clone(),
@@ -72,7 +75,10 @@ pub fn value_expr(col: &DbColumn, value: &Value, binds: &mut Binds) -> Result<St
 
 pub fn cast_of(col: &DbColumn) -> String {
     match col.kind {
-        Kind::Array => format!("{}[]", col.elem_udt.clone().unwrap_or_else(|| "text".into())),
+        Kind::Array => format!(
+            "{}[]",
+            col.elem_udt.clone().unwrap_or_else(|| "text".into())
+        ),
         _ => col.udt.clone(),
     }
 }
@@ -105,7 +111,10 @@ pub fn present_row(row: &mut Value, masked: &[String], binary_cols: &[String]) {
     for b in binary_cols {
         if let Some(v) = map.get_mut(b) {
             if let Value::String(s) = &v {
-                let bytes = s.strip_prefix("\\x").map(|h| h.len() / 2).unwrap_or(s.len());
+                let bytes = s
+                    .strip_prefix("\\x")
+                    .map(|h| h.len() / 2)
+                    .unwrap_or(s.len());
                 *v = serde_json::json!({ "__bytes__": bytes });
             }
         }

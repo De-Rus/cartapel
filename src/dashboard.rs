@@ -119,7 +119,9 @@ pub async fn render_panel(
                         "alert": value.map(|v| alert_of(v, w.alert_above, w.alert_below)).unwrap_or(Value::Null),
                     })
                 }
-                Err(e) => json!({ "id": id, "type": "stat", "label": w.label, "value": Value::Null, "error": e }),
+                Err(e) => {
+                    json!({ "id": id, "type": "stat", "label": w.label, "value": Value::Null, "error": e })
+                }
             }
         }
         PanelKind::Chart => {
@@ -148,7 +150,9 @@ pub async fn render_panel(
                         "format": w.format.clone().unwrap_or_else(|| "number".into()),
                     })
                 }
-                Err(e) => json!({ "id": id, "type": "chart", "label": w.label, "points": [], "error": e }),
+                Err(e) => {
+                    json!({ "id": id, "type": "chart", "label": w.label, "points": [], "error": e })
+                }
             }
         }
         PanelKind::Table => {
@@ -183,7 +187,9 @@ pub async fn render_panel(
                         "link": w.link, "columns": columns, "cols": cols, "rows": rows, "pk": pk,
                     })
                 }
-                Err(e) => json!({ "id": id, "type": "table", "label": w.label, "rows": [], "columns": [], "error": e }),
+                Err(e) => {
+                    json!({ "id": id, "type": "table", "label": w.label, "rows": [], "columns": [], "error": e })
+                }
             }
         }
     };
@@ -228,7 +234,9 @@ pub async fn dashboard_handler(
     let env = crate::vars::resolve(&state, &user, &params).await?;
     let cfg = state.cfg();
     let widgets = render_panels(&state, &cfg.dashboard, &user, &env).await;
-    Ok(Json(json!({ "widgets": widgets, "columns": cfg.dashboard.columns })))
+    Ok(Json(
+        json!({ "widgets": widgets, "columns": cfg.dashboard.columns }),
+    ))
 }
 
 pub async fn page_widgets_handler(
@@ -273,7 +281,9 @@ mod tests {
             "type = \"iframe\"\nlabel = \"Docs\"\nurl = \"https://x.io\"\nw = 2\nh = 2\ncategory = \"Links\"\n",
         )
         .unwrap();
-        let rendered = render_panel(&state, &w, "w0", &Default::default()).await.unwrap();
+        let rendered = render_panel(&state, &w, "w0", &Default::default())
+            .await
+            .unwrap();
         assert_eq!(rendered["type"], json!("iframe"));
         assert_eq!(rendered["w"], json!(2));
         assert_eq!(rendered["h"], json!(2));
@@ -281,9 +291,14 @@ mod tests {
 
         let bare: crate::config::PanelConfig =
             hcl::from_str("type = \"iframe\"\nlabel = \"Docs\"\nurl = \"https://x.io\"\n").unwrap();
-        let rendered = render_panel(&state, &bare, "w0", &Default::default()).await.unwrap();
+        let rendered = render_panel(&state, &bare, "w0", &Default::default())
+            .await
+            .unwrap();
         assert!(rendered.get("w").is_none(), "absent span not emitted");
-        assert!(rendered.get("category").is_none(), "absent category not emitted");
+        assert!(
+            rendered.get("category").is_none(),
+            "absent category not emitted"
+        );
     }
 
     #[test]
@@ -295,7 +310,10 @@ mod tests {
         ];
         assert_eq!(spark_series(&rows), vec![3.0, 5.0, 4.0]);
 
-        let no_v = vec![json!({ "bucket": "a", "n": 7.0 }), json!({ "bucket": "b", "n": 9.0 })];
+        let no_v = vec![
+            json!({ "bucket": "a", "n": 7.0 }),
+            json!({ "bucket": "b", "n": 9.0 }),
+        ];
         assert_eq!(spark_series(&no_v), vec![7.0, 9.0]);
     }
 

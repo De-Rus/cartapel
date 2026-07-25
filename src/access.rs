@@ -59,7 +59,10 @@ pub async fn users_create(
     let id = match state.store.create_user(&email, &body.password, &body.role) {
         Ok(id) => id,
         Err(UserCreateError::Duplicate) => {
-            return Err(AppError(StatusCode::CONFLICT, "email already exists".into()))
+            return Err(AppError(
+                StatusCode::CONFLICT,
+                "email already exists".into(),
+            ))
         }
         Err(UserCreateError::Other(e)) => return Err(AppError::internal(e)),
     };
@@ -70,7 +73,10 @@ pub async fn users_create(
         "user:create",
         Some(&json!({ "email": email, "role": body.role })),
     );
-    Ok((StatusCode::CREATED, Json(json!({ "id": id, "email": email, "role": body.role }))))
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({ "id": id, "email": email, "role": body.role })),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -124,7 +130,10 @@ pub async fn users_update(
                 "password must be at least {MIN_PASSWORD_LEN} characters"
             )));
         }
-        state.store.update_user_password(id, pw).map_err(AppError::internal)?;
+        state
+            .store
+            .update_user_password(id, pw)
+            .map_err(AppError::internal)?;
         changes.insert("password".into(), json!("reset"));
     }
 
@@ -229,7 +238,9 @@ pub(crate) fn validate_definition(state: &AppState, def: &RoleConfig) -> Result<
         if !table_configured(state, table) {
             return Err(AppError::bad(format!("unknown table in editable: {table}")));
         }
-        let Some(dbt) = state.resolve_table(table) else { continue };
+        let Some(dbt) = state.resolve_table(table) else {
+            continue;
+        };
         for col in cols {
             if dbt.column(col).is_none() {
                 return Err(AppError::bad(format!(
@@ -245,7 +256,9 @@ pub(crate) fn validate_definition(state: &AppState, def: &RoleConfig) -> Result<
     }
     for table in def.row_filter.keys() {
         if !table_configured(state, table) {
-            return Err(AppError::bad(format!("unknown table in row_filter: {table}")));
+            return Err(AppError::bad(format!(
+                "unknown table in row_filter: {table}"
+            )));
         }
     }
     Ok(())
@@ -310,14 +323,20 @@ fn write_auth(
         .map_err(|e| AppError::internal(format!("serialize auth config: {e}")))?;
     crate::config::reject_duplicate_labels(&hcl).map_err(AppError::bad)?;
 
-    let writable = state.config_dir.as_deref().map(crate::configedit::dir_writable).unwrap_or(false);
+    let writable = state
+        .config_dir
+        .as_deref()
+        .map(crate::configedit::dir_writable)
+        .unwrap_or(false);
     let Some(dir) = state.config_dir.clone().filter(|_| writable) else {
         return Ok((false, json!({ "ok": false, "writable": false, "hcl": hcl })));
     };
     let _ = std::fs::create_dir_all(dir.join("config"));
     let path = dir.join("config").join("auth.hcl");
     crate::configedit::commit_and_reload(state, &path, &dir, &hcl)?;
-    state.store.config_version_add("config/auth", &hcl, &user.email, None)?;
+    state
+        .store
+        .config_version_add("config/auth", &hcl, &user.email, None)?;
     Ok((true, json!({ "ok": true, "reloaded": true })))
 }
 
@@ -348,7 +367,10 @@ pub async fn roles_create(
         ));
     }
     if name == "admin" || state.cfg().auth.roles.contains_key(&name) {
-        return Err(AppError(StatusCode::CONFLICT, format!("role '{name}' already exists")));
+        return Err(AppError(
+            StatusCode::CONFLICT,
+            format!("role '{name}' already exists"),
+        ));
     }
     validate_definition(&state, &body.definition)?;
     validate_extends(&state, &name, &body.definition)?;
@@ -383,7 +405,9 @@ pub async fn roles_update(
 ) -> Result<Json<Value>, AppError> {
     admin_only(&user)?;
     if name == "admin" {
-        return Err(AppError::forbidden("the built-in admin role cannot be edited"));
+        return Err(AppError::forbidden(
+            "the built-in admin role cannot be edited",
+        ));
     }
     if !state.cfg().auth.roles.contains_key(&name) {
         return Err(AppError::not_found(format!("role '{name}' not found")));
@@ -415,12 +439,19 @@ pub async fn roles_delete(
 ) -> Result<Json<Value>, AppError> {
     admin_only(&user)?;
     if name == "admin" {
-        return Err(AppError::forbidden("the built-in admin role cannot be deleted"));
+        return Err(AppError::forbidden(
+            "the built-in admin role cannot be deleted",
+        ));
     }
     if !state.cfg().auth.roles.contains_key(&name) {
         return Err(AppError::not_found(format!("role '{name}' not found")));
     }
-    let count = state.store.role_user_counts().get(&name).copied().unwrap_or(0);
+    let count = state
+        .store
+        .role_user_counts()
+        .get(&name)
+        .copied()
+        .unwrap_or(0);
     if count > 0 {
         return Err(AppError(
             StatusCode::CONFLICT,
@@ -451,7 +482,9 @@ pub async fn roles_delete(
     if !ok {
         return Ok(Json(out));
     }
-    state.store.audit(&user.email, "roles", Some(&name), "role:delete", None);
+    state
+        .store
+        .audit(&user.email, "roles", Some(&name), "role:delete", None);
     Ok(Json(out))
 }
 
@@ -549,7 +582,9 @@ mod tests {
     }
 
     fn state_from(cfg: ConfigDir, config_dir: Option<std::path::PathBuf>) -> Arc<AppState> {
-        let pg = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://x").unwrap();
+        let pg = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://x")
+            .unwrap();
         Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
@@ -576,7 +611,10 @@ mod tests {
     }
 
     fn admin() -> CurrentUser {
-        CurrentUser { email: "a@x.io".into(), role: "admin".into() }
+        CurrentUser {
+            email: "a@x.io".into(),
+            role: "admin".into(),
+        }
     }
 
     /// A state whose config lives in a fresh writable temp dir (with an empty
@@ -601,24 +639,35 @@ mod tests {
         let mut cfg = (*state.cfg()).clone();
         cfg.auth.roles.insert(name.into(), def.clone());
         state.cfg.store(Arc::new(cfg));
-        CurrentUser { email: "u@x.io".into(), role: name.into() }
+        CurrentUser {
+            email: "u@x.io".into(),
+            role: name.into(),
+        }
     }
 
     #[tokio::test]
     async fn last_admin_cannot_be_demoted_or_deleted() {
         let state = test_state();
-        let id = state.store.create_user("admin@x.io", "password1", "admin").unwrap();
+        let id = state
+            .store
+            .create_user("admin@x.io", "password1", "admin")
+            .unwrap();
         assert_eq!(state.store.count_admins().unwrap(), 1);
 
-        let demote =
-            state.store.user_by_id(id).map(|(_, r)| r == "admin" && state.store.count_admins().unwrap() <= 1);
+        let demote = state
+            .store
+            .user_by_id(id)
+            .map(|(_, r)| r == "admin" && state.store.count_admins().unwrap() <= 1);
         assert_eq!(demote, Some(true));
     }
 
     #[tokio::test]
     async fn create_user_rejects_duplicate() {
         let state = test_state();
-        state.store.create_user("a@x.io", "password1", "admin").unwrap();
+        state
+            .store
+            .create_user("a@x.io", "password1", "admin")
+            .unwrap();
         let dup = state.store.create_user("a@x.io", "password2", "admin");
         assert!(matches!(dup, Err(UserCreateError::Duplicate)));
     }
@@ -642,7 +691,8 @@ mod tests {
         def.tables.insert("bots".into(), "read".into());
         def.actions.push("bots.halt".into());
         def.masked.insert("bots".into(), vec!["secret".into()]);
-        def.row_filter.insert("bots".into(), "owner_email = {actor.email}".into());
+        def.row_filter
+            .insert("bots".into(), "owner_email = {actor.email}".into());
         assert!(validate_definition(&state, &def).is_ok());
     }
 
@@ -652,20 +702,35 @@ mod tests {
         let mut def = RoleConfig::default();
         def.tables.insert("bots".into(), "read".into());
         def.masked.insert("bots".into(), vec!["secret".into()]);
-        def.row_filter.insert("bots".into(), "owner_email = {actor.email}".into());
+        def.row_filter
+            .insert("bots".into(), "owner_email = {actor.email}".into());
         let _ = make_config_role(&state, "support", &def);
 
-        let u = CurrentUser { email: "admin@example.com".into(), role: "support".into() };
+        let u = CurrentUser {
+            email: "admin@example.com".into(),
+            role: "support".into(),
+        };
         assert_eq!(state.role_level(&u, "bots"), crate::state::Level::Read);
-        assert_eq!(state.role_level(&u, "instruments"), crate::state::Level::None);
-        assert!(state.masked_columns(&u, "bots").contains(&"secret".to_string()));
+        assert_eq!(
+            state.role_level(&u, "instruments"),
+            crate::state::Level::None
+        );
+        assert!(state
+            .masked_columns(&u, "bots")
+            .contains(&"secret".to_string()));
         assert_eq!(
             state.row_filter(&u, "bots"),
             Some("owner_email = 'admin@example.com'".to_string())
         );
 
-        let unknown = CurrentUser { email: "x@x.io".into(), role: "ghost".into() };
-        assert_eq!(state.role_level(&unknown, "bots"), crate::state::Level::None);
+        let unknown = CurrentUser {
+            email: "x@x.io".into(),
+            role: "ghost".into(),
+        };
+        assert_eq!(
+            state.role_level(&unknown, "bots"),
+            crate::state::Level::None
+        );
     }
 
     #[tokio::test]
@@ -675,14 +740,19 @@ mod tests {
         def.tables.insert("bots".into(), "write".into());
         def.actions.push("bots.halt".into());
         let u = make_config_role(&state, "ops", &def);
-        assert!(state.allowed_actions(&u, "bots").contains(&"halt".to_string()));
+        assert!(state
+            .allowed_actions(&u, "bots")
+            .contains(&"halt".to_string()));
     }
 
     #[tokio::test]
     async fn role_user_counts_reflects_assignment() {
         let state = test_state();
         let _ = make_config_role(&state, "ops", &RoleConfig::default());
-        state.store.create_user("o@x.io", "password1", "ops").unwrap();
+        state
+            .store
+            .create_user("o@x.io", "password1", "ops")
+            .unwrap();
         assert_eq!(state.store.role_user_counts().get("ops").copied(), Some(1));
     }
 
@@ -721,7 +791,12 @@ mod tests {
         def.tables.insert("bots".into(), "write".into());
         def.perms.insert(
             "bots".into(),
-            TablePerm { view: Some(true), create: Some(false), update: Some(true), delete: Some(false) },
+            TablePerm {
+                view: Some(true),
+                create: Some(false),
+                update: Some(true),
+                delete: Some(false),
+            },
         );
         let u = make_config_role(&state, "support", &def);
         let p = state.table_perms(&u, "bots");
@@ -737,12 +812,20 @@ mod tests {
         // Ask for create even though the table config forbids it.
         def.perms.insert(
             "locked".into(),
-            TablePerm { view: None, create: Some(true), update: None, delete: None },
+            TablePerm {
+                view: None,
+                create: Some(true),
+                update: None,
+                delete: None,
+            },
         );
         let u = make_config_role(&state, "clamp", &def);
         let p = state.table_perms(&u, "locked");
         assert!(p.view && p.update && p.delete);
-        assert!(!p.create, "config create=false must clamp perms create=true");
+        assert!(
+            !p.create,
+            "config create=false must clamp perms create=true"
+        );
     }
 
     #[tokio::test]
@@ -800,8 +883,14 @@ mod tests {
 
         let inlines = meta["inlines"].as_array().unwrap();
         let self_inline = inlines.iter().find(|i| i["table"] == "bots").unwrap();
-        assert_eq!(self_inline["columns"], serde_json::json!(["mode", "status"]));
-        assert_eq!(self_inline["can_create"], true, "bots has no create ceiling");
+        assert_eq!(
+            self_inline["columns"],
+            serde_json::json!(["mode", "status"])
+        );
+        assert_eq!(
+            self_inline["can_create"], true,
+            "bots has no create ceiling"
+        );
         assert_eq!(self_inline["can_delete"], true);
 
         let locked_inline = inlines.iter().find(|i| i["table"] == "locked").unwrap();
@@ -861,7 +950,12 @@ mod tests {
         // Only pin delete=false; the rest defer to coarse write.
         def.perms.insert(
             "bots".into(),
-            TablePerm { view: None, create: None, update: None, delete: Some(false) },
+            TablePerm {
+                view: None,
+                create: None,
+                update: None,
+                delete: Some(false),
+            },
         );
         let u = make_config_role(&state, "nodelete", &def);
         let p = state.table_perms(&u, "bots");
@@ -874,7 +968,8 @@ mod tests {
         let state = test_state();
         let mut def = RoleConfig::default();
         def.tables.insert("bots".into(), "write".into());
-        def.editable.insert("bots".into(), vec!["mode".into(), "status".into()]);
+        def.editable
+            .insert("bots".into(), vec!["mode".into(), "status".into()]);
         let u = make_config_role(&state, "editrole", &def);
 
         assert_eq!(
@@ -897,7 +992,10 @@ mod tests {
     #[tokio::test]
     async fn admin_bypasses_granular_perms_and_editable() {
         let state = test_state();
-        let admin = CurrentUser { email: "a@x.io".into(), role: "admin".into() };
+        let admin = CurrentUser {
+            email: "a@x.io".into(),
+            role: "admin".into(),
+        };
         let p = state.table_perms(&admin, "bots");
         assert!(p.view && p.create && p.update && p.delete);
         // Even on the create-capped table, admin still can't exceed the config ceiling.
@@ -913,7 +1011,10 @@ mod tests {
         let mut def = RoleConfig::default();
         def.perms.insert(
             "nope".into(),
-            TablePerm { view: Some(true), ..Default::default() },
+            TablePerm {
+                view: Some(true),
+                ..Default::default()
+            },
         );
         assert!(validate_definition(&state, &def).is_err());
 
@@ -930,9 +1031,15 @@ mod tests {
         def.tables.insert("bots".into(), "write".into());
         def.perms.insert(
             "bots".into(),
-            TablePerm { view: Some(true), create: Some(false), update: Some(true), delete: Some(false) },
+            TablePerm {
+                view: Some(true),
+                create: Some(false),
+                update: Some(true),
+                delete: Some(false),
+            },
         );
-        def.editable.insert("bots".into(), vec!["mode".into(), "status".into()]);
+        def.editable
+            .insert("bots".into(), vec!["mode".into(), "status".into()]);
         assert!(validate_definition(&state, &def).is_ok());
     }
 
@@ -950,7 +1057,13 @@ mod tests {
         assert!(validate_definition(&state, &def).is_err());
 
         let mut def = RoleConfig::default();
-        def.perms.insert("bots".into(), TablePerm { view: Some(true), ..Default::default() });
+        def.perms.insert(
+            "bots".into(),
+            TablePerm {
+                view: Some(true),
+                ..Default::default()
+            },
+        );
         assert!(validate_definition(&state, &def).is_err());
     }
 
@@ -958,7 +1071,9 @@ mod tests {
     async fn unconfigured_table_is_absent_and_404s() {
         let state = test_state();
         // `locked` is introspected AND configured — visible + resolvable.
-        assert!(state.visible_tables(&admin()).contains(&"locked".to_string()));
+        assert!(state
+            .visible_tables(&admin())
+            .contains(&"locked".to_string()));
         assert!(state.readable_table(&admin(), "locked").is_ok());
 
         // Drop `locked`'s config: still introspected, but no longer part of the admin.
@@ -966,9 +1081,15 @@ mod tests {
         cfg.tables.remove("locked");
         state.cfg.store(Arc::new(cfg));
 
-        assert!(!state.visible_tables(&admin()).contains(&"locked".to_string()));
+        assert!(!state
+            .visible_tables(&admin())
+            .contains(&"locked".to_string()));
         let err = state.readable_table(&admin(), "locked").unwrap_err();
-        assert_eq!(err.0, StatusCode::NOT_FOUND, "direct URL to an unconfigured table 404s");
+        assert_eq!(
+            err.0,
+            StatusCode::NOT_FOUND,
+            "direct URL to an unconfigured table 404s"
+        );
     }
 
     #[tokio::test]
@@ -978,22 +1099,39 @@ mod tests {
         def.tables.insert("bots".into(), "write".into());
         def.perms.insert(
             "bots".into(),
-            TablePerm { view: Some(true), create: Some(false), update: Some(true), delete: Some(false) },
+            TablePerm {
+                view: Some(true),
+                create: Some(false),
+                update: Some(true),
+                delete: Some(false),
+            },
         );
         def.editable.insert("bots".into(), vec!["mode".into()]);
         let u = make_config_role(&state, "granular", &def);
 
         let p = state.table_perms(&u, "bots");
         assert!(p.view && p.update && !p.create && !p.delete);
-        assert_eq!(state.editable_columns(&u, "bots"), Some(vec!["mode".to_string()]));
+        assert_eq!(
+            state.editable_columns(&u, "bots"),
+            Some(vec!["mode".to_string()])
+        );
 
         let stored = state.resolve_role("granular").unwrap();
         assert!(stored.perms.get("bots").unwrap().update == Some(true));
-        assert_eq!(stored.editable.get("bots").unwrap(), &vec!["mode".to_string()]);
+        assert_eq!(
+            stored.editable.get("bots").unwrap(),
+            &vec!["mode".to_string()]
+        );
     }
 
     fn read_role_def(state: &AppState, name: &str) -> RoleConfig {
-        state.cfg().auth.roles.get(name).cloned().expect("role present")
+        state
+            .cfg()
+            .auth
+            .roles
+            .get(name)
+            .cloned()
+            .expect("role present")
     }
 
     #[tokio::test]
@@ -1006,7 +1144,10 @@ mod tests {
         let (code, body) = roles_create(
             State(state.clone()),
             admin(),
-            Json(CreateRole { name: "support".into(), definition: def }),
+            Json(CreateRole {
+                name: "support".into(),
+                definition: def,
+            }),
         )
         .await
         .unwrap();
@@ -1014,10 +1155,19 @@ mod tests {
         assert_eq!(body.0["ok"], json!(true));
 
         let on_disk = std::fs::read_to_string(dir.join("config").join("auth.hcl")).unwrap();
-        assert!(on_disk.contains("role \"support\""), "written to config/auth.hcl:\n{on_disk}");
-        assert!(state.cfg().auth.roles.contains_key("support"), "live config picked it up");
+        assert!(
+            on_disk.contains("role \"support\""),
+            "written to config/auth.hcl:\n{on_disk}"
+        );
+        assert!(
+            state.cfg().auth.roles.contains_key("support"),
+            "live config picked it up"
+        );
         assert_eq!(
-            state.store.config_versions_list("config/auth").unwrap()["versions"].as_array().unwrap().len(),
+            state.store.config_versions_list("config/auth").unwrap()["versions"]
+                .as_array()
+                .unwrap()
+                .len(),
             1,
             "a version was snapshotted under config/auth",
         );
@@ -1031,7 +1181,10 @@ mod tests {
         let _ = roles_create(
             State(state.clone()),
             admin(),
-            Json(CreateRole { name: "support".into(), definition: def }),
+            Json(CreateRole {
+                name: "support".into(),
+                definition: def,
+            }),
         )
         .await
         .unwrap();
@@ -1041,7 +1194,12 @@ mod tests {
         def2.tables.insert("bots".into(), "write".into());
         def2.perms.insert(
             "bots".into(),
-            TablePerm { view: Some(true), create: Some(false), update: Some(true), delete: Some(false) },
+            TablePerm {
+                view: Some(true),
+                create: Some(false),
+                update: Some(true),
+                delete: Some(false),
+            },
         );
         def2.editable.insert("bots".into(), vec!["mode".into()]);
         let out = roles_update(
@@ -1057,7 +1215,10 @@ mod tests {
         let stored = read_role_def(&state, "support");
         assert_eq!(stored.tables.get("bots").map(String::as_str), Some("write"));
         assert_eq!(stored.perms.get("bots").unwrap().update, Some(true));
-        assert_eq!(stored.editable.get("bots").unwrap(), &vec!["mode".to_string()]);
+        assert_eq!(
+            stored.editable.get("bots").unwrap(),
+            &vec!["mode".to_string()]
+        );
     }
 
     #[tokio::test]
@@ -1066,17 +1227,28 @@ mod tests {
         let _ = roles_create(
             State(state.clone()),
             admin(),
-            Json(CreateRole { name: "support".into(), definition: RoleConfig::default() }),
+            Json(CreateRole {
+                name: "support".into(),
+                definition: RoleConfig::default(),
+            }),
         )
         .await
         .unwrap();
         assert!(state.cfg().auth.roles.contains_key("support"));
 
-        let out = roles_delete(State(state.clone()), admin(), Path("support".into())).await.unwrap();
+        let out = roles_delete(State(state.clone()), admin(), Path("support".into()))
+            .await
+            .unwrap();
         assert_eq!(out.0["ok"], json!(true));
-        assert!(!state.cfg().auth.roles.contains_key("support"), "removed from live config");
+        assert!(
+            !state.cfg().auth.roles.contains_key("support"),
+            "removed from live config"
+        );
         let on_disk = std::fs::read_to_string(dir.join("config").join("auth.hcl")).unwrap();
-        assert!(!on_disk.contains("role \"support\""), "removed from disk:\n{on_disk}");
+        assert!(
+            !on_disk.contains("role \"support\""),
+            "removed from disk:\n{on_disk}"
+        );
     }
 
     #[tokio::test]
@@ -1085,15 +1257,24 @@ mod tests {
         let _ = roles_create(
             State(state.clone()),
             admin(),
-            Json(CreateRole { name: "support".into(), definition: RoleConfig::default() }),
+            Json(CreateRole {
+                name: "support".into(),
+                definition: RoleConfig::default(),
+            }),
         )
         .await
         .unwrap();
-        state.store.create_user("s@x.io", "password1", "support").unwrap();
+        state
+            .store
+            .create_user("s@x.io", "password1", "support")
+            .unwrap();
 
         let r = roles_delete(State(state.clone()), admin(), Path("support".into())).await;
         assert!(matches!(r, Err(AppError(StatusCode::CONFLICT, _))));
-        assert!(state.cfg().auth.roles.contains_key("support"), "role kept while assigned");
+        assert!(
+            state.cfg().auth.roles.contains_key("support"),
+            "role kept while assigned"
+        );
     }
 
     #[tokio::test]
@@ -1103,7 +1284,9 @@ mod tests {
             State(state.clone()),
             admin(),
             Path("admin".into()),
-            Json(UpdateRole { definition: RoleConfig::default() }),
+            Json(UpdateRole {
+                definition: RoleConfig::default(),
+            }),
         )
         .await;
         assert!(matches!(u, Err(AppError(StatusCode::FORBIDDEN, _))));
@@ -1127,7 +1310,10 @@ mod tests {
         let r = roles_create(
             State(state.clone()),
             admin(),
-            Json(CreateRole { name: "support".into(), definition: def }),
+            Json(CreateRole {
+                name: "support".into(),
+                definition: def,
+            }),
         )
         .await;
         assert!(matches!(r, Err(AppError(StatusCode::BAD_REQUEST, _))));
@@ -1136,8 +1322,14 @@ mod tests {
             before,
             "auth.hcl reverted byte-for-byte",
         );
-        assert!(!state.cfg().auth.roles.contains_key("support"), "failed write never went live");
-        assert!(state.cfg().auth.roles.contains_key("seed"), "prior role still live");
+        assert!(
+            !state.cfg().auth.roles.contains_key("support"),
+            "failed write never went live"
+        );
+        assert!(
+            state.cfg().auth.roles.contains_key("seed"),
+            "prior role still live"
+        );
     }
 
     #[tokio::test]
@@ -1146,7 +1338,10 @@ mod tests {
         let out = roles_create(
             State(state.clone()),
             admin(),
-            Json(CreateRole { name: "support".into(), definition: RoleConfig::default() }),
+            Json(CreateRole {
+                name: "support".into(),
+                definition: RoleConfig::default(),
+            }),
         )
         .await
         .unwrap();
@@ -1162,13 +1357,17 @@ mod tests {
         let (state, dir) = writable_state();
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555)).unwrap();
 
-        let before =
-            state.store.audit_list(Some("roles"), 1, 10).unwrap()["total"].as_i64().unwrap();
+        let before = state.store.audit_list(Some("roles"), 1, 10).unwrap()["total"]
+            .as_i64()
+            .unwrap();
 
         let (code, body) = roles_create(
             State(state.clone()),
             admin(),
-            Json(CreateRole { name: "support".into(), definition: RoleConfig::default() }),
+            Json(CreateRole {
+                name: "support".into(),
+                definition: RoleConfig::default(),
+            }),
         )
         .await
         .unwrap();
@@ -1178,10 +1377,14 @@ mod tests {
         assert_eq!(body.0["ok"], json!(false));
         assert_eq!(body.0["writable"], json!(false));
         assert_ne!(code, StatusCode::CREATED, "read-only write must not 201");
-        let after =
-            state.store.audit_list(Some("roles"), 1, 10).unwrap()["total"].as_i64().unwrap();
+        let after = state.store.audit_list(Some("roles"), 1, 10).unwrap()["total"]
+            .as_i64()
+            .unwrap();
         assert_eq!(before, after, "no audit row for a write that never applied");
-        assert!(!state.cfg().auth.roles.contains_key("support"), "role never went live");
+        assert!(
+            !state.cfg().auth.roles.contains_key("support"),
+            "role never went live"
+        );
     }
 
     #[tokio::test]
@@ -1204,7 +1407,9 @@ mod tests {
         let r = state.resolve_role("support").unwrap();
         assert_eq!(r.tables.get("bots").map(String::as_str), Some("write"));
         assert_eq!(r.tables.get("locked").map(String::as_str), Some("read"));
-        assert!(r.actions.contains(&"export".to_string()) && r.actions.contains(&"notify".to_string()));
+        assert!(
+            r.actions.contains(&"export".to_string()) && r.actions.contains(&"notify".to_string())
+        );
         assert!(r.extends.is_none(), "resolution flattens the chain");
     }
 
@@ -1216,7 +1421,10 @@ mod tests {
         let r = roles_create(
             State(state.clone()),
             admin(),
-            Json(CreateRole { name: "support".into(), definition: def }),
+            Json(CreateRole {
+                name: "support".into(),
+                definition: def,
+            }),
         )
         .await;
         let e = r.err().expect("unknown parent must be rejected");
@@ -1232,7 +1440,10 @@ mod tests {
         roles_create(
             State(state.clone()),
             admin(),
-            Json(CreateRole { name: "a".into(), definition: a }),
+            Json(CreateRole {
+                name: "a".into(),
+                definition: a,
+            }),
         )
         .await
         .unwrap();
@@ -1241,7 +1452,10 @@ mod tests {
         roles_create(
             State(state.clone()),
             admin(),
-            Json(CreateRole { name: "b".into(), definition: b }),
+            Json(CreateRole {
+                name: "b".into(),
+                definition: b,
+            }),
         )
         .await
         .unwrap();

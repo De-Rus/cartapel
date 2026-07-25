@@ -1,10 +1,10 @@
+use crate::config::RoleConfig;
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::Argon2;
 use chrono::Utc;
 use rand::RngCore;
 use rusqlite::{Connection, OptionalExtension};
 use rusqlite_migration::{Migrations, M};
-use crate::config::RoleConfig;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -106,9 +106,12 @@ impl Store {
     pub fn open(data_dir: &Path) -> Result<Self, String> {
         std::fs::create_dir_all(data_dir).map_err(|e| e.to_string())?;
         let mut conn = Connection::open(data_dir.join("steward.db")).map_err(|e| e.to_string())?;
-        conn.pragma_update(None, "journal_mode", "WAL").map_err(|e| e.to_string())?;
+        conn.pragma_update(None, "journal_mode", "WAL")
+            .map_err(|e| e.to_string())?;
         MIGRATIONS.to_latest(&mut conn).map_err(|e| e.to_string())?;
-        Ok(Self { conn: Mutex::new(conn) })
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
     }
 
     pub fn user_count(&self) -> rusqlite::Result<i64> {
@@ -146,8 +149,7 @@ impl Store {
 
     pub fn list_users(&self) -> rusqlite::Result<Value> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt =
-            conn.prepare("SELECT id, email, role, created_at FROM users ORDER BY id")?;
+        let mut stmt = conn.prepare("SELECT id, email, role, created_at FROM users ORDER BY id")?;
         let mut q = stmt.query([])?;
         let mut rows = Vec::new();
         while let Some(r) = q.next()? {
@@ -171,7 +173,12 @@ impl Store {
             .ok()
     }
 
-    pub fn create_user(&self, email: &str, password: &str, role: &str) -> Result<i64, UserCreateError> {
+    pub fn create_user(
+        &self,
+        email: &str,
+        password: &str,
+        role: &str,
+    ) -> Result<i64, UserCreateError> {
         let hash = Self::hash_password(password).map_err(UserCreateError::Other)?;
         let conn = self.conn.lock().unwrap();
         conn.execute(
@@ -192,23 +199,34 @@ impl Store {
     /// Atomic (single mutex hold) check-then-mutate for the last-admin invariant.
     /// `new_role = None` means delete. Returns the outcome so the handler can map
     /// to 404 / 409 / success without a separate racy count.
-    pub fn guarded_admin_mutation(&self, id: i64, new_role: Option<&str>) -> rusqlite::Result<AdminGuard> {
+    pub fn guarded_admin_mutation(
+        &self,
+        id: i64,
+        new_role: Option<&str>,
+    ) -> rusqlite::Result<AdminGuard> {
         let conn = self.conn.lock().unwrap();
         let current: Option<String> = conn
             .query_row("SELECT role FROM users WHERE id = ?1", [id], |r| r.get(0))
             .ok();
-        let Some(current) = current else { return Ok(AdminGuard::NotFound) };
+        let Some(current) = current else {
+            return Ok(AdminGuard::NotFound);
+        };
         let losing_admin = current == "admin" && new_role != Some("admin");
         if losing_admin {
             let admins: i64 =
-                conn.query_row("SELECT count(*) FROM users WHERE role = 'admin'", [], |r| r.get(0))?;
+                conn.query_row("SELECT count(*) FROM users WHERE role = 'admin'", [], |r| {
+                    r.get(0)
+                })?;
             if admins <= 1 {
                 return Ok(AdminGuard::LastAdmin);
             }
         }
         match new_role {
             Some(role) => {
-                conn.execute("UPDATE users SET role = ?1 WHERE id = ?2", rusqlite::params![role, id])?;
+                conn.execute(
+                    "UPDATE users SET role = ?1 WHERE id = ?2",
+                    rusqlite::params![role, id],
+                )?;
             }
             None => {
                 conn.execute("DELETE FROM users WHERE id = ?1", [id])?;
@@ -222,17 +240,20 @@ impl Store {
         self.conn
             .lock()
             .unwrap()
-            .execute("UPDATE users SET pw_hash = ?1 WHERE id = ?2", rusqlite::params![hash, id])
+            .execute(
+                "UPDATE users SET pw_hash = ?1 WHERE id = ?2",
+                rusqlite::params![hash, id],
+            )
             .map_err(|e| e.to_string())
     }
 
-
     #[allow(dead_code)]
     pub fn count_admins(&self) -> rusqlite::Result<i64> {
-        self.conn
-            .lock()
-            .unwrap()
-            .query_row("SELECT count(*) FROM users WHERE role = 'admin'", [], |r| r.get(0))
+        self.conn.lock().unwrap().query_row(
+            "SELECT count(*) FROM users WHERE role = 'admin'",
+            [],
+            |r| r.get(0),
+        )
     }
 
     /// One-time transitional read of the legacy `roles` table for the config
@@ -256,7 +277,9 @@ impl Store {
         let Ok(mut stmt) = conn.prepare("SELECT name, definition FROM roles ORDER BY name") else {
             return (Vec::new(), Vec::new());
         };
-        let Ok(mut q) = stmt.query([]) else { return (Vec::new(), Vec::new()) };
+        let Ok(mut q) = stmt.query([]) else {
+            return (Vec::new(), Vec::new());
+        };
         let mut out = Vec::new();
         let mut failed = Vec::new();
         while let Ok(Some(r)) = q.next() {
@@ -273,7 +296,11 @@ impl Store {
 
     /// Drop the legacy `roles` table once its rows have been ported to config.
     pub fn drop_legacy_roles(&self) {
-        let _ = self.conn.lock().unwrap().execute("DROP TABLE IF EXISTS roles", []);
+        let _ = self
+            .conn
+            .lock()
+            .unwrap()
+            .execute("DROP TABLE IF EXISTS roles", []);
     }
 
     #[cfg(test)]
@@ -296,7 +323,9 @@ impl Store {
         let Ok(mut stmt) = conn.prepare("SELECT role, count(*) FROM users GROUP BY role") else {
             return HashMap::new();
         };
-        let Ok(mut q) = stmt.query([]) else { return HashMap::new() };
+        let Ok(mut q) = stmt.query([]) else {
+            return HashMap::new();
+        };
         let mut out = HashMap::new();
         while let Ok(Some(r)) = q.next() {
             if let (Ok(role), Ok(n)) = (r.get::<_, String>(0), r.get::<_, i64>(1)) {
@@ -373,7 +402,14 @@ impl Store {
     }
 
     /// Returns the entry id; 0 on failure (audit never blocks the mutation).
-    pub fn audit(&self, actor: &str, table: &str, pk: Option<&str>, action: &str, changes: Option<&Value>) -> i64 {
+    pub fn audit(
+        &self,
+        actor: &str,
+        table: &str,
+        pk: Option<&str>,
+        action: &str,
+        changes: Option<&Value>,
+    ) -> i64 {
         let conn = self.conn.lock().unwrap();
         let ok = conn
             .execute(
@@ -389,7 +425,11 @@ impl Store {
                 ],
             )
             .is_ok();
-        if ok { conn.last_insert_rowid() } else { 0 }
+        if ok {
+            conn.last_insert_rowid()
+        } else {
+            0
+        }
     }
 
     pub fn audit_entry(&self, id: i64) -> rusqlite::Result<Option<AuditEntry>> {
@@ -438,7 +478,10 @@ impl Store {
     pub fn views_list(&self, owner: &str, table: Option<&str>) -> rusqlite::Result<Value> {
         let conn = self.conn.lock().unwrap();
         let (where_extra, params): (&str, Vec<String>) = match table {
-            Some(t) => ("AND table_name = ?2", vec![owner.to_string(), t.to_string()]),
+            Some(t) => (
+                "AND table_name = ?2",
+                vec![owner.to_string(), t.to_string()],
+            ),
             None => ("", vec![owner.to_string()]),
         };
         let sql = format!(
@@ -476,7 +519,14 @@ impl Store {
         conn.execute(
             "INSERT INTO saved_views (owner_email, table_name, name, query, shared, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            rusqlite::params![owner, table, name, query, shared as i64, Utc::now().to_rfc3339()],
+            rusqlite::params![
+                owner,
+                table,
+                name,
+                query,
+                shared as i64,
+                Utc::now().to_rfc3339()
+            ],
         )?;
         Ok(conn.last_insert_rowid())
     }
@@ -554,7 +604,10 @@ impl Store {
         note: Option<&str>,
     ) -> rusqlite::Result<i64> {
         let conn = self.conn.lock().unwrap();
-        conn.execute("UPDATE config_versions SET published = 0 WHERE table_name = ?1", [table])?;
+        conn.execute(
+            "UPDATE config_versions SET published = 0 WHERE table_name = ?1",
+            [table],
+        )?;
         conn.execute(
             "INSERT INTO config_versions (table_name, toml, actor, note, created_at, published)
              VALUES (?1, ?2, ?3, ?4, ?5, 1)",
@@ -616,8 +669,11 @@ impl Store {
             )
             .ok();
         let toml = toml?;
-        conn.execute("UPDATE config_versions SET published = 0 WHERE table_name = ?1", [table])
-            .ok()?;
+        conn.execute(
+            "UPDATE config_versions SET published = 0 WHERE table_name = ?1",
+            [table],
+        )
+        .ok()?;
         conn.execute(
             "UPDATE config_versions SET published = 1 WHERE id = ?1 AND table_name = ?2",
             rusqlite::params![id, table],
@@ -656,7 +712,9 @@ mod tests {
                 "users",
             ]
         );
-        let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
+        let version: i64 = conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(version, 1);
     }
 
@@ -685,7 +743,13 @@ mod tests {
     fn saved_views_round_trip() {
         let store = Store::open_memory();
         let id = store
-            .view_create("admin@example.com", "bots", "Active bots", "f_active=1&sort=-id", false)
+            .view_create(
+                "admin@example.com",
+                "bots",
+                "Active bots",
+                "f_active=1&sort=-id",
+                false,
+            )
             .unwrap();
         let other = store
             .view_create("someone@x.io", "bots", "Shared view", "q=btc", true)
@@ -710,7 +774,9 @@ mod tests {
         assert_eq!(shared_row["shared"], serde_json::json!(true));
 
         // table filter isolates
-        let empty = store.views_list("admin@example.com", Some("orders")).unwrap();
+        let empty = store
+            .views_list("admin@example.com", Some("orders"))
+            .unwrap();
         assert!(empty["rows"].as_array().unwrap().is_empty());
 
         let (owner, table) = store.view_meta(id).unwrap();
@@ -739,8 +805,12 @@ mod tests {
     #[test]
     fn config_version_add_publishes_newest_and_unsets_others() {
         let store = Store::open_memory();
-        let v1 = store.config_version_add("bots", "label = \"A\"\n", "a@x.io", None).unwrap();
-        let v2 = store.config_version_add("bots", "label = \"B\"\n", "a@x.io", Some("second")).unwrap();
+        let v1 = store
+            .config_version_add("bots", "label = \"A\"\n", "a@x.io", None)
+            .unwrap();
+        let v2 = store
+            .config_version_add("bots", "label = \"B\"\n", "a@x.io", Some("second"))
+            .unwrap();
 
         let out = store.config_versions_list("bots").unwrap();
         let rows = out["versions"].as_array().unwrap();
@@ -748,7 +818,10 @@ mod tests {
         assert_eq!(rows[0]["id"], serde_json::json!(v2));
         assert_eq!(rows[1]["id"], serde_json::json!(v1));
         assert!(rows[0].get("toml").is_none());
-        assert_eq!(rows[0]["bytes"], serde_json::json!("label = \"B\"\n".len() as i64));
+        assert_eq!(
+            rows[0]["bytes"],
+            serde_json::json!("label = \"B\"\n".len() as i64)
+        );
         assert_eq!(rows[0]["note"], serde_json::json!("second"));
         // exactly the newest is published
         assert_eq!(rows[0]["published"], serde_json::json!(true));
@@ -758,8 +831,13 @@ mod tests {
     #[test]
     fn config_version_get_is_scoped_to_table() {
         let store = Store::open_memory();
-        let id = store.config_version_add("bots", "label = \"A\"\n", "a@x.io", None).unwrap();
-        assert_eq!(store.config_version_get("bots", id).as_deref(), Some("label = \"A\"\n"));
+        let id = store
+            .config_version_add("bots", "label = \"A\"\n", "a@x.io", None)
+            .unwrap();
+        assert_eq!(
+            store.config_version_get("bots", id).as_deref(),
+            Some("label = \"A\"\n")
+        );
         // same id, wrong table → None
         assert!(store.config_version_get("orders", id).is_none());
         assert!(store.config_version_get("bots", 99999).is_none());
@@ -768,17 +846,27 @@ mod tests {
     #[test]
     fn config_version_publish_flips_published_and_returns_toml() {
         let store = Store::open_memory();
-        let v1 = store.config_version_add("bots", "label = \"A\"\n", "a@x.io", None).unwrap();
-        let _v2 = store.config_version_add("bots", "label = \"B\"\n", "a@x.io", None).unwrap();
+        let v1 = store
+            .config_version_add("bots", "label = \"A\"\n", "a@x.io", None)
+            .unwrap();
+        let _v2 = store
+            .config_version_add("bots", "label = \"B\"\n", "a@x.io", None)
+            .unwrap();
 
         let toml = store.config_version_publish("bots", v1);
         assert_eq!(toml.as_deref(), Some("label = \"A\"\n"));
 
         let out = store.config_versions_list("bots").unwrap();
         let rows = out["versions"].as_array().unwrap();
-        let r1 = rows.iter().find(|r| r["id"] == serde_json::json!(v1)).unwrap();
+        let r1 = rows
+            .iter()
+            .find(|r| r["id"] == serde_json::json!(v1))
+            .unwrap();
         assert_eq!(r1["published"], serde_json::json!(true));
-        let published_count = rows.iter().filter(|r| r["published"] == serde_json::json!(true)).count();
+        let published_count = rows
+            .iter()
+            .filter(|r| r["published"] == serde_json::json!(true))
+            .count();
         assert_eq!(published_count, 1);
 
         // wrong table / missing → None, nothing published for it

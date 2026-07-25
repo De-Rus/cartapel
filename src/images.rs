@@ -13,11 +13,7 @@ use std::sync::Arc;
 
 const MAX_UPLOAD: usize = 8 * 1024 * 1024;
 
-fn image_cfg(
-    state: &AppState,
-    table: &str,
-    col: &str,
-) -> Option<crate::config::ImageConfig> {
+fn image_cfg(state: &AppState, table: &str, col: &str) -> Option<crate::config::ImageConfig> {
     table_config(state, table)
         .fields
         .get(col)
@@ -108,9 +104,16 @@ pub async fn put_image(
     let (path, name) = resolve_path(&state, &user, &table, &col, &pk).await?;
 
     let mut raw: Option<Bytes> = None;
-    while let Some(field) = multipart.next_field().await.map_err(|e| AppError::bad(e.to_string()))? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::bad(e.to_string()))?
+    {
         if field.name() == Some("file") {
-            let data = field.bytes().await.map_err(|e| AppError::bad(e.to_string()))?;
+            let data = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::bad(e.to_string()))?;
             if data.len() > MAX_UPLOAD {
                 return Err(AppError::bad("image too large (max 8MB)"));
             }

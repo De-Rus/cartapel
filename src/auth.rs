@@ -47,9 +47,14 @@ impl FromRequestParts<Arc<AppState>> for CurrentUser {
             {
                 if state.cfg().auth.roles.contains_key(as_role) {
                     if !matches!(parts.method, Method::GET | Method::HEAD) {
-                        return Err(AppError::forbidden("read-only while viewing as another role"));
+                        return Err(AppError::forbidden(
+                            "read-only while viewing as another role",
+                        ));
                     }
-                    return Ok(CurrentUser { email, role: as_role.to_string() });
+                    return Ok(CurrentUser {
+                        email,
+                        role: as_role.to_string(),
+                    });
                 }
             }
         }
@@ -111,7 +116,9 @@ pub async fn login_handler(
         }
     }
 
-    let Some((email, role)) = state.store.verify_login(&body.email.trim().to_lowercase(), &body.password)
+    let Some((email, role)) = state
+        .store
+        .verify_login(&body.email.trim().to_lowercase(), &body.password)
     else {
         state
             .login_limiter
@@ -120,7 +127,10 @@ pub async fn login_handler(
             .entry(ip)
             .and_modify(|e| e.0 += 1)
             .or_insert((1, Instant::now()));
-        return Err(AppError(StatusCode::UNAUTHORIZED, "invalid credentials".into()));
+        return Err(AppError(
+            StatusCode::UNAUTHORIZED,
+            "invalid credentials".into(),
+        ));
     };
 
     let token = state.store.create_session(&email)?;
@@ -132,7 +142,10 @@ pub async fn login_handler(
     cookie.set_same_site(SameSite::Lax);
     cookie.set_secure(state.secure_cookies);
     cookie.set_max_age(time::Duration::days(30));
-    Ok((jar.add(cookie), Json(json!({ "email": email, "role": role }))))
+    Ok((
+        jar.add(cookie),
+        Json(json!({ "email": email, "role": role })),
+    ))
 }
 
 pub async fn logout_handler(
@@ -160,9 +173,20 @@ pub async fn audit_handler(
     if !user.is_admin() {
         return Err(AppError::forbidden("audit log is admin-only"));
     }
-    let page = params.get("page").and_then(|p| p.parse().ok()).unwrap_or(1u32).max(1);
-    let pp = params.get("pp").and_then(|p| p.parse().ok()).unwrap_or(50u32).clamp(1, 200);
-    let table = params.get("table").filter(|t| !t.is_empty()).map(String::as_str);
+    let page = params
+        .get("page")
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(1u32)
+        .max(1);
+    let pp = params
+        .get("pp")
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(50u32)
+        .clamp(1, 200);
+    let table = params
+        .get("table")
+        .filter(|t| !t.is_empty())
+        .map(String::as_str);
     Ok(Json(state.store.audit_list(table, page, pp)?))
 }
 
@@ -175,7 +199,9 @@ mod tests {
     use super::*;
 
     fn test_state_with_key(secret_key: [u8; 32]) -> Arc<AppState> {
-        let pg = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://x").unwrap();
+        let pg = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://x")
+            .unwrap();
         Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
@@ -201,7 +227,10 @@ mod tests {
         test_state_with_key([7u8; 32])
     }
 
-    async fn extract(state: &Arc<AppState>, cookie_val: Option<&str>) -> Result<CurrentUser, AppError> {
+    async fn extract(
+        state: &Arc<AppState>,
+        cookie_val: Option<&str>,
+    ) -> Result<CurrentUser, AppError> {
         let mut builder = axum::http::Request::builder();
         if let Some(v) = cookie_val {
             builder = builder.header("cookie", format!("{COOKIE}={v}"));
@@ -232,18 +261,27 @@ mod tests {
         let token = state.store.create_session("u@x.io").unwrap();
         let sig = state.sign(token.as_bytes());
 
-        let ok = extract(&state, Some(&format!("{token}.{sig}"))).await.unwrap();
+        let ok = extract(&state, Some(&format!("{token}.{sig}")))
+            .await
+            .unwrap();
         assert_eq!(ok.email, "u@x.io");
         assert_eq!(ok.role, "admin");
 
-        assert!(extract(&state, Some(&format!("{token}.deadbeef"))).await.is_err(), "bad sig");
+        assert!(
+            extract(&state, Some(&format!("{token}.deadbeef")))
+                .await
+                .is_err(),
+            "bad sig"
+        );
         assert!(extract(&state, Some(&token)).await.is_err(), "missing sig");
         assert!(extract(&state, None).await.is_err(), "no cookie");
 
         let other = test_state_with_key([9u8; 32]);
         let cross_sig = other.sign(token.as_bytes());
         assert!(
-            extract(&state, Some(&format!("{token}.{cross_sig}"))).await.is_err(),
+            extract(&state, Some(&format!("{token}.{cross_sig}")))
+                .await
+                .is_err(),
             "signature from a different secret_key is rejected"
         );
     }
@@ -253,11 +291,16 @@ mod tests {
         let state = test_state();
         state.store.create_user("u@x.io", "pw", "admin").unwrap();
         let token = state.store.create_session("u@x.io").unwrap();
-        assert!(state.store.session_user(&token).is_some(), "token present in store");
+        assert!(
+            state.store.session_user(&token).is_some(),
+            "token present in store"
+        );
 
         let forged = state.sign(b"a-different-token");
         assert!(
-            extract(&state, Some(&format!("{token}.{forged}"))).await.is_err(),
+            extract(&state, Some(&format!("{token}.{forged}")))
+                .await
+                .is_err(),
             "valid stored token with a bad signature is 401 — verify gates the DB lookup"
         );
     }

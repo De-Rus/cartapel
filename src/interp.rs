@@ -67,7 +67,9 @@ pub fn interpolate(
                 match ty {
                     VarType::Ident => {
                         if !is_ident(value) {
-                            return Err(format!("variable {name}: {value:?} is not a valid identifier"));
+                            return Err(format!(
+                                "variable {name}: {value:?} is not a valid identifier"
+                            ));
                         }
                         out.push_str(value);
                     }
@@ -138,7 +140,10 @@ mod tests {
         pairs.iter().map(|(k, v)| (k.to_string(), *v)).collect()
     }
     fn supplied(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     #[test]
@@ -150,7 +155,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(sql, "SELECT * FROM t WHERE venue = $1 AND days > $2");
-        assert_eq!(binds, vec![BoundVal::Text("BINANCE".into()), BoundVal::Int(30)]);
+        assert_eq!(
+            binds,
+            vec![BoundVal::Text("BINANCE".into()), BoundVal::Int(30)]
+        );
     }
 
     #[test]
@@ -162,7 +170,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(sql, "WHERE v = $1");
-        assert_eq!(binds, vec![BoundVal::Text("x'; DROP TABLE users;--".into())]);
+        assert_eq!(
+            binds,
+            vec![BoundVal::Text("x'; DROP TABLE users;--".into())]
+        );
     }
 
     #[test]
@@ -216,8 +227,7 @@ mod tests {
 
     #[test]
     fn unterminated_braces_left_verbatim() {
-        let (sql, binds) =
-            interpolate("SELECT {{ from t", &types(&[]), &supplied(&[])).unwrap();
+        let (sql, binds) = interpolate("SELECT {{ from t", &types(&[]), &supplied(&[])).unwrap();
         assert_eq!(sql, "SELECT {{ from t");
         assert!(binds.is_empty());
     }

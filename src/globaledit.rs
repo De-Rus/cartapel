@@ -14,12 +14,18 @@ fn validate_panel(w: &PanelConfig) -> Result<(), AppError> {
     match w.kind {
         PanelKind::Stat | PanelKind::Chart | PanelKind::Table => {
             if blank(&w.sql) {
-                return Err(AppError::bad(format!("widget '{}' requires `sql`", w.label)));
+                return Err(AppError::bad(format!(
+                    "widget '{}' requires `sql`",
+                    w.label
+                )));
             }
         }
         PanelKind::Iframe => {
             if blank(&w.url) {
-                return Err(AppError::bad(format!("iframe widget '{}' requires `url`", w.label)));
+                return Err(AppError::bad(format!(
+                    "iframe widget '{}' requires `url`",
+                    w.label
+                )));
             }
         }
     }
@@ -71,7 +77,10 @@ pub async fn put_dashboard(
         validate_panel(w)?;
     }
     crate::config::validate_panel_fields(&body.widgets).map_err(AppError::bad)?;
-    let dashboard = DashboardConfig { columns: body.columns, widgets: body.widgets };
+    let dashboard = DashboardConfig {
+        columns: body.columns,
+        widgets: body.widgets,
+    };
     let hcl = hcl::to_string(&dashboard)
         .map_err(|e| AppError::internal(format!("serialize dashboard: {e}")))?;
     crate::config::reject_duplicate_labels(&hcl).map_err(AppError::bad)?;
@@ -90,12 +99,18 @@ pub async fn put_dashboard(
         let _ = std::fs::create_dir_all(dir.join("config"));
         let path = dir.join("config").join("dashboard.hcl");
         crate::configedit::commit_and_reload(&state, &path, &dir, &hcl)?;
-        state.store.config_version_add(DASHBOARD_KEY, &hcl, &user.email, None)?;
+        state
+            .store
+            .config_version_add(DASHBOARD_KEY, &hcl, &user.email, None)?;
     }
 
-    state
-        .store
-        .audit(&user.email, "config", Some("dashboard"), "dashboard:update", None);
+    state.store.audit(
+        &user.email,
+        "config",
+        Some("dashboard"),
+        "dashboard:update",
+        None,
+    );
     Ok(Json(json!({ "ok": true, "reloaded": true })))
 }
 
@@ -202,7 +217,10 @@ mod tests {
         let p = put_dashboard(
             axum::extract::State(state.clone()),
             admin(),
-            Json(PutDashboard { widgets: vec![iframe("Docs", "https://x.io")], columns: None }),
+            Json(PutDashboard {
+                widgets: vec![iframe("Docs", "https://x.io")],
+                columns: None,
+            }),
         )
         .await
         .unwrap()
@@ -218,15 +236,20 @@ mod tests {
     async fn invalid_widget_missing_sql_is_400() {
         let dir = tmp_dir();
         let state = state_with_tables(Some(dir.clone()), &["bots"]);
-        let bad: PanelConfig =
-            hcl::from_str("type = \"stat\"\nlabel = \"Count\"\n").unwrap();
+        let bad: PanelConfig = hcl::from_str("type = \"stat\"\nlabel = \"Count\"\n").unwrap();
         let p = put_dashboard(
             axum::extract::State(state),
             admin(),
-            Json(PutDashboard { widgets: vec![bad], columns: None }),
+            Json(PutDashboard {
+                widgets: vec![bad],
+                columns: None,
+            }),
         )
         .await;
-        assert!(matches!(p, Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))));
+        assert!(matches!(
+            p,
+            Err(AppError(axum::http::StatusCode::BAD_REQUEST, _))
+        ));
         assert!(!dir.join("config").join("dashboard.hcl").exists());
     }
 
@@ -237,14 +260,19 @@ mod tests {
         let out = preview_panel(
             axum::extract::State(state.clone()),
             admin(),
-            Json(PreviewWidget { widget: iframe("Docs", "https://x.io") }),
+            Json(PreviewWidget {
+                widget: iframe("Docs", "https://x.io"),
+            }),
         )
         .await
         .unwrap()
         .0;
         assert_eq!(out["widget"]["type"], json!("iframe"));
         assert_eq!(out["widget"]["url"], json!("https://x.io"));
-        assert!(!dir.join("config").join("dashboard.hcl").exists(), "preview never writes");
+        assert!(
+            !dir.join("config").join("dashboard.hcl").exists(),
+            "preview never writes"
+        );
         assert!(
             state.store.config_versions_list(DASHBOARD_KEY).unwrap()["versions"]
                 .as_array()
@@ -258,14 +286,23 @@ mod tests {
     async fn admin_gate_blocks_non_admin() {
         let state = state_with_tables(Some(tmp_dir()), &["bots"]);
         let g = get_dashboard(axum::extract::State(state.clone()), viewer()).await;
-        assert!(matches!(g, Err(AppError(axum::http::StatusCode::FORBIDDEN, _))));
+        assert!(matches!(
+            g,
+            Err(AppError(axum::http::StatusCode::FORBIDDEN, _))
+        ));
         let p = put_dashboard(
             axum::extract::State(state),
             viewer(),
-            Json(PutDashboard { widgets: vec![], columns: None }),
+            Json(PutDashboard {
+                widgets: vec![],
+                columns: None,
+            }),
         )
         .await;
-        assert!(matches!(p, Err(AppError(axum::http::StatusCode::FORBIDDEN, _))));
+        assert!(matches!(
+            p,
+            Err(AppError(axum::http::StatusCode::FORBIDDEN, _))
+        ));
     }
 
     #[tokio::test]
@@ -275,14 +312,20 @@ mod tests {
         let _ = put_dashboard(
             axum::extract::State(state.clone()),
             admin(),
-            Json(PutDashboard { widgets: vec![iframe("One", "https://one.io")], columns: None }),
+            Json(PutDashboard {
+                widgets: vec![iframe("One", "https://one.io")],
+                columns: None,
+            }),
         )
         .await
         .unwrap();
         let _ = put_dashboard(
             axum::extract::State(state.clone()),
             admin(),
-            Json(PutDashboard { widgets: vec![iframe("Two", "https://two.io")], columns: None }),
+            Json(PutDashboard {
+                widgets: vec![iframe("Two", "https://two.io")],
+                columns: None,
+            }),
         )
         .await
         .unwrap();
@@ -292,12 +335,15 @@ mod tests {
             .await
             .unwrap()
             .0;
-        let old_id = list["versions"].as_array().unwrap()[1]["id"].as_i64().unwrap();
+        let old_id = list["versions"].as_array().unwrap()[1]["id"]
+            .as_i64()
+            .unwrap();
 
-        let p = publish_dashboard_version(axum::extract::State(state.clone()), admin(), Path(old_id))
-            .await
-            .unwrap()
-            .0;
+        let p =
+            publish_dashboard_version(axum::extract::State(state.clone()), admin(), Path(old_id))
+                .await
+                .unwrap()
+                .0;
         assert_eq!(p["ok"], json!(true));
         assert_eq!(state.cfg().dashboard.widgets[0].label, "One");
     }
@@ -308,7 +354,10 @@ mod tests {
         let p = put_dashboard(
             axum::extract::State(state),
             admin(),
-            Json(PutDashboard { widgets: vec![iframe("Docs", "https://x.io")], columns: None }),
+            Json(PutDashboard {
+                widgets: vec![iframe("Docs", "https://x.io")],
+                columns: None,
+            }),
         )
         .await
         .unwrap()

@@ -40,7 +40,9 @@ fn ensure_slug(slug: &str) -> Result<(), AppError> {
         return Ok(());
     }
     if RESERVED_STEMS.iter().any(|r| r.eq_ignore_ascii_case(slug)) {
-        return Err(AppError::bad(format!("'{slug}' is a reserved name and cannot be a group")));
+        return Err(AppError::bad(format!(
+            "'{slug}' is a reserved name and cannot be a group"
+        )));
     }
     Err(AppError::bad(
         "group slug must be letters, digits or '-', with no leading '_' or '-'",
@@ -79,7 +81,11 @@ pub async fn list_groups(
 ) -> Result<Json<Value>, AppError> {
     admin_only(&user)?;
     let cfg = state.cfg();
-    let writable = state.config_dir.as_deref().map(dir_writable).unwrap_or(false);
+    let writable = state
+        .config_dir
+        .as_deref()
+        .map(dir_writable)
+        .unwrap_or(false);
 
     let groups: Vec<Value> = cfg
         .groups
@@ -145,7 +151,10 @@ pub async fn create_group(
     let slug = body.slug.trim().to_string();
     ensure_slug(&slug)?;
     if state.cfg().groups.iter().any(|g| g.slug == slug) {
-        return Err(AppError(StatusCode::CONFLICT, format!("group '{slug}' already exists")));
+        return Err(AppError(
+            StatusCode::CONFLICT,
+            format!("group '{slug}' already exists"),
+        ));
     }
 
     let group_cfg = GroupConfig {
@@ -162,7 +171,10 @@ pub async fn create_group(
     };
     let gdir = group_dir(&dir, &slug);
     if gdir.exists() {
-        return Err(AppError(StatusCode::CONFLICT, format!("folder '{slug}' already exists")));
+        return Err(AppError(
+            StatusCode::CONFLICT,
+            format!("folder '{slug}' already exists"),
+        ));
     }
 
     {
@@ -172,10 +184,15 @@ pub async fn create_group(
             &dir,
             vec![
                 FsOp::Mkdir { path: gdir.clone() },
-                FsOp::Write { path: gdir.join("_group.hcl"), contents: hcl.clone() },
+                FsOp::Write {
+                    path: gdir.join("_group.hcl"),
+                    contents: hcl.clone(),
+                },
             ],
         )?;
-        state.store.config_version_add(&format!("_group/{slug}"), &hcl, &user.email, None)?;
+        state
+            .store
+            .config_version_add(&format!("_group/{slug}"), &hcl, &user.email, None)?;
     }
 
     state.store.audit(
@@ -185,7 +202,10 @@ pub async fn create_group(
         "group:create",
         Some(&json!({ "slug": slug })),
     );
-    Ok((StatusCode::CREATED, Json(json!({ "ok": true, "reloaded": true }))))
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({ "ok": true, "reloaded": true })),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -220,7 +240,9 @@ pub async fn patch_group(
         label: body.label.unwrap_or_else(|| existing.label.clone()),
         icon: body.icon.or_else(|| existing.icon.clone()),
         order: body.order.unwrap_or(existing.order),
-        table_order: body.table_order.unwrap_or_else(|| existing.table_order.clone()),
+        table_order: body
+            .table_order
+            .unwrap_or_else(|| existing.table_order.clone()),
         nav: existing.nav.clone(),
     };
     drop(cfg);
@@ -235,9 +257,14 @@ pub async fn patch_group(
         commit_batch_and_reload(
             &state,
             &dir,
-            vec![FsOp::Write { path: group_dir(&dir, &slug).join("_group.hcl"), contents: hcl.clone() }],
+            vec![FsOp::Write {
+                path: group_dir(&dir, &slug).join("_group.hcl"),
+                contents: hcl.clone(),
+            }],
         )?;
-        state.store.config_version_add(&format!("_group/{slug}"), &hcl, &user.email, None)?;
+        state
+            .store
+            .config_version_add(&format!("_group/{slug}"), &hcl, &user.email, None)?;
     }
 
     state.store.audit(
@@ -274,7 +301,10 @@ pub async fn rename_group(
         return Err(AppError::not_found(format!("group '{slug}' not found")));
     }
     if cfg.groups.iter().any(|g| g.slug == to) {
-        return Err(AppError(StatusCode::CONFLICT, format!("group '{to}' already exists")));
+        return Err(AppError(
+            StatusCode::CONFLICT,
+            format!("group '{to}' already exists"),
+        ));
     }
     let group_hcl = std::fs::read_to_string(
         state
@@ -292,7 +322,10 @@ pub async fn rename_group(
     let from_dir = group_dir(&dir, &slug);
     let to_dir = from_dir.with_file_name(&to);
     if to_dir.exists() {
-        return Err(AppError(StatusCode::CONFLICT, format!("folder '{to}' already exists")));
+        return Err(AppError(
+            StatusCode::CONFLICT,
+            format!("folder '{to}' already exists"),
+        ));
     }
 
     {
@@ -300,10 +333,18 @@ pub async fn rename_group(
         commit_batch_and_reload(
             &state,
             &dir,
-            vec![FsOp::Move { from: from_dir, to: to_dir }],
+            vec![FsOp::Move {
+                from: from_dir,
+                to: to_dir,
+            }],
         )?;
         if !group_hcl.is_empty() {
-            state.store.config_version_add(&format!("_group/{to}"), &group_hcl, &user.email, None)?;
+            state.store.config_version_add(
+                &format!("_group/{to}"),
+                &group_hcl,
+                &user.email,
+                None,
+            )?;
         }
     }
 
@@ -332,7 +373,10 @@ pub async fn delete_group(
         .table_sources
         .values()
         .any(|s| s.group.as_deref() == Some(slug.as_str()))
-        || cfg.pages.iter().any(|p| p.group.as_deref() == Some(slug.as_str()));
+        || cfg
+            .pages
+            .iter()
+            .any(|p| p.group.as_deref() == Some(slug.as_str()));
     drop(cfg);
     if has_members {
         return Err(AppError(
@@ -358,8 +402,12 @@ pub async fn delete_group(
             &state,
             &dir,
             vec![
-                FsOp::Remove { path: group_dir.join("_group.hcl") },
-                FsOp::Rmdir { path: group_dir.clone() },
+                FsOp::Remove {
+                    path: group_dir.join("_group.hcl"),
+                },
+                FsOp::Rmdir {
+                    path: group_dir.clone(),
+                },
             ],
         )?;
     }
@@ -380,7 +428,8 @@ fn leftover_entries(group_dir: &FsPath) -> bool {
     let Ok(rd) = std::fs::read_dir(group_dir) else {
         return false;
     };
-    rd.filter_map(|e| e.ok()).any(|e| e.file_name() != "_group.hcl")
+    rd.filter_map(|e| e.ok())
+        .any(|e| e.file_name() != "_group.hcl")
 }
 
 #[derive(Deserialize)]
@@ -423,7 +472,9 @@ pub async fn save_layout(
             match placed.get(t.as_str()) {
                 Some(Some(prev)) if *prev == g.slug.as_str() => {}
                 Some(_) => {
-                    return Err(AppError::bad(format!("table '{t}' assigned to more than one group")))
+                    return Err(AppError::bad(format!(
+                        "table '{t}' assigned to more than one group"
+                    )))
                 }
                 None => {
                     placed.insert(t.as_str(), Some(g.slug.as_str()));
@@ -435,7 +486,9 @@ pub async fn save_layout(
         match placed.get(t.as_str()) {
             Some(None) => {}
             Some(Some(_)) => {
-                return Err(AppError::bad(format!("table '{t}' assigned to more than one group")))
+                return Err(AppError::bad(format!(
+                    "table '{t}' assigned to more than one group"
+                )))
             }
             None => {
                 placed.insert(t.as_str(), None);
@@ -506,7 +559,10 @@ pub async fn save_layout(
         // by the loader).
         let src_is_screen = src.path.file_name().is_some_and(|n| n == "screen.hcl");
         let from = if src_is_screen {
-            src.path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| src.path.clone())
+            src.path
+                .parent()
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| src.path.clone())
         } else {
             src.path.clone()
         };
@@ -528,7 +584,11 @@ pub async fn save_layout(
             None => {
                 // Ungrouped folder-form tables live under the config's root
                 // convention — screens/ when it exists, else the dir root.
-                let root = if dir.join("screens").is_dir() { dir.join("screens") } else { dir.clone() };
+                let root = if dir.join("screens").is_dir() {
+                    dir.join("screens")
+                } else {
+                    dir.clone()
+                };
                 if src_is_screen {
                     root.join(&stem)
                 } else {
@@ -565,8 +625,11 @@ pub async fn save_layout(
         ops.push(FsOp::Move { from, to });
     }
 
-    let requested_order: std::collections::BTreeMap<&str, &[String]> =
-        body.groups.iter().map(|g| (g.slug.as_str(), g.tables.as_slice())).collect();
+    let requested_order: std::collections::BTreeMap<&str, &[String]> = body
+        .groups
+        .iter()
+        .map(|g| (g.slug.as_str(), g.tables.as_slice()))
+        .collect();
 
     let mut touched_groups: Vec<(String, String)> = Vec::new();
     for slug in &affected_groups {
@@ -606,7 +669,9 @@ pub async fn save_layout(
         let _guard = state.config_write_lock.lock().unwrap();
         commit_batch_and_reload(&state, &dir, ops)?;
         for (slug, hcl) in &touched_groups {
-            state.store.config_version_add(&format!("_group/{slug}"), hcl, &user.email, None)?;
+            state
+                .store
+                .config_version_add(&format!("_group/{slug}"), hcl, &user.email, None)?;
         }
     }
 
@@ -624,14 +689,21 @@ pub async fn save_layout(
 /// first (deduped, in that order), then any remaining members alphabetically.
 /// Only members actually in the folder are emitted — a stem whose file no longer
 /// lives here is never written back into `table_order`.
-fn reconcile_order(members: &std::collections::BTreeSet<String>, preferred: &[String]) -> Vec<String> {
+fn reconcile_order(
+    members: &std::collections::BTreeSet<String>,
+    preferred: &[String],
+) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for t in preferred {
         if members.contains(t) && !out.contains(t) {
             out.push(t.clone());
         }
     }
-    let mut rest: Vec<String> = members.iter().filter(|t| !out.contains(*t)).cloned().collect();
+    let mut rest: Vec<String> = members
+        .iter()
+        .filter(|t| !out.contains(*t))
+        .cloned()
+        .collect();
     rest.sort();
     out.extend(rest);
     out
@@ -649,7 +721,11 @@ mod tests {
     fn seed_group(dir: &FsPath, slug: &str, label: &str) {
         let gdir = dir.join(slug);
         std::fs::create_dir_all(&gdir).unwrap();
-        std::fs::write(gdir.join("_group.hcl"), format!("label = \"{label}\"\norder = 1\n")).unwrap();
+        std::fs::write(
+            gdir.join("_group.hcl"),
+            format!("label = \"{label}\"\norder = 1\n"),
+        )
+        .unwrap();
     }
 
     fn seed_table(dir: &FsPath, group: Option<&str>, stem: &str, label: &str) {
@@ -693,16 +769,35 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(state.cfg().group_label("trading").as_deref(), Some("Trading desk"));
         assert_eq!(
-            state.cfg().groups.iter().find(|g| g.slug == "trading").and_then(|g| g.icon.as_deref()),
+            state.cfg().group_label("trading").as_deref(),
+            Some("Trading desk")
+        );
+        assert_eq!(
+            state
+                .cfg()
+                .groups
+                .iter()
+                .find(|g| g.slug == "trading")
+                .and_then(|g| g.icon.as_deref()),
             Some("chart"),
             "patching only the label preserves the previously-set icon",
         );
 
-        let out = list_groups(axum::extract::State(state), admin()).await.unwrap().0;
-        assert!(out["groups"].as_array().unwrap().iter().any(|g| g["slug"] == "trading"));
-        assert!(out["unconfigured"].as_array().unwrap().iter().any(|t| t == "bots"));
+        let out = list_groups(axum::extract::State(state), admin())
+            .await
+            .unwrap()
+            .0;
+        assert!(out["groups"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|g| g["slug"] == "trading"));
+        assert!(out["unconfigured"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|t| t == "bots"));
     }
 
     #[tokio::test]
@@ -730,7 +825,10 @@ mod tests {
         seed_group(&dir, "trading", "Trading");
         seed_table(&dir, Some("trading"), "bots", "Bots");
         let state = state_with_tables(Some(dir.clone()), &["bots"]);
-        assert_eq!(state.cfg().table_group_label("bots").as_deref(), Some("Trading"));
+        assert_eq!(
+            state.cfg().table_group_label("bots").as_deref(),
+            Some("Trading")
+        );
 
         let _ = rename_group(
             axum::extract::State(state.clone()),
@@ -745,7 +843,11 @@ mod tests {
         // Table identity unchanged: still keyed "bots", now under the new group.
         assert!(state.cfg().tables.contains_key("bots"));
         assert_eq!(
-            state.cfg().table_sources.get("bots").and_then(|s| s.group.as_deref()),
+            state
+                .cfg()
+                .table_sources
+                .get("bots")
+                .and_then(|s| s.group.as_deref()),
             Some("desk"),
         );
     }
@@ -774,13 +876,22 @@ mod tests {
         seed_table(&dir, Some("full"), "bots", "Bots");
         let state = state_with_tables(Some(dir.clone()), &["bots"]);
 
-        let bad = delete_group(axum::extract::State(state.clone()), admin(), Path("full".into())).await;
+        let bad = delete_group(
+            axum::extract::State(state.clone()),
+            admin(),
+            Path("full".into()),
+        )
+        .await;
         assert!(matches!(bad, Err(AppError(StatusCode::CONFLICT, _))));
         assert!(dir.join("full").exists());
 
-        let _ = delete_group(axum::extract::State(state.clone()), admin(), Path("empty".into()))
-            .await
-            .unwrap();
+        let _ = delete_group(
+            axum::extract::State(state.clone()),
+            admin(),
+            Path("empty".into()),
+        )
+        .await
+        .unwrap();
         assert!(!dir.join("empty").exists());
         assert!(!state.cfg().groups.iter().any(|g| g.slug == "empty"));
     }
@@ -792,15 +903,28 @@ mod tests {
         seed_group(&dir, "b", "B");
         seed_table(&dir, Some("a"), "bots", "Bots");
         let state = state_with_tables(Some(dir.clone()), &["bots"]);
-        assert_eq!(state.cfg().table_sources.get("bots").and_then(|s| s.group.as_deref()), Some("a"));
+        assert_eq!(
+            state
+                .cfg()
+                .table_sources
+                .get("bots")
+                .and_then(|s| s.group.as_deref()),
+            Some("a")
+        );
 
         let out = save_layout(
             axum::extract::State(state.clone()),
             admin(),
             Json(Layout {
                 groups: vec![
-                    LayoutGroup { slug: "a".into(), tables: vec![] },
-                    LayoutGroup { slug: "b".into(), tables: vec!["bots".into()] },
+                    LayoutGroup {
+                        slug: "a".into(),
+                        tables: vec![],
+                    },
+                    LayoutGroup {
+                        slug: "b".into(),
+                        tables: vec!["bots".into()],
+                    },
                 ],
                 ungrouped: vec![],
             }),
@@ -814,7 +938,11 @@ mod tests {
         // /t/bots URL identity is the stem — unchanged; only the nav group moved.
         assert!(state.cfg().tables.contains_key("bots"));
         assert_eq!(
-            state.cfg().table_sources.get("bots").and_then(|s| s.group.as_deref()),
+            state
+                .cfg()
+                .table_sources
+                .get("bots")
+                .and_then(|s| s.group.as_deref()),
             Some("b"),
         );
         assert_eq!(state.cfg().table_group_label("bots").as_deref(), Some("B"));
@@ -827,21 +955,38 @@ mod tests {
         for (g, label) in [("a", "A"), ("b", "B")] {
             let gd = screens.join(g);
             std::fs::create_dir_all(&gd).unwrap();
-            std::fs::write(gd.join("_group.hcl"), format!("label = \"{label}\"\norder = 1\n")).unwrap();
+            std::fs::write(
+                gd.join("_group.hcl"),
+                format!("label = \"{label}\"\norder = 1\n"),
+            )
+            .unwrap();
         }
         let td = screens.join("a").join("bots");
         std::fs::create_dir_all(&td).unwrap();
         std::fs::write(td.join("screen.hcl"), "label = \"Bots\"\n").unwrap();
         let state = state_with_tables(Some(dir.clone()), &["bots"]);
-        assert_eq!(state.cfg().table_sources.get("bots").and_then(|s| s.group.as_deref()), Some("a"));
+        assert_eq!(
+            state
+                .cfg()
+                .table_sources
+                .get("bots")
+                .and_then(|s| s.group.as_deref()),
+            Some("a")
+        );
 
         let out = save_layout(
             axum::extract::State(state.clone()),
             admin(),
             Json(Layout {
                 groups: vec![
-                    LayoutGroup { slug: "a".into(), tables: vec![] },
-                    LayoutGroup { slug: "b".into(), tables: vec!["bots".into()] },
+                    LayoutGroup {
+                        slug: "a".into(),
+                        tables: vec![],
+                    },
+                    LayoutGroup {
+                        slug: "b".into(),
+                        tables: vec!["bots".into()],
+                    },
                 ],
                 ungrouped: vec![],
             }),
@@ -856,7 +1001,11 @@ mod tests {
         assert!(screens.join("b").join("bots").join("screen.hcl").exists());
         assert!(!dir.join("b").exists());
         assert_eq!(
-            state.cfg().table_sources.get("bots").and_then(|s| s.group.as_deref()),
+            state
+                .cfg()
+                .table_sources
+                .get("bots")
+                .and_then(|s| s.group.as_deref()),
             Some("b"),
         );
     }
@@ -874,7 +1023,10 @@ mod tests {
             axum::extract::State(state.clone()),
             admin(),
             Json(Layout {
-                groups: vec![LayoutGroup { slug: "a".into(), tables: vec!["bots".into()] }],
+                groups: vec![LayoutGroup {
+                    slug: "a".into(),
+                    tables: vec!["bots".into()],
+                }],
                 ungrouped: vec![],
             }),
         )
@@ -883,9 +1035,18 @@ mod tests {
         .0;
         assert_eq!(out["ok"], json!(true));
         assert!(!dir.join("bots.hcl").exists());
-        assert!(dir.join("screens").join("a").join("bots").join("screen.hcl").exists());
+        assert!(dir
+            .join("screens")
+            .join("a")
+            .join("bots")
+            .join("screen.hcl")
+            .exists());
         assert_eq!(
-            state.cfg().table_sources.get("bots").and_then(|s| s.group.as_deref()),
+            state
+                .cfg()
+                .table_sources
+                .get("bots")
+                .and_then(|s| s.group.as_deref()),
             Some("a"),
         );
     }
@@ -905,7 +1066,10 @@ mod tests {
             axum::extract::State(state),
             admin(),
             Json(Layout {
-                groups: vec![LayoutGroup { slug: "b".into(), tables: vec!["bots".into()] }],
+                groups: vec![LayoutGroup {
+                    slug: "b".into(),
+                    tables: vec!["bots".into()],
+                }],
                 ungrouped: vec![],
             }),
         )
@@ -926,8 +1090,14 @@ mod tests {
             admin(),
             Json(Layout {
                 groups: vec![
-                    LayoutGroup { slug: "a".into(), tables: vec!["bots".into()] },
-                    LayoutGroup { slug: "b".into(), tables: vec!["bots".into()] },
+                    LayoutGroup {
+                        slug: "a".into(),
+                        tables: vec!["bots".into()],
+                    },
+                    LayoutGroup {
+                        slug: "b".into(),
+                        tables: vec!["bots".into()],
+                    },
                 ],
                 ungrouped: vec![],
             }),
@@ -955,7 +1125,10 @@ mod tests {
         let out = save_layout(
             axum::extract::State(state.clone()),
             admin(),
-            Json(Layout { groups: vec![], ungrouped: vec!["bots".into()] }),
+            Json(Layout {
+                groups: vec![],
+                ungrouped: vec!["bots".into()],
+            }),
         )
         .await
         .unwrap()
@@ -965,12 +1138,22 @@ mod tests {
         assert!(!dir.join("a").join("bots.hcl").exists());
 
         let ghcl = std::fs::read_to_string(dir.join("a").join("_group.hcl")).unwrap();
-        assert!(!ghcl.contains("\"bots\""), "stale stem stripped from source order:\n{ghcl}");
+        assert!(
+            !ghcl.contains("\"bots\""),
+            "stale stem stripped from source order:\n{ghcl}"
+        );
         assert!(ghcl.contains("\"other\""), "remaining member kept");
 
-        assert!(state.cfg().tables.contains_key("bots"), "same /t/bots identity");
+        assert!(
+            state.cfg().tables.contains_key("bots"),
+            "same /t/bots identity"
+        );
         assert_eq!(
-            state.cfg().table_sources.get("bots").and_then(|s| s.group.as_deref()),
+            state
+                .cfg()
+                .table_sources
+                .get("bots")
+                .and_then(|s| s.group.as_deref()),
             None,
             "now ungrouped",
         );
@@ -999,7 +1182,11 @@ mod tests {
         .0;
         assert_eq!(out["ok"], json!(true));
         let ghcl = std::fs::read_to_string(dir.join("a").join("_group.hcl")).unwrap();
-        assert_eq!(ghcl.matches("\"bots\"").count(), 1, "table_order deduped:\n{ghcl}");
+        assert_eq!(
+            ghcl.matches("\"bots\"").count(),
+            1,
+            "table_order deduped:\n{ghcl}"
+        );
     }
 
     /// Renaming a group moves the WHOLE folder, including a co-located page
@@ -1031,7 +1218,10 @@ mod tests {
         assert!(!dir.join("trading").exists());
         assert!(dir.join("desk").join("ops").join("page.hcl").exists());
         assert!(dir.join("desk").join("queries.hcl").exists());
-        assert!(state.cfg().queries.contains_key("trading_fleet"), "query still registered");
+        assert!(
+            state.cfg().queries.contains_key("trading_fleet"),
+            "query still registered"
+        );
         assert!(
             state.cfg().pages.iter().any(|p| p.id() == "desk/ops"),
             "page re-ids under the renamed group",

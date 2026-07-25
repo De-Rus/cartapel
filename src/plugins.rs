@@ -32,15 +32,16 @@ fn content_type(ext: &str) -> Option<&'static str> {
 /// admin-relative path. The resolved file must stay within the canonical config
 /// dir (traversal + symlink-escape rejected), carry an allowlisted extension, and
 /// never be config/secret material (`.hcl`/`.toml`/`.env`/dotfiles).
-pub async fn serve_static(State(state): State<Arc<AppState>>, Path(path): Path<String>) -> Response {
+pub async fn serve_static(
+    State(state): State<Arc<AppState>>,
+    Path(path): Path<String>,
+) -> Response {
     let Some(dir) = &state.config_dir else {
         return (StatusCode::NOT_FOUND, "no config dir").into_response();
     };
     if path
         .split('/')
-        .any(|seg| {
-            seg.is_empty() || seg == ".." || seg.starts_with('.') || seg.contains('\\')
-        })
+        .any(|seg| seg.is_empty() || seg == ".." || seg.starts_with('.') || seg.contains('\\'))
     {
         return (StatusCode::BAD_REQUEST, "bad asset path").into_response();
     }
@@ -110,14 +111,18 @@ pub async fn named_query(
         crate::interp::interpolate(&sql, &env.types, &env.values).map_err(AppError::bad)?;
 
     let mut tx = state.pool_for(source.as_deref()).begin().await?;
-    sqlx::query("SET TRANSACTION READ ONLY").execute(&mut *tx).await?;
+    sqlx::query("SET TRANSACTION READ ONLY")
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("SET LOCAL statement_timeout = '8000ms'")
         .execute(&mut *tx)
         .await?;
     let wrapped = format!(
         "SELECT coalesce(json_agg(row_to_json(sub.*)), '[]'::json) AS r FROM ({sql}) sub LIMIT {QUERY_CAP}"
     );
-    let row = crate::interp::bind_all(sqlx::query(&wrapped), &binds).fetch_one(&mut *tx).await?;
+    let row = crate::interp::bind_all(sqlx::query(&wrapped), &binds)
+        .fetch_one(&mut *tx)
+        .await?;
     let _ = tx.rollback().await;
     let rows: Value = row.get("r");
     Ok(Json(json!({ "rows": rows })))
@@ -168,7 +173,10 @@ async fn proxy_source(
             } else {
                 format!("{base}/{}", rest.trim_start_matches('/'))
             };
-            let mut req = state.http.get(&url).timeout(std::time::Duration::from_secs(15));
+            let mut req = state
+                .http
+                .get(&url)
+                .timeout(std::time::Duration::from_secs(15));
             if let Some(env_name) = &src.token_env {
                 if let Ok(tok) = std::env::var(env_name) {
                     let hdr = src.header.as_deref().unwrap_or("x-admin-token");
@@ -179,14 +187,17 @@ async fn proxy_source(
                 .send()
                 .await
                 .map_err(|e| AppError::internal(format!("source {name} failed: {e}")))?;
-            let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+            let status =
+                StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
             let body = resp
                 .bytes()
                 .await
                 .map_err(|e| AppError::internal(e.to_string()))?;
             Ok((status, [(header::CONTENT_TYPE, "application/json")], body).into_response())
         }
-        other => Err(AppError::bad(format!("unsupported source type \"{other}\""))),
+        other => Err(AppError::bad(format!(
+            "unsupported source type \"{other}\""
+        ))),
     }
 }
 
@@ -196,7 +207,9 @@ mod tests {
     use axum::http::header::CONTENT_TYPE;
 
     fn asset_state(dir: PathBuf) -> Arc<AppState> {
-        let pg = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://x").unwrap();
+        let pg = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://x")
+            .unwrap();
         Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
@@ -226,9 +239,21 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("overview").join("ops")).unwrap();
         std::fs::create_dir_all(root.join("config").join("widgets")).unwrap();
-        std::fs::write(root.join("overview").join("ops").join("ops.js"), "export default 1;").unwrap();
-        std::fs::write(root.join("overview").join("ops").join("page.hcl"), "label = \"Ops\"\n").unwrap();
-        std::fs::write(root.join("config").join("widgets").join("minibar.js"), "export const minibar = 1;").unwrap();
+        std::fs::write(
+            root.join("overview").join("ops").join("ops.js"),
+            "export default 1;",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("overview").join("ops").join("page.hcl"),
+            "label = \"Ops\"\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("config").join("widgets").join("minibar.js"),
+            "export const minibar = 1;",
+        )
+        .unwrap();
         root
     }
 
@@ -246,7 +271,11 @@ mod tests {
             "text/javascript; charset=utf-8"
         );
         let mini = get(&dir, "config/widgets/minibar.js").await;
-        assert_eq!(mini.status(), StatusCode::OK, "shared widget-kind served from config/widgets");
+        assert_eq!(
+            mini.status(),
+            StatusCode::OK,
+            "shared widget-kind served from config/widgets"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -264,7 +293,9 @@ mod tests {
             ".. traversal rejected"
         );
         assert_eq!(
-            get(&dir, "overview/../config/widgets/minibar.js").await.status(),
+            get(&dir, "overview/../config/widgets/minibar.js")
+                .await
+                .status(),
             StatusCode::BAD_REQUEST,
             "interior .. rejected"
         );
@@ -283,7 +314,9 @@ mod tests {
 
     #[tokio::test]
     async fn missing_config_dir_is_404() {
-        let pg = sqlx::postgres::PgPoolOptions::new().connect_lazy("postgres://x").unwrap();
+        let pg = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://x")
+            .unwrap();
         let state = Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
@@ -311,11 +344,16 @@ mod tests {
     #[cfg(unix)]
     async fn rejects_out_of_tree_symlink() {
         let dir = bundle();
-        let outside = std::env::temp_dir().join(format!("steward-asset-out-{}", std::process::id()));
+        let outside =
+            std::env::temp_dir().join(format!("steward-asset-out-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&outside);
         std::fs::create_dir_all(&outside).unwrap();
         std::fs::write(outside.join("evil.js"), "export const evil = 1;").unwrap();
-        std::os::unix::fs::symlink(outside.join("evil.js"), dir.join("config").join("widgets").join("evil.js")).unwrap();
+        std::os::unix::fs::symlink(
+            outside.join("evil.js"),
+            dir.join("config").join("widgets").join("evil.js"),
+        )
+        .unwrap();
 
         assert_eq!(
             get(&dir, "config/widgets/evil.js").await.status(),
