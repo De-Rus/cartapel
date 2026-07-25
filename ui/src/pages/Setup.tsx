@@ -96,9 +96,12 @@ export default function Setup() {
           }))
           .filter((g) => g.tables.length > 0),
       ),
-    onSuccess: (r) => {
+    onSuccess: async (r) => {
       if (r.ok) {
         toast(t('setup_done', { n: String(r.tables ?? 0) }), 'ok')
+        // Dashboard redirects back here while meta still says "no tables" —
+        // refetch meta BEFORE navigating so the new panel is what renders.
+        await qc.refetchQueries({ queryKey: ['meta'] })
         void qc.invalidateQueries()
         navigate('/')
       } else {

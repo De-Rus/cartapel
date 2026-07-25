@@ -335,16 +335,16 @@ pub async fn discover(
 ) -> Result<Json<Value>, AppError> {
     admin_only(&user)?;
     let cfg = state.cfg();
-    let unconfigured: Vec<&crate::introspect::DbTable> = state
+    let unconfigured: Vec<(&String, &crate::introspect::DbTable)> = state
         .db
         .tables
-        .values()
-        .filter(|t| !cfg.tables.contains_key(&t.name))
-        .filter(|t| !RESERVED_STEMS.iter().any(|r| r.eq_ignore_ascii_case(&t.name)))
+        .iter()
+        .filter(|(k, _)| !cfg.tables.contains_key(*k))
+        .filter(|(k, _)| !RESERVED_STEMS.iter().any(|r| r.eq_ignore_ascii_case(k)))
         .collect();
 
     let schemas: std::collections::HashSet<&str> =
-        unconfigured.iter().map(|t| t.schema.as_str()).collect();
+        unconfigured.iter().map(|(_, t)| t.schema.as_str()).collect();
     let multi_schema = schemas.len() > 1;
     let prefix_of = |name: &str| {
         name.split('_')
@@ -353,7 +353,7 @@ pub async fn discover(
             .map(|p| p.trim_end_matches('s').to_string())
     };
     let mut prefix_counts: HashMap<String, usize> = HashMap::new();
-    for t in &unconfigured {
+    for (_, t) in &unconfigured {
         if let Some(p) = prefix_of(&t.name) {
             *prefix_counts.entry(p).or_default() += 1;
         }
@@ -370,7 +370,7 @@ pub async fn discover(
 
     let tables: Vec<Value> = unconfigured
         .iter()
-        .map(|t| {
+        .map(|(key, t)| {
             let group = if multi_schema {
                 t.schema.clone()
             } else {
@@ -380,7 +380,7 @@ pub async fn discover(
                 }
             };
             json!({
-                "name": t.name,
+                "name": key,
                 "schema": t.schema,
                 "is_view": t.is_view,
                 "pk": t.pk,
@@ -427,6 +427,15 @@ pub async fn apply_setup(
         return Err(AppError::bad("nothing selected"));
     }
     let cfg = state.cfg();
+    let mut plan_slugs: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for g in &plan.groups {
+        if !plan_slugs.insert(g.slug.clone()) {
+            return Err(AppError::bad(format!("duplicate group slug '{}'", g.slug)));
+        }
+        if cfg.groups.iter().any(|eg| eg.slug == g.slug) {
+            return Err(AppError::conflict(format!("group '{}' already exists", g.slug)));
+        }
+    }
     let mut ops: Vec<FsOp> = Vec::new();
     let mut files: serde_json::Map<String, Value> = serde_json::Map::new();
     let mut versions: Vec<(String, String)> = Vec::new();
