@@ -10,6 +10,7 @@ const es: Dict = {
   unknown_table: 'tabla desconocida',
   row_not_found: 'fila no encontrada',
   page_load_failed: 'no se pudo cargar la página',
+  page_load_failed_hint: 'Revisa la consola del navegador; el módulo se sirve desde /static y usa el SDK sx ({base}/sx.d.ts).',
   meta_load_failed: 'error cargando meta',
 
   login_email: 'Email',
@@ -556,6 +557,7 @@ const en: Dict = {
   unknown_table: 'unknown table',
   row_not_found: 'row not found',
   page_load_failed: 'could not load the page',
+  page_load_failed_hint: 'Check the browser console; the module is served from /static and uses the sx SDK ({base}/sx.d.ts).',
   meta_load_failed: 'error loading meta',
 
   login_email: 'Email',

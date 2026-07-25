@@ -11,15 +11,15 @@ export default function CustomPage() {
   const page = meta.pages?.find((p) => p.id === id)
   const hostRef = useRef<HTMLDivElement>(null)
   const elRef = useRef<HTMLElement | null>(null)
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    setFailed(false)
+    setFailed(null)
     setReady(false)
     elRef.current = null
     if (!page || !page.module) {
-      setFailed(true)
+      setFailed(page ? 'module missing' : 'unknown page')
       return
     }
     let cancelled = false
@@ -29,12 +29,12 @@ export default function CustomPage() {
       .then(() => {
         if (cancelled) return
         if (!customElements.get(tag)) {
-          setFailed(true)
+          setFailed(`custom element <${tag}> was never defined — does the module call sx.definePage('${page.slug}', …)?`)
           return
         }
         setReady(true)
       })
-      .catch(() => !cancelled && setFailed(true))
+      .catch((e: unknown) => !cancelled && setFailed(e instanceof Error ? e.message : String(e)))
     return () => {
       cancelled = true
     }
@@ -54,10 +54,16 @@ export default function CustomPage() {
     el.params = {}
   }, [ready, failed, page])
 
-  if (failed) {
+  if (failed !== null) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="card px-6 py-4 text-sm text-critical">{t('page_load_failed')}</div>
+        <div className="card max-w-xl space-y-2 px-6 py-4">
+          <div className="text-sm text-critical">{t('page_load_failed')}</div>
+          <pre className="overflow-auto rounded-ctl bg-page p-2 font-mono text-xxs text-sec">
+            {page?.module ? `${page.module}: ${failed}` : failed}
+          </pre>
+          <div className="text-xxs text-muted">{t('page_load_failed_hint')}</div>
+        </div>
       </div>
     )
   }
