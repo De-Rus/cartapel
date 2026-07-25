@@ -27,9 +27,14 @@ docker compose up            # → populated demo on http://localhost:8686/admin
 - **Auth, roles, audit**: built-in users/sessions (stored in steward's own
   SQLite file — your database is never written to unless you edit a row),
   per-table/per-field/row-level permissions, and an audit log of every write
-  with before/after diffs.
+  with before/after diffs — **any audited edit reverts in one click**, and the
+  revert is itself audited and undoable. Admins can **view as any role** to
+  verify exactly what it sees (read-only while impersonating).
 - **Dashboards**: SQL-defined stat tiles, charts and tables, evaluated
-  read-only.
+  read-only — parametric via **template variables** (`{{var}}`, bound server-side,
+  URL-backed selector, shareable links).
+- **Zero-config relations**: introspected FKs surface automatically — related
+  records appear as inlines on every detail page with no config at all.
 
 ## Try the demo
 
