@@ -10,7 +10,13 @@ const CHART_CAP: i64 = 500;
 const TABLE_CAP: i64 = 50;
 const SPARK_CAP: i64 = 100;
 
-async fn read_only_rows(state: &AppState, sql: &str, cap: i64) -> Result<Vec<Value>, String> {
+async fn read_only_rows(
+    state: &AppState,
+    sql: &str,
+    cap: i64,
+    env: &crate::vars::Resolved,
+) -> Result<Vec<Value>, String> {
+    let (sql, binds) = crate::interp::interpolate(sql, &env.types, &env.values)?;
     let mut tx = state.pg.begin().await.map_err(|e| e.to_string())?;
     sqlx::query("SET TRANSACTION READ ONLY")
         .execute(&mut *tx)
@@ -21,7 +27,7 @@ async fn read_only_rows(state: &AppState, sql: &str, cap: i64) -> Result<Vec<Val
         .await
         .map_err(|e| e.to_string())?;
     let wrapped = format!("SELECT row_to_json(sub.*) AS r FROM ({sql}) sub LIMIT {cap}");
-    let rows = sqlx::query(&wrapped)
+    let rows = crate::interp::bind_all(sqlx::query(&wrapped), &binds)
         .fetch_all(&mut *tx)
         .await
         .map_err(|e| e.to_string())?;
@@ -73,6 +79,7 @@ pub async fn render_panel(
     state: &AppState,
     w: &crate::config::PanelConfig,
     id: &str,
+    env: &crate::vars::Resolved,
 ) -> Option<Value> {
     let widget = match w.kind {
         PanelKind::Iframe => json!({
@@ -80,11 +87,11 @@ pub async fn render_panel(
         }),
         PanelKind::Stat => {
             let sql = w.sql.as_ref()?;
-            match read_only_rows(state, sql, 1).await {
+            match read_only_rows(state, sql, 1, env).await {
                 Ok(rows) => {
                     let value = scalar(&rows);
                     let compare = match &w.compare_sql {
-                        Some(cs) => match read_only_rows(state, cs, 1).await {
+                        Some(cs) => match read_only_rows(state, cs, 1, env).await {
                             Ok(crows) => scalar(&crows).map(|v| {
                                 json!({ "value": v, "label": w.compare_label.clone().unwrap_or_else(|| "prev".into()) })
                             }),
@@ -93,7 +100,7 @@ pub async fn render_panel(
                         None => None,
                     };
                     let spark = match &w.spark {
-                        Some(sq) => match read_only_rows(state, sq, SPARK_CAP).await {
+                        Some(sq) => match read_only_rows(state, sq, SPARK_CAP, env).await {
                             Ok(srows) => {
                                 let s = spark_series(&srows);
                                 (s.len() > 1).then_some(s)
@@ -117,7 +124,7 @@ pub async fn render_panel(
         }
         PanelKind::Chart => {
             let sql = w.sql.as_ref()?;
-            match read_only_rows(state, sql, CHART_CAP).await {
+            match read_only_rows(state, sql, CHART_CAP, env).await {
                 Ok(rows) => {
                     let points: Vec<Value> = rows
                         .iter()
@@ -146,7 +153,7 @@ pub async fn render_panel(
         }
         PanelKind::Table => {
             let sql = w.sql.as_ref()?;
-            match read_only_rows(state, sql, TABLE_CAP).await {
+            match read_only_rows(state, sql, TABLE_CAP, env).await {
                 Ok(rows) => {
                     let columns: Vec<String> = rows
                         .first()
@@ -199,13 +206,14 @@ async fn render_panels(
     state: &AppState,
     dc: &crate::config::DashboardConfig,
     user: &CurrentUser,
+    env: &crate::vars::Resolved,
 ) -> Vec<Value> {
     let mut widgets = Vec::new();
     for (i, w) in dc.widgets.iter().enumerate() {
         if !w.roles.is_empty() && !w.roles.contains(&user.role) && !user.is_admin() {
             continue;
         }
-        if let Some(widget) = render_panel(state, w, &format!("w{i}")).await {
+        if let Some(widget) = render_panel(state, w, &format!("w{i}"), env).await {
             widgets.push(widget);
         }
     }
@@ -215,9 +223,11 @@ async fn render_panels(
 pub async fn dashboard_handler(
     State(state): State<Arc<AppState>>,
     user: CurrentUser,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<Value>, AppError> {
+    let env = crate::vars::resolve(&state, &user, &params).await?;
     let cfg = state.cfg();
-    let widgets = render_panels(&state, &cfg.dashboard, &user).await;
+    let widgets = render_panels(&state, &cfg.dashboard, &user, &env).await;
     Ok(Json(json!({ "widgets": widgets, "columns": cfg.dashboard.columns })))
 }
 
@@ -225,7 +235,9 @@ pub async fn page_widgets_handler(
     State(state): State<Arc<AppState>>,
     axum::extract::Path(id): axum::extract::Path<String>,
     user: CurrentUser,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<Value>, AppError> {
+    let env = crate::vars::resolve(&state, &user, &params).await?;
     let cfg = state.cfg();
     let page = cfg
         .pages
@@ -240,7 +252,7 @@ pub async fn page_widgets_handler(
         if !w.roles.is_empty() && !w.roles.contains(&user.role) && !user.is_admin() {
             continue;
         }
-        if let Some(widget) = render_panel(&state, w, &format!("w{i}")).await {
+        if let Some(widget) = render_panel(&state, w, &format!("w{i}"), &env).await {
             widgets.push(widget);
         }
     }
@@ -261,7 +273,7 @@ mod tests {
             "type = \"iframe\"\nlabel = \"Docs\"\nurl = \"https://x.io\"\nw = 2\nh = 2\ncategory = \"Links\"\n",
         )
         .unwrap();
-        let rendered = render_panel(&state, &w, "w0").await.unwrap();
+        let rendered = render_panel(&state, &w, "w0", &Default::default()).await.unwrap();
         assert_eq!(rendered["type"], json!("iframe"));
         assert_eq!(rendered["w"], json!(2));
         assert_eq!(rendered["h"], json!(2));
@@ -269,7 +281,7 @@ mod tests {
 
         let bare: crate::config::PanelConfig =
             hcl::from_str("type = \"iframe\"\nlabel = \"Docs\"\nurl = \"https://x.io\"\n").unwrap();
-        let rendered = render_panel(&state, &bare, "w0").await.unwrap();
+        let rendered = render_panel(&state, &bare, "w0", &Default::default()).await.unwrap();
         assert!(rendered.get("w").is_none(), "absent span not emitted");
         assert!(rendered.get("category").is_none(), "absent category not emitted");
     }

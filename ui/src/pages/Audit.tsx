@@ -1,17 +1,19 @@
 import { useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { api } from '../api/client'
-import type { AuditChange } from '../api/types'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { api, ApiError } from '../api/client'
+import type { AuditChange, AuditRow } from '../api/types'
 import { fmtDateTime, fmtInt } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useMeta } from '../lib/meta'
 import { Badge } from '../components/CellValue'
+import { useToast } from '../components/Toast'
 
 const ACTION_COLORS: Record<string, string> = {
   create: 'green',
   update: 'blue',
   delete: 'red',
   login: 'gray',
+  revert: 'green',
 }
 
 function actionColor(action: string): Record<string, string> {
@@ -47,9 +49,13 @@ function ChangePills({ changes }: { changes: Record<string, AuditChange> | null 
   )
 }
 
+const REVERTABLE = new Set(['update', 'revert'])
+
 export default function Audit() {
   const meta = useMeta()
   const t = useT()
+  const toast = useToast()
+  const qc = useQueryClient()
   const [sp, setSp] = useSearchParams()
   const table = sp.get('table') ?? ''
   const page = Math.max(1, Number(sp.get('page') ?? 1))
@@ -63,6 +69,16 @@ export default function Audit() {
   const { data, isLoading } = useQuery({
     queryKey: ['audit', qs.toString()],
     queryFn: () => api.audit(qs.toString()),
+  })
+
+  const revert = useMutation({
+    mutationFn: (r: AuditRow) => api.revert(r.table_name, r.pk, r.id),
+    onSuccess: () => {
+      toast(t('audit_reverted'), 'ok')
+      void qc.invalidateQueries({ queryKey: ['audit'] })
+    },
+    onError: (e) =>
+      toast(e instanceof ApiError && e.status === 409 ? t('audit_revert_conflict') : String(e), 'error'),
   })
 
   const from = data ? (data.total === 0 ? 0 : (page - 1) * pp + 1) : 0
@@ -125,7 +141,7 @@ export default function Audit() {
               </tr>
             )}
             {data?.rows.map((r) => (
-              <tr key={r.id} className="border-t align-top hover:bg-hover">
+              <tr key={r.id} className="group border-t align-top hover:bg-hover">
                 <td className="whitespace-nowrap px-2.5 py-2 tabular-nums text-sec">
                   {fmtDateTime(r.ts)}
                 </td>
@@ -138,7 +154,19 @@ export default function Audit() {
                   {r.pk || '—'}
                 </td>
                 <td className="px-2.5 py-2">
-                  <ChangePills changes={r.changes} />
+                  <span className="flex items-start justify-between gap-2">
+                    <ChangePills changes={r.changes} />
+                    {REVERTABLE.has(r.action) && r.changes && r.table_name && r.pk && (
+                      <button
+                        type="button"
+                        disabled={revert.isPending}
+                        onClick={() => revert.mutate(r)}
+                        className="pointer-events-none text-xxs text-accent opacity-0 transition-opacity hover:underline focus-visible:pointer-events-auto focus-visible:opacity-100 disabled:opacity-50 group-hover:pointer-events-auto group-hover:opacity-100"
+                      >
+                        {t('audit_revert')}
+                      </button>
+                    )}
+                  </span>
                 </td>
               </tr>
             ))}

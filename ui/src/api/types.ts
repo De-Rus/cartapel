@@ -161,9 +161,24 @@ export interface ThemeConfig {
   logo_dark?: string | null
 }
 
+export interface VarOption {
+  value: string
+  label: string
+}
+
+export interface VarDef {
+  name: string
+  label: string
+  type: string
+  kind: string
+  default: string | null
+  options: VarOption[]
+}
+
 export interface Meta {
   brand: string
   base_path: string
+  variables?: VarDef[]
   tables: TableMeta[]
   nav?: NavGroup[]
   user: User

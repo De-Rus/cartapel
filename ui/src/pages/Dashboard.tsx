@@ -7,6 +7,7 @@ import type { Row, StatWidget, TableColumn, TableWidget, Widget } from '../api/t
 import { applyFormat, fmtByFormat, fmtPercent } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useMeta } from '../lib/meta'
+import { VarBar, useVarQuery } from '../components/VarBar'
 import { Badge, CellValue, NUMERIC_WIDGETS } from '../components/CellValue'
 import { Chart, Sparkline } from '../components/Chart'
 import { EmptyState } from '../components/EmptyState'
@@ -496,10 +497,12 @@ function DashboardView({ widgets, columns = DEFAULT_COLS }: { widgets: Widget[];
 
 export default function Dashboard() {
   const meta = useMeta()
+  const vq = useVarQuery()
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: api.dashboard,
+    queryKey: ['dashboard', vq],
+    queryFn: () => api.dashboard(vq),
     enabled: meta.has_dashboard,
+    placeholderData: (prev) => prev,
   })
 
   if (!meta.has_dashboard) {
@@ -507,17 +510,24 @@ export default function Dashboard() {
     return <Navigate to={first ? `/${first.name}` : '/audit'} replace />
   }
   if (isLoading) return <LoadingGrid />
-  return <DashboardView widgets={data?.widgets ?? []} columns={data?.columns ?? DEFAULT_COLS} />
+  return (
+    <div className="space-y-4">
+      <VarBar />
+      <DashboardView widgets={data?.widgets ?? []} columns={data?.columns ?? DEFAULT_COLS} />
+    </div>
+  )
 }
 
 export function PageDashboard() {
   const { '*': id = '' } = useParams()
   const meta = useMeta()
+  const vq = useVarQuery()
   const known = meta.pages?.some((p) => p.id === id && p.declarative)
   const { data, isLoading } = useQuery({
-    queryKey: ['page-widgets', id],
-    queryFn: () => api.pageWidgets(id),
+    queryKey: ['page-widgets', id, vq],
+    queryFn: () => api.pageWidgets(id, vq),
     enabled: known,
+    placeholderData: (prev) => prev,
   })
 
   if (!known) return <Navigate to="/" replace />
@@ -525,6 +535,7 @@ export function PageDashboard() {
   return (
     <div className="space-y-4">
       {data?.label && <h1 className="text-lg font-semibold text-ink">{data.label}</h1>}
+      <VarBar />
       <DashboardView widgets={data?.widgets ?? []} columns={data?.columns ?? DEFAULT_COLS} />
     </div>
   )

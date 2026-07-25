@@ -372,19 +372,24 @@ impl Store {
             .execute("DELETE FROM sessions WHERE token_hash = ?1", [token_hash]);
     }
 
-    pub fn audit(&self, actor: &str, table: &str, pk: Option<&str>, action: &str, changes: Option<&Value>) {
-        let _ = self.conn.lock().unwrap().execute(
-            "INSERT INTO audit_log (ts, actor, table_name, pk, action, changes)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            rusqlite::params![
-                Utc::now().to_rfc3339(),
-                actor,
-                table,
-                pk,
-                action,
-                changes.map(|c| c.to_string())
-            ],
-        );
+    /// Returns the entry id; 0 on failure (audit never blocks the mutation).
+    pub fn audit(&self, actor: &str, table: &str, pk: Option<&str>, action: &str, changes: Option<&Value>) -> i64 {
+        let conn = self.conn.lock().unwrap();
+        let ok = conn
+            .execute(
+                "INSERT INTO audit_log (ts, actor, table_name, pk, action, changes)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                rusqlite::params![
+                    Utc::now().to_rfc3339(),
+                    actor,
+                    table,
+                    pk,
+                    action,
+                    changes.map(|c| c.to_string())
+                ],
+            )
+            .is_ok();
+        if ok { conn.last_insert_rowid() } else { 0 }
     }
 
     pub fn audit_entry(&self, id: i64) -> rusqlite::Result<Option<AuditEntry>> {

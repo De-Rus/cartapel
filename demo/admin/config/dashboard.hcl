@@ -19,10 +19,10 @@ panel {
 
 panel {
   type          = "stat"
-  label         = "Orders 30d"
+  label         = "Orders"
   category      = "Sales"
-  sql           = "SELECT count(*) AS v FROM orders WHERE placed_at > now() - interval '30 days'"
-  spark         = "SELECT count(*) AS v FROM orders WHERE placed_at > now() - interval '30 days' GROUP BY date_trunc('day', placed_at) ORDER BY date_trunc('day', placed_at)"
+  sql           = "SELECT count(*) AS v FROM orders WHERE placed_at > now() - {{days}} * interval '1 day'"
+  spark         = "SELECT count(*) AS v FROM orders WHERE placed_at > now() - {{days}} * interval '1 day' GROUP BY date_trunc('day', placed_at) ORDER BY date_trunc('day', placed_at)"
   good_when     = "up"
 }
 

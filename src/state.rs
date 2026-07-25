@@ -59,6 +59,9 @@ impl AppError {
     pub fn forbidden(msg: impl Into<String>) -> Self {
         Self(StatusCode::FORBIDDEN, msg.into())
     }
+    pub fn conflict(msg: impl Into<String>) -> Self {
+        Self(StatusCode::CONFLICT, msg.into())
+    }
     pub fn unauthorized() -> Self {
         Self(StatusCode::UNAUTHORIZED, "not authenticated".into())
     }

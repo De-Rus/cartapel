@@ -155,9 +155,9 @@ export const api = {
   me: () => request<User>('GET', '/me'),
   meta: () => request<Meta>('GET', '/meta'),
   branding: () => request<Partial<Meta>>('GET', '/public'),
-  dashboard: () => request<DashboardResponse>('GET', '/dashboard'),
-  pageWidgets: (id: string) =>
-    request<DashboardResponse>('GET', `/dash/${id.split('/').map(encodeURIComponent).join('/')}`),
+  dashboard: (qs = '') => request<DashboardResponse>('GET', `/dashboard${qs ? `?${qs}` : ''}`),
+  pageWidgets: (id: string, qs = '') =>
+    request<DashboardResponse>('GET', `/dash/${id.split('/').map(encodeURIComponent).join('/')}${qs ? `?${qs}` : ''}`),
   list: (table: string, qs: string) => request<ListResponse>('GET', `/t/${table}?${qs}`),
   row: (table: string, pk: string) =>
     request<RowResponse>('GET', `/t/${table}/r/${encodeURIComponent(pk)}`),
@@ -185,7 +185,7 @@ export const api = {
   ) => request<ImportResult>('POST', `/t/${table}/import`, { format, data, mode }),
   audit: (qs: string) => request<AuditResponse>('GET', `/audit?${qs}`),
   revert: (table: string, pk: string, auditId: number) =>
-    request<{ row: Row }>('POST', `/t/${table}/r/${encodeURIComponent(pk)}/revert/${auditId}`, {}),
+    request<{ row: Row; audit_id?: number }>('POST', `/t/${table}/r/${encodeURIComponent(pk)}/revert/${auditId}`, {}),
   rowAudit: (table: string, pk: string) =>
     request<AuditResponse>('GET', `/t/${table}/r/${encodeURIComponent(pk)}/audit`),
   search: (q: string) =>

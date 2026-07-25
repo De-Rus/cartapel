@@ -126,7 +126,13 @@ function SidebarGroups({
                 {group}
               </button>
             )}
-            <div className={clsx('space-y-0.5', !rail && isCollapsed && 'hidden')}>
+            <div
+              className={clsx(
+                'space-y-0.5',
+                !rail && 'wide:ml-3.5 wide:border-l wide:border-[color:var(--border)] wide:pl-1.5',
+                !rail && isCollapsed && 'hidden',
+              )}
+            >
               {items.map((e) => (
                 <NavLink
                   key={e.key}
@@ -350,7 +356,13 @@ function TableNav({
                 <span className="truncate">{g.label}</span>
               </button>
             )}
-            <div className={clsx('space-y-0.5', !rail && isCollapsed && 'hidden')}>
+            <div
+              className={clsx(
+                'space-y-0.5',
+                !rail && 'wide:ml-3.5 wide:border-l wide:border-[color:var(--border)] wide:pl-1.5',
+                !rail && isCollapsed && 'hidden',
+              )}
+            >
               {g.tables.map((e) => (
                 <NavLink
                   key={e.key}

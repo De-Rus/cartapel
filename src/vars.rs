@@ -9,6 +9,7 @@ use std::collections::{BTreeMap, HashMap};
 /// in-scope variable (for [`crate::interp::interpolate`]) and its chosen value
 /// (from `v_<name>` params, default-filled). `ident`-typed values are additionally
 /// constrained to the variable's option set here, since they are inlined unquoted.
+#[derive(Default)]
 pub struct Resolved {
     pub types: BTreeMap<String, VarType>,
     pub values: BTreeMap<String, String>,

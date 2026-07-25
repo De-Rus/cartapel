@@ -115,7 +115,8 @@ pub async fn preview_panel(
         return Err(AppError::forbidden("ad-hoc SQL preview is disabled"));
     }
     validate_panel(&body.widget)?;
-    let rendered = crate::dashboard::render_panel(&state, &body.widget, "preview")
+    let env = crate::vars::resolve(&state, &user, &Default::default()).await?;
+    let rendered = crate::dashboard::render_panel(&state, &body.widget, "preview", &env)
         .await
         .unwrap_or(Value::Null);
     Ok(Json(json!({ "widget": rendered })))

@@ -546,13 +546,13 @@ pub async fn update_handler(
     Path((table, pk)): Path<(String, String)>,
     Json(body): Json<Value>,
 ) -> Result<Json<Value>, AppError> {
-    apply_update(&state, &user, &table, &pk, &body, "update").await
+    apply_update(&state, &user, &table, &pk, &body, "update", None).await
 }
 
-/// The single row-update path: permission gates, editable-set validation, the
-/// row-filtered UPDATE, masking, and the audit diff. `update_handler` and
-/// `revert_handler` both funnel through here so a revert is governed by exactly
-/// the same rules as the edit it undoes.
+/// The single row-update path — reverts ride it so they obey the same rules as
+/// edits. `guard` cols must still hold the given jsonb values inside the
+/// UPDATE's WHERE (else 409): staleness is decided in the same statement as the
+/// write, never check-then-act.
 async fn apply_update(
     state: &AppState,
     user: &CurrentUser,
@@ -560,6 +560,7 @@ async fn apply_update(
     pk: &str,
     body: &Value,
     action: &str,
+    guard: Option<&Map<String, Value>>,
 ) -> Result<Json<Value>, AppError> {
     let dbt = table_of(state, user, table)?;
     if !state.table_perms(user, table).update {
@@ -580,12 +581,32 @@ async fn apply_update(
     if let Some(rf) = state.row_filter(user, table) {
         where_sql = format!("{where_sql} AND ({rf})");
     }
+    if let Some(g) = guard {
+        for (col, val) in g {
+            if dbt.column(col).is_none() {
+                return Err(AppError::bad(format!("unknown column {col}")));
+            }
+            let k = binds.push(Some(col.clone()));
+            let v = binds.push(Some(val.to_string()));
+            where_sql = format!(
+                "{where_sql} AND to_jsonb(t.*)->(${k}::text) IS NOT DISTINCT FROM ${v}::jsonb"
+            );
+        }
+    }
     let sql = format!(
         "UPDATE {} t SET {} WHERE {where_sql} RETURNING to_jsonb(t.*) AS r",
         state.qualified_of(dbt),
         sets.join(", ")
     );
-    let row = binds.query(&sql).fetch_one(state.pool_of(dbt)).await?;
+    let row = match binds.query(&sql).fetch_one(state.pool_of(dbt)).await {
+        Ok(row) => row,
+        Err(sqlx::Error::RowNotFound) if guard.is_some() => {
+            return Err(AppError::conflict(
+                "the row has changed since this edit — refresh and review before reverting",
+            ));
+        }
+        Err(e) => return Err(e.into()),
+    };
     let mut after: Value = row.get("r");
     present_row(&mut after, &state.masked_columns(user, table), &binary_cols(dbt));
 
@@ -596,21 +617,21 @@ async fn apply_update(
             json!({ "from": before.get(col), "to": after.get(col) }),
         );
     }
-    state
-        .store
-        .audit(&user.email, table, Some(pk), action, Some(&Value::Object(diff)));
-    Ok(Json(json!({ "row": after })))
+    let audit_id =
+        state
+            .store
+            .audit(&user.email, table, Some(pk), action, Some(&Value::Object(diff)));
+    Ok(Json(json!({ "row": after, "audit_id": audit_id })))
 }
 
-/// One-click undo of an audited edit: rebuild `{col: from}` from the stored
-/// diff and push it back through the normal update path. Refuses when the row
-/// has moved on since (any audited `to` no longer matches the current value) —
-/// a revert never guesses over someone else's later edit.
+/// Admin-only (the audit log it replays is admin-only to read); 409 when the
+/// row moved on since the audited edit.
 pub async fn revert_handler(
     State(state): State<Arc<AppState>>,
     user: CurrentUser,
     Path((table, pk, audit_id)): Path<(String, String, i64)>,
 ) -> Result<Json<Value>, AppError> {
+    crate::configedit::admin_only(&user)?;
     let dbt = table_of(&state, &user, &table)?;
     if !state.table_perms(&user, &table).update {
         return Err(AppError::forbidden("no write access"));
@@ -632,20 +653,22 @@ pub async fn revert_handler(
         .filter(|d| !d.is_empty())
         .ok_or_else(|| AppError::bad("audit entry has no revertable changes"))?;
 
+    // Pre-check names the drifted column; the atomic backstop is the WHERE guard.
     let current = fetch_one(&state, &user, &table, dbt, &pk).await?;
     let mut set = Map::new();
+    let mut guard = Map::new();
     for (col, change) in diff {
         let from = change.get("from").cloned().unwrap_or(Value::Null);
         let to = change.get("to").cloned().unwrap_or(Value::Null);
         if current.get(col.as_str()).cloned().unwrap_or(Value::Null) != to {
-            return Err(AppError(
-                axum::http::StatusCode::CONFLICT,
-                format!("{col} has changed since this edit — refresh and review before reverting"),
-            ));
+            return Err(AppError::conflict(format!(
+                "{col} has changed since this edit — refresh and review before reverting"
+            )));
         }
         set.insert(col.clone(), from);
+        guard.insert(col.clone(), to);
     }
-    apply_update(&state, &user, &table, &pk, &json!({ "set": set }), "revert").await
+    apply_update(&state, &user, &table, &pk, &json!({ "set": set }), "revert", Some(&guard)).await
 }
 
 const MAX_BULK_PKS: usize = 5000;

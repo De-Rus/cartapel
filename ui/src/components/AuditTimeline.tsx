@@ -46,14 +46,25 @@ function Entry({ r, table, pk }: { r: AuditRow; table: string; pk: string }) {
   const toast = useToast()
   const qc = useQueryClient()
   const revert = useMutation({
-    mutationFn: () => api.revert(table, pk, r.id),
-    onSuccess: () => {
-      toast(t('audit_reverted'), 'ok')
+    mutationFn: (auditId: number) => api.revert(table, pk, auditId),
+    onSuccess: (data) => {
+      const undoId = data.audit_id
+      toast(
+        t('audit_reverted'),
+        undoId
+          ? { kind: 'ok', action: { label: t('audit_undo'), onClick: () => revert.mutate(undoId) } }
+          : 'ok',
+      )
       void qc.invalidateQueries({ queryKey: ['row', table, pk] })
       void qc.invalidateQueries({ queryKey: ['rowAudit', table, pk] })
       void qc.invalidateQueries({ queryKey: ['list', table] })
+      void qc.invalidateQueries({ queryKey: ['audit'] })
     },
-    onError: (e) => toast(e instanceof ApiError ? e.message : String(e), 'error'),
+    onError: (e) =>
+      toast(
+        e instanceof ApiError && e.status === 409 ? t('audit_revert_conflict') : String(e),
+        'error',
+      ),
   })
   const revertable = REVERTABLE.has(r.action) && r.changes && Object.keys(r.changes).length > 0
   return (
@@ -69,8 +80,8 @@ function Entry({ r, table, pk }: { r: AuditRow; table: string; pk: string }) {
             <button
               type="button"
               disabled={revert.isPending}
-              onClick={() => revert.mutate()}
-              className="text-xxs text-accent opacity-0 transition-opacity hover:underline focus-visible:opacity-100 disabled:opacity-50 group-hover:opacity-100"
+              onClick={() => revert.mutate(r.id)}
+              className="pointer-events-none text-xxs text-accent opacity-0 transition-opacity hover:underline focus-visible:pointer-events-auto focus-visible:opacity-100 disabled:opacity-50 group-hover:pointer-events-auto group-hover:opacity-100"
             >
               {t('audit_revert')}
             </button>
