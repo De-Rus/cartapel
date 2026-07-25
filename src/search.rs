@@ -23,6 +23,10 @@ pub async fn search_handler(
     };
     let started = Instant::now();
     let mut results: Vec<Value> = Vec::new();
+    let mut seen: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
+    // "42" or a UUID jumps straight to that row (indexed pk hit, ranked first).
+    let pkish = q.chars().all(|c| c.is_ascii_digit())
+        || (q.len() == 36 && q.chars().all(|c| c.is_ascii_hexdigit() || c == '-'));
 
     for table in state.visible_tables(&user) {
         if results.len() >= TOTAL_CAP || started.elapsed() > BUDGET {
@@ -41,6 +45,38 @@ pub async fn search_handler(
         }
         let title_col = fk_label_col(dbt);
         let title_col = if masked.contains(&title_col) { pk.clone() } else { title_col };
+
+        if pkish {
+            let mut b = Binds::new();
+            let n = b.push(Some(q.clone()));
+            let mut w = format!("{}::text = ${n}", ident(&pk));
+            if let Some(rf) = state.row_filter(&user, &table) {
+                w = format!("{w} AND ({rf})");
+            }
+            let sql = format!(
+                "SELECT {}::text AS pk, {}::text AS title FROM {} t WHERE {w} LIMIT 1",
+                ident(&pk),
+                ident(&title_col),
+                state.qualified_of(dbt),
+            );
+            let hit: Option<(Option<String>, Option<String>)> = async {
+                let mut tx = state.pool_of(dbt).begin().await.ok()?;
+                sqlx::query("SET TRANSACTION READ ONLY").execute(&mut *tx).await.ok()?;
+                sqlx::query("SET LOCAL statement_timeout = '2000ms'").execute(&mut *tx).await.ok()?;
+                let mut qq = sqlx::query_as::<_, (Option<String>, Option<String>)>(&sql);
+                for v in &b.values {
+                    qq = qq.bind(v.as_deref());
+                }
+                qq.fetch_optional(&mut *tx).await.ok()?
+            }
+            .await;
+            if let Some((Some(pkv), titlev)) = hit {
+                if seen.insert((table.clone(), pkv.clone())) {
+                    let label = cfg.label.clone().unwrap_or_else(|| humanize(&table));
+                    results.push(json!({ "table": table, "label": label, "pk": pkv, "title": titlev }));
+                }
+            }
+        }
 
         let mut binds = Binds::new();
         let n = binds.push(Some(format!("%{q}%")));
@@ -78,6 +114,9 @@ pub async fn search_handler(
                 break;
             }
             let Some(pkv) = pkv else { continue };
+            if !seen.insert((table.clone(), pkv.clone())) {
+                continue;
+            }
             results.push(json!({
                 "table": table,
                 "label": label,
