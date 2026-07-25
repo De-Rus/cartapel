@@ -9,6 +9,21 @@ use serde_json::{json, Value};
 use std::path::Path as FsPath;
 use std::sync::Arc;
 
+/// Where a group's folder lives (or should live). An existing group keeps its
+/// convention; a NEW group follows the config's: `screens/<slug>/` when a
+/// `screens/` root exists, else the flat `<slug>/`.
+pub(crate) fn group_dir(dir: &FsPath, slug: &str) -> std::path::PathBuf {
+    let screens = dir.join("screens").join(slug);
+    let flat = dir.join(slug);
+    if screens.join("_group.hcl").exists() {
+        screens
+    } else if flat.join("_group.hcl").exists() || !dir.join("screens").is_dir() {
+        flat
+    } else {
+        screens
+    }
+}
+
 /// A group's stable key is its folder name. It must be a plain slug: ASCII
 /// letters/digits/`-`, never empty, never leading `_` or `-` (leading `_` is
 /// reserved for framework folders like `config`), and never a reserved stem.
@@ -143,7 +158,8 @@ pub async fn create_group(
     let Some(dir) = writable_dir(&state) else {
         return Ok((StatusCode::OK, not_writable(Some(hcl))));
     };
-    if dir.join(&slug).exists() {
+    let gdir = group_dir(&dir, &slug);
+    if gdir.exists() {
         return Err(AppError(StatusCode::CONFLICT, format!("folder '{slug}' already exists")));
     }
 
@@ -153,8 +169,8 @@ pub async fn create_group(
             &state,
             &dir,
             vec![
-                FsOp::Mkdir { path: dir.join(&slug) },
-                FsOp::Write { path: dir.join(&slug).join("_group.hcl"), contents: hcl.clone() },
+                FsOp::Mkdir { path: gdir.clone() },
+                FsOp::Write { path: gdir.join("_group.hcl"), contents: hcl.clone() },
             ],
         )?;
         state.store.config_version_add(&format!("_group/{slug}"), &hcl, &user.email, None)?;
@@ -217,7 +233,7 @@ pub async fn patch_group(
         commit_batch_and_reload(
             &state,
             &dir,
-            vec![FsOp::Write { path: dir.join(&slug).join("_group.hcl"), contents: hcl.clone() }],
+            vec![FsOp::Write { path: group_dir(&dir, &slug).join("_group.hcl"), contents: hcl.clone() }],
         )?;
         state.store.config_version_add(&format!("_group/{slug}"), &hcl, &user.email, None)?;
     }
@@ -267,7 +283,9 @@ pub async fn rename_group(
     let Some(dir) = writable_dir(&state) else {
         return Ok(not_writable(None));
     };
-    if dir.join(&to).exists() {
+    let from_dir = group_dir(&dir, &slug);
+    let to_dir = from_dir.with_file_name(&to);
+    if to_dir.exists() {
         return Err(AppError(StatusCode::CONFLICT, format!("folder '{to}' already exists")));
     }
 
@@ -276,7 +294,7 @@ pub async fn rename_group(
         commit_batch_and_reload(
             &state,
             &dir,
-            vec![FsOp::Move { from: dir.join(&slug), to: dir.join(&to) }],
+            vec![FsOp::Move { from: from_dir, to: to_dir }],
         )?;
         if !group_hcl.is_empty() {
             state.store.config_version_add(&format!("_group/{to}"), &group_hcl, &user.email, None)?;
@@ -320,7 +338,7 @@ pub async fn delete_group(
     let Some(dir) = writable_dir(&state) else {
         return Ok(not_writable(None));
     };
-    let group_dir = dir.join(&slug);
+    let group_dir = group_dir(&dir, &slug);
     if leftover_entries(&group_dir) {
         return Err(AppError(
             StatusCode::CONFLICT,
@@ -476,25 +494,57 @@ pub async fn save_layout(
             affected_groups.insert(dg.clone());
         }
         let stem = crate::configedit::safe_stem(table)?;
+        // A `screen.hcl` table is a folder — the folder moves whole (keeps its
+        // module files). A flat `<t>.hcl` moving into a screens-layout group is
+        // converted to the folder form (a bare stem under screens/ is rejected
+        // by the loader).
+        let src_is_screen = src.path.file_name().is_some_and(|n| n == "screen.hcl");
+        let from = if src_is_screen {
+            src.path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| src.path.clone())
+        } else {
+            src.path.clone()
+        };
+        let mut mkdir: Option<std::path::PathBuf> = None;
         let to = match want_group {
-            Some(slug) => dir.join(slug).join(format!("{stem}.hcl")),
-            None => dir.join(format!("{stem}.hcl")),
+            Some(slug) => {
+                let gd = group_dir(&dir, slug);
+                let in_screens = gd.starts_with(dir.join("screens"));
+                if src_is_screen {
+                    gd.join(&stem)
+                } else if in_screens {
+                    let td = gd.join(&stem);
+                    mkdir = Some(td.clone());
+                    td.join("screen.hcl")
+                } else {
+                    gd.join(format!("{stem}.hcl"))
+                }
+            }
+            None => {
+                if src_is_screen {
+                    dir.join("screens").join(&stem)
+                } else {
+                    dir.join(format!("{stem}.hcl"))
+                }
+            }
         };
         // A moved stem must not land on an existing DIFFERENT file in the
         // destination — that would trip the loader's duplicate-table error.
-        if to != src.path && to.exists() {
+        if to != from && to.exists() {
             return Err(AppError(
                 StatusCode::CONFLICT,
-                format!("'{stem}.hcl' already exists in the destination group"),
+                format!("'{stem}' already exists in the destination group"),
             ));
         }
         if !dest_paths.insert(to.clone()) {
             return Err(AppError(
                 StatusCode::CONFLICT,
-                format!("two tables target the same destination '{stem}.hcl'"),
+                format!("two tables target the same destination '{stem}'"),
             ));
         }
-        ops.push(FsOp::Move { from: src.path.clone(), to });
+        if let Some(d) = mkdir {
+            ops.push(FsOp::Mkdir { path: d });
+        }
+        ops.push(FsOp::Move { from, to });
     }
 
     let requested_order: std::collections::BTreeMap<&str, &[String]> =
@@ -523,7 +573,7 @@ pub async fn save_layout(
         };
         let hcl = serialize_group(&group_cfg)?;
         ops.push(FsOp::Write {
-            path: dir.join(slug).join("_group.hcl"),
+            path: group_dir(&dir, slug).join("_group.hcl"),
             contents: hcl.clone(),
         });
         touched_groups.push((slug.clone(), hcl));
@@ -750,6 +800,76 @@ mod tests {
             Some("b"),
         );
         assert_eq!(state.cfg().table_group_label("bots").as_deref(), Some("B"));
+    }
+
+    #[tokio::test]
+    async fn layout_move_in_screens_layout_moves_the_table_folder() {
+        let dir = tmp_dir();
+        let screens = dir.join("screens");
+        for (g, label) in [("a", "A"), ("b", "B")] {
+            let gd = screens.join(g);
+            std::fs::create_dir_all(&gd).unwrap();
+            std::fs::write(gd.join("_group.hcl"), format!("label = \"{label}\"\norder = 1\n")).unwrap();
+        }
+        let td = screens.join("a").join("bots");
+        std::fs::create_dir_all(&td).unwrap();
+        std::fs::write(td.join("screen.hcl"), "label = \"Bots\"\n").unwrap();
+        let state = state_with_tables(Some(dir.clone()), &["bots"]);
+        assert_eq!(state.cfg().table_sources.get("bots").and_then(|s| s.group.as_deref()), Some("a"));
+
+        let out = save_layout(
+            axum::extract::State(state.clone()),
+            admin(),
+            Json(Layout {
+                groups: vec![
+                    LayoutGroup { slug: "a".into(), tables: vec![] },
+                    LayoutGroup { slug: "b".into(), tables: vec!["bots".into()] },
+                ],
+                ungrouped: vec![],
+            }),
+        )
+        .await
+        .unwrap()
+        .0;
+        assert_eq!(out["ok"], json!(true));
+        // The folder moved whole, stayed inside screens/, and NO flat fork
+        // (dir/b/, dir/b/_group.hcl) was created.
+        assert!(!screens.join("a").join("bots").exists());
+        assert!(screens.join("b").join("bots").join("screen.hcl").exists());
+        assert!(!dir.join("b").exists());
+        assert_eq!(
+            state.cfg().table_sources.get("bots").and_then(|s| s.group.as_deref()),
+            Some("b"),
+        );
+    }
+
+    #[tokio::test]
+    async fn flat_table_moved_into_screens_group_converts_to_folder_form() {
+        let dir = tmp_dir();
+        let gd = dir.join("screens").join("a");
+        std::fs::create_dir_all(&gd).unwrap();
+        std::fs::write(gd.join("_group.hcl"), "label = \"A\"\norder = 1\n").unwrap();
+        seed_table(&dir, None, "bots", "Bots");
+        let state = state_with_tables(Some(dir.clone()), &["bots"]);
+
+        let out = save_layout(
+            axum::extract::State(state.clone()),
+            admin(),
+            Json(Layout {
+                groups: vec![LayoutGroup { slug: "a".into(), tables: vec!["bots".into()] }],
+                ungrouped: vec![],
+            }),
+        )
+        .await
+        .unwrap()
+        .0;
+        assert_eq!(out["ok"], json!(true));
+        assert!(!dir.join("bots.hcl").exists());
+        assert!(dir.join("screens").join("a").join("bots").join("screen.hcl").exists());
+        assert_eq!(
+            state.cfg().table_sources.get("bots").and_then(|s| s.group.as_deref()),
+            Some("a"),
+        );
     }
 
     #[tokio::test]

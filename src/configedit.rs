@@ -235,8 +235,13 @@ async fn create_in_group(
         .find(|g| g.slug == group)
         .ok_or_else(|| AppError::bad(format!("unknown group '{group}'")))?;
 
-    let group_dir = dir.join(&g.slug);
-    let table_path = group_dir.join(format!("{stem}.hcl"));
+    let group_dir = crate::groupsedit::group_dir(dir, &g.slug);
+    let in_screens = group_dir.starts_with(dir.join("screens"));
+    let table_path = if in_screens {
+        group_dir.join(stem).join("screen.hcl")
+    } else {
+        group_dir.join(format!("{stem}.hcl"))
+    };
     if table_path.exists() {
         return Err(AppError(
             axum::http::StatusCode::CONFLICT,
@@ -262,14 +267,13 @@ async fn create_in_group(
 
     {
         let _guard = state.config_write_lock.lock().unwrap();
-        commit_batch_and_reload(
-            state,
-            dir,
-            vec![
-                FsOp::Write { path: table_path, contents: hcl_text.to_string() },
-                FsOp::Write { path: group_path, contents: group_hcl.clone() },
-            ],
-        )?;
+        let mut ops = Vec::new();
+        if in_screens {
+            ops.push(FsOp::Mkdir { path: group_dir.join(stem) });
+        }
+        ops.push(FsOp::Write { path: table_path, contents: hcl_text.to_string() });
+        ops.push(FsOp::Write { path: group_path, contents: group_hcl.clone() });
+        commit_batch_and_reload(state, dir, ops)?;
         state.store.config_version_add(table, hcl_text, &user.email, None)?;
         state.store.config_version_add(&group_key, &group_hcl, &user.email, None)?;
     }
