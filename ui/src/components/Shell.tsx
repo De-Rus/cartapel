@@ -696,10 +696,10 @@ function ShellChrome({ meta }: { meta: Meta }) {
           <div className="mb-2 hidden px-1 wide:block">
             <input
               className="input-sm w-full"
-              placeholder="Filter…"
+              placeholder={t('nav_filter_placeholder')}
               value={navFilter}
               onChange={(e) => setNavFilter(e.target.value)}
-              aria-label="Filter navigation"
+              aria-label={t('nav_filter_aria')}
             />
           </div>
         )}
@@ -707,7 +707,7 @@ function ShellChrome({ meta }: { meta: Meta }) {
         <nav className="min-h-0 flex-1 overflow-y-auto">
           {meta.has_dashboard && (
             <div className="space-y-0.5">
-              <NavLink to="/" end className={({ isActive }) => clsx(navCls(isActive), rail && 'justify-center')} title="Dashboard">
+              <NavLink to="/" end className={({ isActive }) => clsx(navCls(isActive), rail && 'justify-center')} title={t('nav_dashboard')}>
                 <IconDashboard size={15} className="shrink-0" />
                 {!rail && <span className="hidden wide:block">{t('nav_dashboard')}</span>}
               </NavLink>
@@ -723,7 +723,7 @@ function ShellChrome({ meta }: { meta: Meta }) {
           {meta.can_manage_access && <AccessNav t={t} rail={rail} />}
           {meta.can_manage_access && <ConfigNav t={t} rail={rail} />}
           <div className="mt-4 border-t pt-3">
-            <NavLink to="/audit" className={({ isActive }) => clsx(navCls(isActive), rail && 'justify-center')} title="Audit">
+            <NavLink to="/audit" className={({ isActive }) => clsx(navCls(isActive), rail && 'justify-center')} title={t('nav_audit')}>
               <IconAudit size={15} className="shrink-0" />
               {!rail && <span className="hidden wide:block">{t('nav_audit')}</span>}
             </NavLink>
@@ -736,8 +736,8 @@ function ShellChrome({ meta }: { meta: Meta }) {
               type="button"
               onClick={() => setCollapsed((c) => !c)}
               className="hidden h-7 w-7 items-center justify-center rounded-ctl text-muted hover:bg-hover hover:text-ink wide:flex"
-              title={rail ? 'Expand sidebar' : 'Collapse sidebar'}
-              aria-label="Toggle sidebar"
+              title={rail ? t('sidebar_expand') : t('sidebar_collapse')}
+              aria-label={rail ? t('sidebar_expand') : t('sidebar_collapse')}
             >
               <IconChevronsLeft size={15} className={rail ? 'rotate-180' : ''} />
             </button>
@@ -776,7 +776,7 @@ function ShellChrome({ meta }: { meta: Meta }) {
               type="button"
               className="btn !px-2"
               onClick={() => setMobileNav(true)}
-              aria-label="Open navigation"
+              aria-label={t('nav_open')}
             >
               <IconMenu size={16} />
             </button>
@@ -787,17 +787,17 @@ function ShellChrome({ meta }: { meta: Meta }) {
             type="button"
             onClick={() => openPalette('default')}
             className="hidden items-center gap-2 rounded-ctl border bg-surface2 px-2.5 py-1 text-[13px] text-muted hover:text-ink sm:flex"
-            aria-label="Open command palette"
+            aria-label={t('palette_open_aria')}
           >
             <IconSearch size={14} />
-            <span className="min-w-28 text-left">Search…</span>
+            <span className="min-w-28 text-left">{t('search')}</span>
             <span className="kbd ml-2">⌘K</span>
           </button>
           <button
             type="button"
             onClick={() => openPalette('default')}
             className="btn !px-2 sm:hidden"
-            aria-label="Search"
+            aria-label={t('palette_open_aria')}
           >
             <IconSearch size={15} />
           </button>

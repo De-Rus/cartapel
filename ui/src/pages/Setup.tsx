@@ -176,7 +176,7 @@ export default function Setup() {
                 />
                 <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{tb.name}</span>
                 {tb.noise && <span className="text-xxs text-muted">{t('setup_noise')}</span>}
-                {tb.is_view && <span className="text-xxs text-muted">view</span>}
+                {tb.is_view && <span className="text-xxs text-muted">{t('cfg_disc_view')}</span>}
                 {!tb.pk && <span className="text-xxs text-warning">{t('setup_no_pk')}</span>}
                 {tb.approx_rows != null && (
                   <span className="text-xxs tabular-nums text-muted">{fmtCompact(tb.approx_rows)}</span>

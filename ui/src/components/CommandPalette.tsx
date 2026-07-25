@@ -53,10 +53,10 @@ interface Group {
 }
 
 const KIND_LABEL: Record<Item['kind'], string> = {
-  jump: 'Table',
-  action: 'Action',
-  record: 'Record',
-  recent: 'Recent',
+  jump: 'palette_kind_table',
+  action: 'palette_kind_action',
+  record: 'palette_kind_record',
+  recent: 'palette_kind_recent',
 }
 
 export function CommandPalette({
@@ -112,7 +112,7 @@ export function CommandPalette({
     const pages = (meta.pages ?? []).map((p) => ({
       id: `p:${p.id}`,
       primary: p.label,
-      secondary: p.group ?? 'Pages',
+      secondary: p.group ?? t('palette_pages'),
       to: `/p/${p.id}`,
     }))
     const extra =
@@ -134,7 +134,7 @@ export function CommandPalette({
       if (recent.length && mode !== 'table') {
         out.push({
           key: 'recent',
-          label: 'Recent',
+          label: t('palette_recent'),
           items: recent.map((r, i) => ({
             kind: 'recent' as const,
             id: `recent:${i}`,
@@ -146,7 +146,7 @@ export function CommandPalette({
       }
       out.push({
         key: 'jump',
-        label: mode === 'table' ? 'Jump to table' : 'Jump to',
+        label: mode === 'table' ? t('palette_jump_to_table') : t('palette_jump_to'),
         items: jumpTargets.map((j) => ({ kind: 'jump' as const, ranges: [], ...j })),
       })
       return out
@@ -159,12 +159,12 @@ export function CommandPalette({
       if (ranked.length) {
         out.push({
           key: 'actions',
-          label: 'Actions',
+          label: t('actions'),
           items: ranked.map((r) => ({
             kind: 'action' as const,
             id: `action:${r.item.name}`,
             primary: `${r.item.label} — ${tb!.label_plural}`,
-            secondary: 'Select rows, then run',
+            secondary: t('palette_select_rows_hint'),
             run: () => navigate(`/${currentTable}`),
           })),
         })
@@ -175,7 +175,7 @@ export function CommandPalette({
     if (jumpRanked.length) {
       out.push({
         key: 'jump',
-        label: mode === 'table' ? 'Jump to table' : 'Jump to',
+        label: mode === 'table' ? t('palette_jump_to_table') : t('palette_jump_to'),
         items: jumpRanked.map((r) => ({
           kind: 'jump' as const,
           ranges: r.match.ranges,
@@ -189,7 +189,7 @@ export function CommandPalette({
       if (hits.length) {
         out.push({
           key: 'records',
-          label: 'Records',
+          label: t('palette_records'),
           items: hits.map((h, i) => ({
             kind: 'record' as const,
             id: `rec:${h.table}:${h.pk}:${i}`,
@@ -201,7 +201,7 @@ export function CommandPalette({
       }
     }
     return out
-  }, [q, mode, currentTable, jumpTargets, searchData, meta, navigate])
+  }, [q, mode, currentTable, jumpTargets, searchData, meta, navigate, t])
 
   const flat = useMemo(() => groups.flatMap((g) => g.items), [groups])
 
@@ -264,14 +264,14 @@ export function CommandPalette({
         className="palette-in flex h-fit max-h-[70vh] w-[min(640px,92vw)] flex-col overflow-hidden rounded-card bg-surface1 shadow-modal"
         role="dialog"
         aria-modal="true"
-        aria-label="Command palette"
+        aria-label={t('palette_aria')}
       >
         <div className="flex h-[52px] shrink-0 items-center gap-3 px-3.5">
           <IconSearch size={16} className="shrink-0 text-muted" />
           <input
             ref={inputRef}
             className="min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none"
-            placeholder={mode === 'table' ? 'Jump to table…' : 'Search or jump to…'}
+            placeholder={mode === 'table' ? t('palette_placeholder_table') : t('palette_placeholder')}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={onKeyDown}
@@ -345,7 +345,7 @@ export function CommandPalette({
                         <span className="block truncate text-xxs text-muted">{item.secondary}</span>
                       )}
                     </span>
-                    <span className="shrink-0 text-xxs text-muted">{KIND_LABEL[item.kind]}</span>
+                    <span className="shrink-0 text-xxs text-muted">{t(KIND_LABEL[item.kind])}</span>
                     {isActive && <IconReturn size={13} className="shrink-0 text-muted" />}
                   </div>
                 )
@@ -355,9 +355,9 @@ export function CommandPalette({
         </div>
 
         <div className="flex h-8 shrink-0 items-center gap-3 border-t bg-surface2 px-3 text-xxs text-muted">
-          <span>↑↓ navigate</span>
-          <span>↵ open</span>
-          <span>⌘↵ new tab</span>
+          <span>{t('kbd_navigate')}</span>
+          <span>{t('kbd_open')}</span>
+          <span>{t('kbd_new_tab')}</span>
         </div>
       </div>
     </div>

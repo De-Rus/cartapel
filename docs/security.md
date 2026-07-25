@@ -102,7 +102,9 @@ reserved stems (`config`, `_group`, `page`, `queries`).
 A `kind = "webhook"` action proxies the selected primary keys to a URL you
 configure — an escape hatch into your real backend rather than a direct DB write.
 When `STEWARD_WEBHOOK_SECRET` is set, outbound webhooks are signed with an
-`X-Steward-Signature` (HMAC-SHA256) header your backend can verify.
+`X-Steward-Signature` (HMAC-SHA256) header your backend can verify. Webhooks
+can be disabled outright with `disable_webhooks` — see
+[Hardening toggles](#hardening-toggles).
 
 ## Audit log
 
@@ -110,3 +112,28 @@ Every write — create, update, delete, bulk action, config change, user/role
 change — is recorded in steward's SQLite audit log with actor, timestamp and, for
 row edits, a before/after diff. Per-record history is available on each detail
 view; the full log is an admin-only view.
+
+### One-click revert
+
+An audited **field edit** (an `update`, or a previous `revert`) can be reverted
+in one click from the record's history or the audit log. Guardrails:
+
+- **Admin-only** — and the revert still passes through the normal update path,
+  so table permissions, row filters and masking all apply.
+- **Refused on drift (409)** — if any affected column has changed since the
+  audited edit, the revert is rejected with a conflict. Staleness is enforced
+  inside the `UPDATE`'s own `WHERE` clause, never check-then-act.
+- **A revert is itself audited** as a `revert` entry with its own diff — so it
+  can be reverted in turn, and the UI offers an immediate undo toast.
+
+## Hardening toggles
+
+Two opt-in switches in `config/steward.hcl` narrow the surface further:
+
+- `disable_sql_preview = true` — disables the dashboard builder's ad-hoc SQL
+  preview, blocking arbitrary read-SQL even for admins.
+- `disable_webhooks = true` — disables outbound webhook actions entirely (an
+  SSRF surface).
+
+Both default to `false`. See the globals table in the
+[configuration overview](/configuration/overview).

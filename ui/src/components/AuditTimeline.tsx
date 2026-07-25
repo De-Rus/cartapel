@@ -134,7 +134,7 @@ export function AuditTimeline({ table, pk }: { table: string; pk: string }) {
           className="mt-1 text-xxs text-accent hover:underline"
           onClick={() => setExpanded((e) => !e)}
         >
-          {expanded ? 'Show less' : t('show_all')}
+          {expanded ? t('show_less') : t('show_all')}
         </button>
       )}
     </div>

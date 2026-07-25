@@ -125,6 +125,28 @@ panel {
 | `link` | table | Target table for row links. |
 | `url` | iframe | The embedded URL. |
 
+## Template variables
+
+`{{name}}` placeholders work in **every panel's `sql`, `compare_sql` and
+`spark`**. They reference the global
+[template variables](/configuration/pages-and-queries#template-variables)
+declared in a `variables.hcl`, and are resolved **per request** from `v_<name>`
+URL parameters (falling back to each variable's default) and bound as SQL
+parameters — never string-spliced.
+
+```hcl
+panel {
+  type  = "stat"
+  label = "Orders"
+  sql   = "SELECT count(*) AS v FROM orders WHERE placed_at > now() - {{window}} * interval '1 day'"
+}
+```
+
+Whenever any variables are in scope, the dashboard renders a selector bar above
+the grid; changing a value re-runs the panels and updates the URL
+(`?v_window=90`), so a parameterized dashboard view is shareable by link. A
+supplied value outside a variable's option set is a hard 400.
+
 ## Safety
 
 Every dashboard and panel query runs in a **read-only transaction** with a

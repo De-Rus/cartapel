@@ -52,7 +52,7 @@ list {
 | --- | --- | --- |
 | `columns` | list | Columns shown in the list, in order. Omit → all introspected columns. |
 | `search` | list | Columns the search box matches against. |
-| `filters` | list | Filterable columns. A name here that matches a `filter_def` uses that custom filter; otherwise it filters on the column's own values. |
+| `filters` | list | Filterable columns. **Omit → every column is filterable** (defaults-first); a declared list is an allowlist — only the listed names are accepted. A name matching a `filter_def` surfaces that custom filter; otherwise it filters on the column's own values. Masked columns can never be filtered. |
 | `sort` | string | Default sort column. Prefix with `-` for descending (`"-created_at"`). |
 | `per_page` | number | Page size for this table (overrides the global `per_page`). |
 | `filter_def "name" { }` | block | A custom filter: a `label` plus a raw `sql` predicate. |

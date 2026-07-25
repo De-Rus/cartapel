@@ -16,6 +16,8 @@ With **no `detail` block at all**, steward already produces a good record view:
 - fields group by their `field { group = … }` tags (or into one "Details" card);
 - identifiers, foreign keys and timestamps (`id`, `*_id`, `*_at`) are detected
   and pulled into the meta sidebar automatically;
+- every configured table with a foreign key into this one appears as an
+  [inline](#inlines) automatically;
 - everything is read-first with an Edit toggle.
 
 You reach for `detail { }` only to name sections, add hero stats, or change how
@@ -133,7 +135,22 @@ detail {
 ## Inlines
 
 Inlines embed rows of a related child table directly in a parent's detail view —
-the classic "orders on a customer" layout. Declare them in `relations { }`.
+the classic "orders on a customer" layout.
+
+### Zero-config
+
+Inlines are **on by default**: with no `relations { }` block at all, every
+*configured* table with an introspected foreign key into this one appears as an
+inline automatically. Opt out with:
+
+```hcl
+relations {
+  auto = false
+}
+```
+
+Declaring any `inlines = [...]` list takes **manual control** — only the listed
+inlines render.
 
 ### Simple form
 

@@ -87,6 +87,10 @@ essentials:
 | `STEWARD_SECURE_COOKIES` | `true` behind HTTPS (default); `false` for local HTTP. |
 | `STEWARD_WEBHOOK_SECRET` | Signs outbound webhook actions. |
 
+First-run bootstrap reads `STEWARD_ADMIN_EMAIL` / `STEWARD_ADMIN_PASSWORD` /
+`STEWARD_ADMIN_ROLE` — the role defaults to `admin`, and a public demo can
+bootstrap a restricted role instead.
+
 Config values themselves can read the environment with `env:NAME` / `${NAME}`, so
 you can keep the DB URL and secret in `config/steward.hcl` while still sourcing
 them from the environment.

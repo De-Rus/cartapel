@@ -380,7 +380,7 @@ export function DataTable({
                       type="button"
                       className="inline-flex items-center gap-1 hover:text-ink"
                       onClick={(e) => toggleSort(c, e.shiftKey)}
-                      title="Click to sort · Shift-click to add"
+                      title={t('sort_tooltip')}
                     >
                       {label}
                       {active &&
@@ -403,7 +403,7 @@ export function DataTable({
                       e.stopPropagation()
                       onResize(c, 0)
                     }}
-                    title="Drag to resize · double-click to auto-fit"
+                    title={t('resize_tooltip')}
                   />
                 </th>
               )

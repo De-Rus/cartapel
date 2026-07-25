@@ -1,10 +1,11 @@
 # Roles & permissions
 
 Access is governed by **roles**. Each user has one role; a role grants access to
-tables, columns, rows and actions. The authoritative roles live in
-`config/auth.hcl` — versioned config you review like code. (Additional roles can
-be created at runtime from the in-app builder and are stored in steward's SQLite
-state; config roles always win a name collision.)
+tables, columns, rows and actions. Roles are authoritative in
+`config/auth.hcl` — versioned config you review like code. The in-app roles
+screen edits that same file: creates, edits and deletes write `config/auth.hcl`
+atomically and hot-swap the live config (on a read-only bundle it hands you the
+HCL to commit yourself).
 
 ## The `admin` role
 
@@ -160,14 +161,32 @@ actions = ["orders.mark_shipped", "orders.refund", "products.deactivate"]
 
 ## Managing roles & users at runtime
 
-Admins can manage roles and users from the in-app access screens (backed by
-steward's SQLite state, additive to the config roles). Guardrails:
+Admins can manage roles and users from the in-app access screens. Role edits
+write `config/auth.hcl` (atomically, versioned, hot-swapped); users live in
+steward's SQLite state. Guardrails:
 
-- A config or builtin role cannot be edited or deleted from the UI.
-- A role still assigned to users cannot be deleted.
+- The builtin `admin` role cannot be edited or deleted.
+- A role still assigned to users cannot be deleted — reassign them first.
 - You cannot delete or demote the **last** admin user.
-- New roles are validated against the live schema — every referenced table,
-  column and action must exist.
+- Role definitions are validated against the live schema — every referenced
+  table, column and action must exist.
+- On a read-only config bundle, role edits change nothing — the screen returns
+  the would-be HCL for you to commit.
 
 Users can also be provisioned offline with
 [`steward user add`](/cli#steward-user-add).
+
+## View as a role
+
+An admin can **impersonate any other defined role** to verify exactly what it
+sees — pick "View as" from the user menu. While impersonating:
+
+- Every request is evaluated with the impersonated role's permissions, masking
+  and row filters.
+- The session is **read-only**: any mutation is rejected with a 403 until you
+  exit.
+- It **never escalates** — only admins are honored, and viewing as `admin` is a
+  no-op.
+
+A banner shows the active role the whole time; exit via the banner or the user
+menu.

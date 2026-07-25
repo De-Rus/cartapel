@@ -105,13 +105,39 @@ steward user add teammate@example.com --role support --data ./steward-data
 
 See the [CLI reference](/cli) for every flag.
 
-## Register your first table
+## Register your first tables
 
 The panel is an **allowlist**: only tables that have a config file are exposed.
 An introspected-but-unconfigured table is absent from the navigation and 404s if
-you hit its URL directly. This means an empty panel is normal until you add a
-config.
+you hit its URL directly. So a fresh panel starts empty — and steward offers two
+ways to fill it: the first-run setup wizard, or config files by hand.
 
+### The setup wizard
+
+When an admin logs into a panel with **zero configured tables**, steward
+redirects them to the setup wizard at `/_setup`. It lists every introspected
+table (with approximate row counts) and builds the whole first config in one
+screen:
+
+- Everything is pre-selected **except** framework noise (`schema_migrations`,
+  `_prisma_migrations`, `django_migrations`, …) and tables without a primary
+  key — both stay in the list, flagged, and can be ticked back on. Views are
+  labeled too.
+- Tables arrive pre-sorted into **suggested groups**: one group per schema when
+  you introspect several, otherwise by shared name prefix (`order_items`,
+  `order_events` → an "Order" group).
+- You can rename any group inline, move a table to another group, or create a
+  new group on the spot.
+
+One click then writes the plan as a **single atomic batch**: a `_group.hcl` per
+group plus an empty config file per table (empty = introspected defaults), and
+hot-swaps it into the live panel — no restart. If the config directory is
+**read-only**, nothing is written: the wizard shows every would-be file with a
+copy button so you can commit them to your repo instead.
+
+### By hand
+
+The wizard writes ordinary files; you can just as well author them yourself.
 First, tell steward which database to read — the reserved `config/steward.hcl`
 declares the primary `source` (its URL comes from `STEWARD_DB` / `--db`):
 
@@ -168,8 +194,10 @@ icon  = "package"   # any lucide icon name
 order = 1
 ```
 
-Save, and steward hot-reloads the config with no restart. Reload the panel and
-the Catalog group appears with your Products table inside it.
+Save the files and **restart steward** — config files on disk are read at
+startup, and there is no filesystem watcher. (Edits made through the in-app
+builder — including the setup wizard — do hot-swap the live config with no
+restart.) The Catalog group then appears with your Products table inside it.
 
 ## What's next
 

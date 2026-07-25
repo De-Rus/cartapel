@@ -61,6 +61,7 @@ Beyond the per-flag variables above, steward reads:
 | `STEWARD_SECRET_KEY` | **Yes** | The app signing root for session cookies. steward refuses to start if this is unset **and** `[steward].secret_key` is also unset. See [Security](/security#secret-key). |
 | `STEWARD_ADMIN_EMAIL` | No | Email for the bootstrap admin created on first run. Defaults to `admin@localhost`. |
 | `STEWARD_ADMIN_PASSWORD` | No | Password for the bootstrap admin. When unset, a random one is generated and logged. |
+| `STEWARD_ADMIN_ROLE` | No | Role for the bootstrap user. Defaults to `admin`; a public demo can bootstrap a restricted role (e.g. a read-mostly `demo` role from `auth.hcl`) instead. |
 | `STEWARD_WEBHOOK_SECRET` | No | HMAC secret for signing outbound webhook actions (`X-Steward-Signature`). |
 | `STEWARD_DB_TX_POOL` | No | Set to `1` to force transaction-pooler mode (disables sqlx's prepared-statement cache). Auto-detected for Supabase's port `6543` pooler. |
 | `RUST_LOG` | No | Standard `tracing` filter. Defaults to `steward=info,tower_http=warn`. |

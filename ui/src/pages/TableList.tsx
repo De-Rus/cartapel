@@ -578,7 +578,7 @@ function ListInner({ table }: { table: TableMeta }) {
       {hasSelection && selected.size > 0 && (
         <div className="card pop-in flex items-center gap-2 px-3 py-2">
           <span className="text-[13px] tabular-nums text-sec">
-            {t('selected', { count: fmtInt(selected.size) })}
+            {selected.size === 1 ? t('selected_one') : t('selected', { count: fmtInt(selected.size) })}
           </span>
           <button type="button" className="text-xxs text-muted hover:text-ink" onClick={() => setSelected(new Set())}>
             {t('clear_all')}

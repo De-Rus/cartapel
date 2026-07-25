@@ -169,7 +169,9 @@ function DeleteRoleModal({
     <Modal title={t('delete')} onClose={onClose}>
       <p className="text-sm text-sec">{interpolate(t('delete_role_confirm'), { name: role.name })}</p>
       {role.user_count > 0 && (
-        <p className="mt-2 text-[13px] text-serious">{interpolate(t('role_in_use'), { count: role.user_count })}</p>
+        <p className="mt-2 text-[13px] text-serious">
+          {role.user_count === 1 ? t('role_in_use_one') : interpolate(t('role_in_use'), { count: role.user_count })}
+        </p>
       )}
       {error && <p className="mt-3 text-[13px] text-critical">{error}</p>}
       <div className="mt-5 flex justify-end gap-2">

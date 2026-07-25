@@ -33,7 +33,6 @@ steward touches two separate stores, and keeps them strictly apart:
   your database:
   - **users** — panel accounts (argon2id password hashes).
   - **sessions** — active login sessions.
-  - **roles** — runtime-created roles (additive to config roles).
   - **saved_views** — users' saved list filters.
   - **audit_log** — every write, with actor, timestamp and before/after diffs.
   - **config_versions** — the history of config edits (see below).

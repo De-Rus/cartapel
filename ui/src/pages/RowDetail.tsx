@@ -654,7 +654,7 @@ export function DetailBody({
           {editable && !col.nullable && !col.computed && <span className="text-[11px] text-serious">*</span>}
           {col.computed && (
             <span className="rounded bg-surface2 px-1 py-px text-[9px] font-medium uppercase tracking-wide text-muted">
-              computed
+              {t('computed_badge')}
             </span>
           )}
         </div>
@@ -711,7 +711,7 @@ export function DetailBody({
           {label}
           {col.computed && (
             <span className="rounded bg-surface2 px-1 py-px text-[9px] font-medium uppercase tracking-wide text-muted">
-              computed
+              {t('computed_badge')}
             </span>
           )}
         </div>
@@ -922,7 +922,9 @@ export function DetailBody({
         {dirty && (
           <div className="sticky bottom-0 -mx-5 -mb-5 flex items-center gap-3 border-t bg-surface1 px-5 py-3 sm:-mx-6 sm:px-6">
             <span className="text-[13px] text-sec">
-              {t('unsaved_changes', { count: fmtInt(Object.keys(diff).length) })}
+              {Object.keys(diff).length === 1
+                ? t('unsaved_changes_one')
+                : t('unsaved_changes', { count: fmtInt(Object.keys(diff).length) })}
             </span>
             {errorBanner}
             <div className="flex-1" />
@@ -1023,7 +1025,9 @@ export function DetailBody({
           className="bar-in fixed bottom-4 left-1/2 z-30 flex items-center gap-3 rounded-card bg-surface1 px-4 py-2.5 shadow-modal outline-none"
         >
           <span className="text-[13px] text-sec">
-            {t('unsaved_changes', { count: fmtInt(Object.keys(diff).length) })}
+            {Object.keys(diff).length === 1
+              ? t('unsaved_changes_one')
+              : t('unsaved_changes', { count: fmtInt(Object.keys(diff).length) })}
           </span>
           {errorBanner}
           <button className="btn" onClick={() => setDraft(null)} disabled={saveMut.isPending}>
