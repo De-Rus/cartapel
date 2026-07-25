@@ -327,15 +327,18 @@ impl AppState {
                     .collect()
             })
             .unwrap_or_default();
-        if user.is_admin() {
-            return out;
-        }
+        // An explicit `masked = true` is the author's call — it applies to
+        // everyone, admins included (the field block only OPTS OUT of the
+        // secret-shape default when masked is absent/false).
         if let Some(f) = fields {
             for (k, fc) in f {
                 if fc.masked && !out.contains(k) {
                     out.push(k.clone());
                 }
             }
+        }
+        if user.is_admin() {
+            return out;
         }
         if let Some(role) = self.resolve_role(&user.role) {
             if let Some(extra) = role.masked.get(table) {

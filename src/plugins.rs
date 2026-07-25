@@ -57,6 +57,18 @@ pub async fn serve_static(State(state): State<Arc<AppState>>, Path(path): Path<S
     };
     let (real, base) = match (dir.join(&path).canonicalize(), dir.canonicalize()) {
         (Ok(real), Ok(base)) => (real, base),
+        // The shared components hook is optional in every config — an empty
+        // module keeps the browser console clean instead of a permanent 404.
+        _ if path == "config/widgets/components.js" => {
+            return (
+                [
+                    (header::CONTENT_TYPE, "text/javascript".to_string()),
+                    (header::CACHE_CONTROL, "no-cache".to_string()),
+                ],
+                "export {}\n",
+            )
+                .into_response()
+        }
         _ => return (StatusCode::NOT_FOUND, "asset not found").into_response(),
     };
     if !real.starts_with(&base) {

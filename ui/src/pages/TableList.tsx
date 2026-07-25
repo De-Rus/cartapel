@@ -3,13 +3,13 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { api, ApiError } from '../api/client'
-import type { ActionMeta, ColumnMeta, FilterMeta, ListResponse, Row, TableMeta } from '../api/types'
+import type { ActionMeta, ColumnMeta, ListResponse, Row, TableMeta } from '../api/types'
 import { type Condition, encodeCondition } from '../lib/filters'
 import { fmtInt } from '../lib/format'
 import { useDebounced, useMediaQuery } from '../lib/hooks'
 import { isEditableTarget } from '../lib/keys'
 import { isEditable } from '../lib/perms'
-import { useT, type TFn } from '../lib/i18n'
+import { useT } from '../lib/i18n'
 import { useMeta, useTable } from '../lib/meta'
 import { emptyStateKind, nextPeekIndex } from '../lib/peek'
 import { useRowPrefetch } from '../lib/prefetch'
@@ -26,7 +26,7 @@ import { BulkEditModal } from '../components/BulkEditModal'
 import { ColumnMenu } from '../components/ColumnMenu'
 import { DataTable } from '../components/DataTable'
 import { ExportButton } from '../components/ExportButton'
-import { FilterBuilder } from '../components/FilterBuilder'
+import { FilterBar } from '../components/FilterBar'
 import { ImportDrawer } from '../components/ImportDrawer'
 import { SavedViews } from '../components/SavedViews'
 import { EmptyState } from '../components/EmptyState'
@@ -34,142 +34,10 @@ import { RecordPeek } from '../components/RecordPeek'
 import { Sheet } from '../components/Sheet'
 import { Modal } from '../components/Modal'
 import { DetailBody } from './RowDetail'
-import { IconDownload, IconFilterOff, IconInbox, IconPlus, IconSearch, IconSliders, IconX } from '../components/Icons'
+import { IconDownload, IconFilterOff, IconInbox, IconPlus, IconSearch, IconSliders } from '../components/Icons'
 import { useToast } from '../components/Toast'
 import { ConfigBuilder } from '../components/ConfigBuilder'
 import { GroupTabs } from '../components/GroupTabs'
-
-const DATE_PRESETS = [
-  { value: 'today', key: 'date_today' },
-  { value: '7d', key: 'date_7d' },
-  { value: '30d', key: 'date_30d' },
-  { value: '90d', key: 'date_90d' },
-]
-
-function isQuickFilter(f: FilterMeta): boolean {
-  return f.type === 'bool' || f.type === 'date' || f.type === 'custom' || (f.type === 'enum' && f.options.length > 0)
-}
-
-function FilterControl({
-  filter,
-  value,
-  onChange,
-  t,
-}: {
-  filter: FilterMeta
-  value: string | null
-  onChange: (v: string | null) => void
-  t: TFn
-}) {
-  const [customOpen, setCustomOpen] = useState(false)
-  const isRange = value?.includes('..') ?? false
-
-  if (filter.type === 'enum') {
-    return (
-      <select
-        className="input-sm"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value || null)}
-        aria-label={filter.label}
-      >
-        <option value="">{t('filter_all', { label: filter.label })}</option>
-        {filter.options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-            {o.count != null ? ` (${fmtInt(o.count)})` : ''}
-          </option>
-        ))}
-        <option value="__null__">{t('filter_empty_option')}</option>
-      </select>
-    )
-  }
-  if (filter.type === 'bool') {
-    return (
-      <select
-        className="input-sm"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value || null)}
-        aria-label={filter.label}
-      >
-        <option value="">{t('filter_all', { label: filter.label })}</option>
-        <option value="true">{t('filter_yes')}</option>
-        <option value="false">{t('filter_no')}</option>
-      </select>
-    )
-  }
-  if (filter.type === 'date') {
-    return (
-      <span className="flex items-center gap-1">
-        <select
-          className="input-sm"
-          value={isRange || customOpen ? 'custom' : (value ?? '')}
-          onChange={(e) => {
-            const v = e.target.value
-            if (v === 'custom') {
-              setCustomOpen(true)
-            } else {
-              setCustomOpen(false)
-              onChange(v || null)
-            }
-          }}
-          aria-label={filter.label}
-        >
-          <option value="">{t('filter_always', { label: filter.label })}</option>
-          {DATE_PRESETS.map((p) => (
-            <option key={p.value} value={p.value}>
-              {t(p.key)}
-            </option>
-          ))}
-          <option value="custom">{t('date_range')}</option>
-        </select>
-        {(customOpen || isRange) && (
-          <DateRange
-            value={isRange ? value! : ''}
-            onChange={(v) => {
-              onChange(v)
-            }}
-          />
-        )}
-      </span>
-    )
-  }
-  return (
-    <button
-      type="button"
-      className={clsx(
-        'rounded-full border px-2.5 py-1 text-xxs font-medium',
-        value === '1' ? 'border-transparent bg-accent text-white' : 'text-sec hover:text-ink',
-      )}
-      onClick={() => onChange(value === '1' ? null : '1')}
-    >
-      {filter.label}
-    </button>
-  )
-}
-
-function DateRange({ value, onChange }: { value: string; onChange: (v: string | null) => void }) {
-  const [from = '', to = ''] = value.split('..')
-  const set = (f: string, t: string) => {
-    if (f && t) onChange(`${f}..${t}`)
-  }
-  return (
-    <span className="flex items-center gap-1">
-      <input
-        type="date"
-        className="input-sm tabular-nums"
-        value={from}
-        onChange={(e) => set(e.target.value, to)}
-      />
-      <span className="text-muted">–</span>
-      <input
-        type="date"
-        className="input-sm tabular-nums"
-        value={to}
-        onChange={(e) => set(from, e.target.value)}
-      />
-    </span>
-  )
-}
 
 function ListInner({ table }: { table: TableMeta }) {
   const navigate = useNavigate()
@@ -353,7 +221,6 @@ function ListInner({ table }: { table: TableMeta }) {
   }
 
   const activeFilters = [...sp.entries()].filter(([k]) => k.startsWith('f_'))
-  const quickFilters = table.list.filters.filter(isQuickFilter)
 
   const applyConditions = (conds: Condition[]) => {
     patch((p) => {
@@ -493,26 +360,6 @@ function ListInner({ table }: { table: TableMeta }) {
             onChange={(e) => setQInput(e.target.value)}
           />
         </div>
-        <FilterBuilder
-          table={table}
-          entries={activeFilters}
-          activeCount={activeFilters.length}
-          onApply={applyConditions}
-        />
-        {quickFilters.map((f) => (
-          <FilterControl
-            key={f.name}
-            filter={f}
-            t={t}
-            value={sp.get(`f_${f.name}`)}
-            onChange={(v) =>
-              patch((p) => {
-                if (v == null) p.delete(`f_${f.name}`)
-                else p.set(`f_${f.name}`, v)
-              })
-            }
-          />
-        ))}
         <ColumnMenu
           table={table}
           state={colState}
@@ -546,34 +393,7 @@ function ListInner({ table }: { table: TableMeta }) {
         onClear={clearListState}
       />
 
-      {activeFilters.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {activeFilters.map(([k, v]) => {
-            const name = k.slice(2).replace(/__\w+$/, '')
-            const f = table.list.filters.find((x) => x.name === name)
-            const opMatch = /__(\w+)$/.exec(k.slice(2))
-            return (
-              <button
-                key={k}
-                type="button"
-                className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-xxs text-sec hover:text-ink"
-                onClick={() => patch((p) => p.delete(k))}
-              >
-                <span className="text-muted">{f?.label ?? name}{opMatch ? ` ${opMatch[1]}` : ''}:</span>
-                {f?.type === 'custom' ? t('filter_yes') : v === '__null__' ? t('filter_empty') : v}
-                <IconX size={10} />
-              </button>
-            )
-          })}
-          <button
-            type="button"
-            className="text-xxs text-muted hover:text-ink"
-            onClick={() => patch((p) => [...p.keys()].filter((k) => k.startsWith('f_')).forEach((k) => p.delete(k)))}
-          >
-            {t('clear_all')}
-          </button>
-        </div>
-      )}
+      <FilterBar table={table} entries={activeFilters} onApply={applyConditions} />
 
       {hasSelection && selected.size > 0 && (
         <div className="card pop-in flex items-center gap-2 px-3 py-2">
