@@ -151,7 +151,7 @@ export default function Setup() {
         >
           {t('setup_write', { n: String(sel.size) })}
         </button>
-        <button type="button" className="btn" onClick={() => navigate('/')}>
+        <button type="button" className="btn" onClick={() => navigate('/audit')}>
           {t('setup_skip')}
         </button>
       </div>
