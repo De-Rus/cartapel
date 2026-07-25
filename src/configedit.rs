@@ -1125,7 +1125,6 @@ pub(crate) mod test_support {
             config_dir: dir,
             store: Store::open_memory(),
             base_path: String::new(),
-            brand: "t".into(),
             http: reqwest::Client::new(),
             secure_cookies: false,
             secret_key: [7u8; 32],

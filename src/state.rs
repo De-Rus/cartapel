@@ -31,7 +31,6 @@ pub struct AppState {
     pub config_dir: Option<PathBuf>,
     pub store: Store,
     pub base_path: String,
-    pub brand: String,
     pub http: reqwest::Client,
     pub secure_cookies: bool,
     /// HMAC-SHA256 root for signing session cookies (and future at-rest secret
@@ -203,6 +202,16 @@ impl AppState {
     /// needed (including across `.await`) without blocking a concurrent reload.
     pub fn cfg(&self) -> Arc<ConfigDir> {
         self.cfg.load_full()
+    }
+
+    /// The live brand — reads the hot-swappable config so an on-disk edit
+    /// applies without a restart.
+    pub fn brand(&self) -> String {
+        self.cfg()
+            .cartapel
+            .brand
+            .clone()
+            .unwrap_or_else(|| "cartapel".into())
     }
 
     /// Re-read the config directory and atomically swap it in. On any failure the

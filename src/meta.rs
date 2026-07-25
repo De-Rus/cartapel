@@ -1111,7 +1111,6 @@ mod relation_tests {
             config_dir: None,
             store: Store::open_memory(),
             base_path: String::new(),
-            brand: "t".into(),
             http: reqwest::Client::new(),
             secure_cookies: false,
             secret_key: [7u8; 32],
@@ -1236,7 +1235,7 @@ mod gate_tests {
 pub async fn public_branding_handler(State(state): State<Arc<AppState>>) -> Json<Value> {
     let cfg = state.cfg();
     Json(json!({
-        "brand": state.brand,
+        "brand": state.brand(),
         "brand_logo": cfg.cartapel.brand_logo,
         "theme": cfg.cartapel.theme,
         "locale": cfg.cartapel.locale,
@@ -1264,7 +1263,7 @@ pub async fn meta_handler(
     let nav = nav_groups(&state, &tables);
     let variables = variables_meta(&state, &user).await;
     Ok(Json(json!({
-        "brand": state.brand,
+        "brand": state.brand(),
         "brand_logo": cfg.cartapel.brand_logo,
         "theme": cfg.cartapel.theme,
         "locale": cfg.cartapel.locale,

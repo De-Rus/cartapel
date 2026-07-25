@@ -516,11 +516,6 @@ async fn serve(
         }
     }
 
-    let brand = cfg
-        .cartapel
-        .brand
-        .clone()
-        .unwrap_or_else(|| "cartapel".into());
     let secret_key = resolve_secret_key(std::env::var("CARTAPEL_SECRET_KEY").ok(), &cfg.cartapel)
         .unwrap_or_else(|e| {
             tracing::error!("{e}");
@@ -536,7 +531,6 @@ async fn serve(
         config_dir: config,
         store,
         base_path: base_path.clone(),
-        brand,
         // No redirect-following: the source proxy and webhook actions both attach
         // secrets (token_env / HMAC signature); a 3xx to another host would leak
         // them. Upstreams are pinned to their configured (trusted, internal) host.

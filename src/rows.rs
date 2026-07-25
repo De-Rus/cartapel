@@ -1789,7 +1789,6 @@ mod tests {
             config_dir: None,
             store: Store::open_memory(),
             base_path: String::new(),
-            brand: "t".into(),
             http: reqwest::Client::new(),
             secure_cookies: false,
             secret_key: [7u8; 32],
