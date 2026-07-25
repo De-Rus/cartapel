@@ -17,10 +17,12 @@ function filterOps(f: FilterMeta) {
   return opsForKind(f.kind)
 }
 
+// Configured filters come first (curated: enum options, filter_defs); every
+// remaining real column is filterable too — the server accepts any column.
 function candidates(table: TableMeta): FilterMeta[] {
-  if (table.list.filters.length) return table.list.filters
-  return table.columns
-    .filter((c) => !['json', 'binary'].includes(c.kind))
+  const declared = new Set(table.list.filters.map((f) => f.name))
+  const rest = table.columns
+    .filter((c) => !declared.has(c.name) && !['json', 'binary'].includes(c.kind))
     .map((c) => ({
       name: c.name,
       label: c.label ?? c.name,
@@ -28,6 +30,7 @@ function candidates(table: TableMeta): FilterMeta[] {
       options: [],
       kind: c.kind,
     }))
+  return [...table.list.filters, ...rest]
 }
 
 function ValueInput({
@@ -179,6 +182,9 @@ function AddFilter({
         }}
       />
       <div className="max-h-56 overflow-auto">
+        {shown.length === 0 && (
+          <div className="px-2 py-1.5 text-[13px] text-muted">{t('no_results')}</div>
+        )}
         {shown.map((f) => (
           <button
             key={f.name}

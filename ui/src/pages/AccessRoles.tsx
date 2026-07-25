@@ -224,7 +224,10 @@ export default function AccessRoles() {
   const [editor, setEditor] = useState<RoleInfo | null>(null)
   const [deleting, setDeleting] = useState<RoleInfo | null>(null)
 
-  const refresh = () => qc.invalidateQueries({ queryKey: ['access-roles'] })
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ['access-roles'] })
+    void qc.invalidateQueries({ queryKey: ['meta'] })
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">

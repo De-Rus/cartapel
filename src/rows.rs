@@ -88,12 +88,9 @@ fn build_list_query(
                 continue;
             }
         }
-        // Defaults-first: with no configured filter list, any real column filters;
-        // a declared list is an allowlist.
-        if !cfg.list.filters.is_empty() && !cfg.list.filters.contains(&name.to_string()) {
-            return Err(AppError::bad(format!("filter {name} is not enabled")));
-        }
-        if cfg.list.filters.is_empty() && dbt.column(name).is_none() {
+        // Any real column filters (Notion-style); the configured list only
+        // curates which are featured. Masked columns are gated below.
+        if !cfg.list.filters.contains(&name.to_string()) && dbt.column(name).is_none() {
             return Err(AppError::bad(format!("unknown filter {name}")));
         }
         if masked.contains(&name.to_string()) {

@@ -37,12 +37,14 @@ fn valid_slug(slug: &str) -> bool {
 
 fn ensure_slug(slug: &str) -> Result<(), AppError> {
     if valid_slug(slug) {
-        Ok(())
-    } else {
-        Err(AppError::bad(
-            "group slug must be letters, digits or '-', with no leading '_' or '-'",
-        ))
+        return Ok(());
     }
+    if RESERVED_STEMS.iter().any(|r| r.eq_ignore_ascii_case(slug)) {
+        return Err(AppError::bad(format!("'{slug}' is a reserved name and cannot be a group")));
+    }
+    Err(AppError::bad(
+        "group slug must be letters, digits or '-', with no leading '_' or '-'",
+    ))
 }
 
 fn writable_dir(state: &AppState) -> Option<std::path::PathBuf> {

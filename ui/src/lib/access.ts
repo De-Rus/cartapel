@@ -58,7 +58,9 @@ export function definitionToMatrix(
   definition: RoleDefinition | null,
   tables: string[],
 ): MatrixModel {
-  const def = definition ?? EMPTY_DEF
+  // The server skips empty maps when serializing (`skip_serializing_if`), so a
+  // stored definition may arrive without tables/masked/row_filter entirely.
+  const def = { ...EMPTY_DEF, ...(definition ?? {}) }
   const vocab = new Set(tables)
   const rows: MatrixRow[] = tables.map((table) => {
     const perm = cleanPerm(def.perms?.[table])

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useT } from '../lib/i18n'
 
 export function Sheet({
   title,
@@ -11,6 +12,7 @@ export function Sheet({
   children: React.ReactNode
   width?: number
 }) {
+  const t = useT()
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -39,7 +41,7 @@ export function Sheet({
             type="button"
             className="rounded-ctl px-2 py-1 text-[13px] text-muted hover:text-ink"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('cfg_close')}
           >
             Esc
           </button>

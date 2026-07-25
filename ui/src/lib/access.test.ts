@@ -58,6 +58,14 @@ describe('definition ↔ matrix mapping', () => {
     expect(back.row_filter).toEqual({ bots: 'owner = {actor.email}' })
   })
 
+
+  it('tolerates a server definition with skipped empty maps', () => {
+    const sparse = { actions: [] } as unknown as RoleDefinition
+    const m = definitionToMatrix(sparse, TABLES)
+    expect(m.rows.every((r) => r.level === 'none' && r.masked.length === 0)).toBe(true)
+    expect(matrixToDefinition(m).tables).toEqual({})
+  })
+
   it('round-trips extends and omits it when unset', () => {
     const def: RoleDefinition = {
       extends: 'viewer',

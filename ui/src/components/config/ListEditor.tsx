@@ -33,7 +33,12 @@ export function ListEditor({
   const shown = new Set(columns)
 
   const toggleColumn = (col: string) => {
-    setList({ columns: shown.has(col) ? columns.filter((c) => c !== col) : [...columns, col] })
+    // Re-checking restores the column at its display position, not the end.
+    setList({
+      columns: shown.has(col)
+        ? columns.filter((c) => c !== col)
+        : order.filter((c) => shown.has(c) || c === col),
+    })
   }
   const reorderColumns = (nextOrder: string[]) => {
     setList({ columns: nextOrder.filter((c) => shown.has(c)) })

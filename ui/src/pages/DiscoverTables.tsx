@@ -111,6 +111,11 @@ export default function DiscoverTables() {
                   <span>
                     {t('cfg_disc_col_cols')}: <span className="tabular-nums">{tb.column_count}</span>
                   </span>
+                  {tb.approx_rows != null && tb.approx_rows >= 0 && (
+                    <span>
+                      {t('cfg_disc_col_rows')}: <span className="tabular-nums">~{tb.approx_rows.toLocaleString()}</span>
+                    </span>
+                  )}
                 </div>
               </div>
               <AddRow table={tb} onAdded={onAdded} />

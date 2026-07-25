@@ -427,6 +427,23 @@ pub async fn roles_delete(
             format!("role '{name}' is assigned to {count} user(s) — reassign them first"),
         ));
     }
+    let dependents: Vec<String> = state
+        .cfg()
+        .auth
+        .roles
+        .iter()
+        .filter(|(_, r)| r.extends.as_deref() == Some(name.as_str()))
+        .map(|(n, _)| n.clone())
+        .collect();
+    if !dependents.is_empty() {
+        return Err(AppError(
+            StatusCode::CONFLICT,
+            format!(
+                "role '{name}' is inherited by {} — remove the inheritance first",
+                dependents.join(", ")
+            ),
+        ));
+    }
     let (ok, out) = write_auth(&state, &user, |auth| {
         auth.roles.remove(&name);
         Ok(())

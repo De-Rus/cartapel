@@ -75,7 +75,11 @@ function PreviewPane({ widget }: { widget: WidgetConfigData }) {
       </div>
       {mut.isError ? (
         <div className="rounded-ctl border bg-surface2 px-2.5 py-2 text-xxs text-critical">
-          {mut.error instanceof ApiError ? mut.error.message : t('cfg_dash_preview_failed')}
+          {mut.error instanceof ApiError
+            ? mut.error.message.includes('preview is disabled')
+              ? t('cfg_dash_preview_off')
+              : mut.error.message
+            : t('cfg_dash_preview_failed')}
         </div>
       ) : result ? (
         <WidgetCard w={result} />

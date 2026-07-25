@@ -305,6 +305,7 @@ const es: Dict = {
   cfg_readonly_back: 'Volver al editor',
   cfg_download: 'Descargar',
   cfg_close: 'Cerrar',
+  cfg_dash_preview_off: 'La vista previa SQL está desactivada en esta instancia (endurecimiento).',
 
   cfg_list_columns: 'Columnas visibles',
   cfg_list_columns_hint: 'Arrastra para reordenar; marca las que se muestran en la lista.',
@@ -531,6 +532,7 @@ const es: Dict = {
   cfg_disc_col_schema: 'Esquema',
   cfg_disc_col_pk: 'Clave',
   cfg_disc_col_cols: 'Columnas',
+  cfg_disc_col_rows: 'Filas',
   cfg_disc_view: 'vista',
   cfg_disc_no_pk: 'sin clave',
   cfg_disc_add: 'Añadir al panel',
@@ -843,6 +845,7 @@ const en: Dict = {
   cfg_readonly_back: 'Back to editor',
   cfg_download: 'Download',
   cfg_close: 'Close',
+  cfg_dash_preview_off: 'SQL preview is disabled on this instance (hardening).',
 
   cfg_list_columns: 'Visible columns',
   cfg_list_columns_hint: 'Drag to reorder; check the ones shown in the list.',
@@ -1069,6 +1072,7 @@ const en: Dict = {
   cfg_disc_col_schema: 'Schema',
   cfg_disc_col_pk: 'Key',
   cfg_disc_col_cols: 'Columns',
+  cfg_disc_col_rows: 'Rows',
   cfg_disc_view: 'view',
   cfg_disc_no_pk: 'no key',
   cfg_disc_add: 'Add to admin',
