@@ -413,7 +413,7 @@ function fieldErrorsFrom(err: unknown, cols: ColumnMeta[]): Record<string, strin
   if (!(err instanceof ApiError) || err.status !== 400) return {}
   const hits: Record<string, string> = {}
   for (const c of cols) {
-    if (err.message.includes(c.name)) hits[c.name] = err.message
+    if (err.message.includes(`"${c.name}"`)) hits[c.name] = err.message
   }
   return hits
 }

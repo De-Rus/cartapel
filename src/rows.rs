@@ -272,6 +272,44 @@ fn operator_clause(
     Ok(())
 }
 
+/// `<col>__label` companions for the list projection: one correlated lookup per
+/// FK whose target the caller may view (same rules as options_handler — target
+/// configured + viewable + row-filtered), skipping masked columns and targets
+/// with no name-ish label column. Cross-source FKs can't be joined and are skipped.
+fn fk_label_pairs(state: &AppState, user: &CurrentUser, key: &str, dbt: &DbTable) -> Vec<String> {
+    let masked = state.masked_columns(user, key);
+    let mut out = Vec::new();
+    for c in &dbt.columns {
+        let Some((ft, fc)) = &c.fk else { continue };
+        if masked.contains(&c.name) {
+            continue;
+        }
+        let Ok(child) = state.readable_table(user, ft) else { continue };
+        if child.source != dbt.source {
+            continue;
+        }
+        let label = fk_label_col(child);
+        if Some(&label) == child.pk.as_ref() {
+            continue;
+        }
+        let mut sub = format!(
+            "SELECT f.{}::text FROM {} f WHERE f.{} = t.{}",
+            ident(&label),
+            state.qualified_of(child),
+            ident(fc),
+            ident(&c.name)
+        );
+        if let Some(rf) = state.row_filter(user, ft) {
+            sub = format!("{sub} AND ({rf})");
+        }
+        out.push(format!(
+            "{}, ({sub} LIMIT 1)",
+            crate::sqlval::sql_literal(&format!("{}__label", c.name))
+        ));
+    }
+    out
+}
+
 async fn fetch_rows(
     state: &AppState,
     user: &CurrentUser,
@@ -281,7 +319,11 @@ async fn fetch_rows(
     limit: i64,
     offset: i64,
 ) -> Result<Vec<Value>, AppError> {
-    let sel = crate::meta::row_select(dbt, &table_config(state, key));
+    let mut sel = crate::meta::row_select(dbt, &table_config(state, key));
+    let pairs = fk_label_pairs(state, user, key, dbt);
+    if !pairs.is_empty() {
+        sel = format!("({sel}) || jsonb_build_object({})", pairs.join(", "));
+    }
     let sql = format!(
         "SELECT {sel} AS r FROM {} t {} {} LIMIT {limit} OFFSET {offset}",
         state.qualified_of(dbt),

@@ -34,6 +34,10 @@ export default function RowCreate() {
   const fields = table.columns.filter((c) => isEditable(table, c))
   const err = createMut.error
   const errMsg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : null
+  // Postgres double-quotes identifiers in constraint messages — match the quoted
+  // form so `id` never lights up inside `customer_id`.
+  const fieldErr = (name: string) => !!errMsg && errMsg.includes(`"${name}"`)
+  const anyFieldErr = fields.some((c) => fieldErr(c.name))
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -54,7 +58,7 @@ export default function RowCreate() {
         <div className="card grid grid-cols-1 gap-x-10 gap-y-4 p-5 md:grid-cols-2">
           {fields.map((col) => {
             const wide = ['json', 'code', 'textarea'].includes(col.widget)
-            const hasErr = !!errMsg && errMsg.includes(col.name)
+            const hasErr = fieldErr(col.name)
             return (
               <div key={col.name} className={clsx(wide && 'md:col-span-2')}>
                 <div className="mb-1 text-xxs font-semibold uppercase tracking-wide text-muted">
@@ -80,7 +84,7 @@ export default function RowCreate() {
           })}
         </div>
         <div className="mt-4 flex items-center justify-end gap-3">
-          {errMsg && <span className="text-[13px] text-critical">{errMsg}</span>}
+          {errMsg && !anyFieldErr && <span className="text-[13px] text-critical">{errMsg}</span>}
           <Link to={`/${table.name}`} className="btn">
             {t('cancel')}
           </Link>

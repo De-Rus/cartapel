@@ -20,7 +20,10 @@ export function GroupSelect({ table }: { table: string }) {
       void qc.invalidateQueries({ queryKey: ['groups'] })
       void qc.invalidateQueries({ queryKey: ['meta'] })
     },
-    onError: (e) => toast(e instanceof ApiError ? e.message : t('error')),
+    onError: (e) => {
+      toast(e instanceof ApiError ? e.message : t('error'))
+      void qc.invalidateQueries({ queryKey: ['groups'] })
+    },
   })
 
   if (!data || !data.writable || data.groups.length === 0) return null
