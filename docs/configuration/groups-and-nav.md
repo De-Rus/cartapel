@@ -24,6 +24,8 @@ table_order = ["customers", "subscriptions"]
 | `icon` | string | A [lucide](https://lucide.dev) icon name (`trending-up`, `bot`, `package`, …). |
 | `order` | number | Sort key among groups (lower first). Defaults to `0`. |
 | `table_order` | list | Explicit ordering of the tables within the group. Unlisted tables follow. |
+| `nav` | string | Sidebar mode for this group: `expanded` (every table listed) or `page` (one entry that opens the group's primary table with its siblings as tabs). Falls back to the global `group_nav`, then `expanded`. |
+| `labels` | map | Per-locale label overrides (`labels = { es = "Clientes" }`); the instance `locale` picks one. |
 
 ## Ordering
 
@@ -34,8 +36,13 @@ table_order = ["customers", "subscriptions"]
 ## Grouping rules
 
 - A folder may hold only a `_group.hcl` — an empty, table-less group is valid.
-- A group folder without a `_group.hcl` still groups its tables, but under the
-  folder name with no custom label/icon.
+- A folder without a `_group.hcl` is not a sidebar group — its tables fall
+  into the trailing "Ungrouped" section. Add a `_group.hcl` to name the group.
+- The same group slug in two folders is a **load error** — a group lives in
+  exactly one folder.
+- `screens` and a handful of framework names (`config`, `page`, `queries`,
+  `groups`, `dashboard`, `discover`, `versions`) are **reserved** and can
+  never be group slugs.
 - Folders whose name begins with an underscore are never sidebar groups. A
   `_group.hcl` in such a folder is ignored with a warning.
 
@@ -55,6 +62,9 @@ breaks existing deep links to those pages. Table record links are unaffected.
 ## The in-app groups editor
 
 The visual builder can create groups, rename them, reorder groups and tables,
-and move tables between groups — all of which just rewrite `_group.hcl` files and
-relocate table configs on disk. When the config bundle is mounted read-only,
+and move tables between groups — all of which just rewrite `_group.hcl` files
+and relocate configs on disk, respecting the documented layout: new and moved
+group folders stay under `screens/`, a table folder moves **whole** — its
+`screen.hcl` together with any co-located module and query files — and a move
+that would collide with an existing folder is refused. When the config bundle is mounted read-only,
 these edits are disabled (see [Deployment](/deployment#writable-config-volume)).

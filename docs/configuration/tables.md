@@ -17,6 +17,15 @@ A complete table config is made of a handful of optional blocks:
 label        = "product"           # singular label
 label_plural = "Products"          # plural label (nav + list heading)
 
+labels        = { es = "producto" }   # per-locale overrides; the instance
+labels_plural = { es = "Productos" }  #   [steward] `locale` picks one
+
+from {                             # serve from another postgres source/schema
+  source = "replica"               #   (an unknown or non-postgres source is
+  schema = "billing"               #    a load error)
+  table  = "orders_v"
+}
+
 list      { … }        # the list view: columns, search, filters, sort
 display   { … }         # the record title template
 detail    { … }         # the detail-view layout (sections, sidebar, mode)
@@ -50,9 +59,9 @@ list {
 
 | Key | Type | Description |
 | --- | --- | --- |
-| `columns` | list | Columns shown in the list, in order. Omit → all introspected columns. |
+| `columns` | list | Columns shown in the list, in order. Omit → the primary key plus the first few introspected columns (six total, JSON and binary columns skipped). |
 | `search` | list | Columns the search box matches against. |
-| `filters` | list | Filterable columns. **Omit → every column is filterable** (defaults-first); a declared list is an allowlist — only the listed names are accepted. A name matching a `filter_def` surfaces that custom filter; otherwise it filters on the column's own values. Masked columns can never be filtered. |
+| `filters` | list | Featured filters. **Every real column is always filterable** — the "+ Filter" picker lists declared names first (with value options preloaded), then every remaining column. Declaring a name here features it and, for enum-ish columns, populates its value dropdown; a name matching a `filter_def` surfaces that custom filter. Masked columns can never be filtered, for anyone. |
 | `sort` | string | Default sort column. Prefix with `-` for descending (`"-created_at"`). |
 | `per_page` | number | Page size for this table (overrides the global `per_page`). |
 | `filter_def "name" { }` | block | A custom filter: a `label` plus a raw `sql` predicate. |
@@ -69,7 +78,7 @@ filter_def "needs_attention" {
 }
 ```
 
-List `"needs_attention"` in `filters` to surface it as a toggle in the UI.
+List `"needs_attention"` in `filters` to surface it in the list's "+ Filter" picker; adding it applies the predicate as an on/off filter chip.
 
 ## `display { }` — the record title
 
@@ -81,7 +90,7 @@ display {
 
 `title` is a template with `{column}` placeholders, used wherever a single
 record needs a human label (detail heading, breadcrumbs, inline row labels).
-Omit it and steward falls back to the primary key.
+Omit it and steward picks a name-ish text column (`name`, `title`, `email`, `username`, …) when one exists; otherwise the title is `Label #pk` ("Subscription #8"), never a bare id.
 
 ## `edit { }` — read-only columns
 
@@ -220,13 +229,22 @@ list {
 display { title = "Order #{id}" }
 
 detail {
-  section { title = "Identity"  fields = ["id", "customer_id", "status"] }
-  section { title = "Amounts"   fields = ["total", "item_count", "placed_at"] }
+  section {
+    title  = "Identity"
+    fields = ["id", "customer_id", "status"]
+  }
+  section {
+    title  = "Amounts"
+    fields = ["total", "item_count", "placed_at"]
+  }
 }
 
 edit        { readonly = ["id", "customer_id", "placed_at"] }
 relations   { inlines  = ["order_items"] }
-permissions { create = false, delete = false }
+permissions {
+  create = false
+  delete = false
+}
 
 field "status" {
   widget = "badge"

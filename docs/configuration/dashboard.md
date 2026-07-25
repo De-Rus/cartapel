@@ -100,6 +100,33 @@ panel {
 | `sql` | The rows to display; column set is taken from the query. |
 | `link` | A table name — each row links to that table's matching record. |
 
+A `table` panel can style its columns with repeated `field { }` blocks; without
+them the column set comes straight from the query and cells fall back to
+sensible defaults (headers humanized, ISO timestamps date-formatted):
+
+```hcl
+panel {
+  type  = "table"
+  label = "Top products"
+  sql   = "SELECT name, revenue, status FROM …"
+
+  field {
+    key     = "revenue"
+    format  = "money"
+    align   = "right"
+    display = "bar"          # in-cell data bar ("heat" tints by magnitude)
+  }
+  field {
+    key   = "status"
+    badge = { active = "green", churned = "red" }
+  }
+}
+```
+
+`field` keys: `key` (required), `label`, `format` (`money`/`percent`/`number`/
+`bytes`/`duration`/`date`/`datetime`/`rel` — validated at load), `align`,
+`max`, `badge` (value → tone map), `display` (`bar` | `heat`), `tone`.
+
 ### `iframe` — an embedded view
 
 ```hcl

@@ -20,9 +20,10 @@ field "price" {
 | Key | Type | Description |
 | --- | --- | --- |
 | `label` | string | Override the column header / detail label. |
+| `labels` | map | Per-locale label overrides (`labels = { es = "Precio" }`); the instance `locale` picks one, `label` is the fallback. |
 | `widget` | string | The renderer — a built-in name or `custom:<name>`. See the [widget library](#widget-library). |
 | `readonly` | bool | Field is shown but not editable (per-field variant of `edit.readonly`). |
-| `masked` | bool | Value is masked in lists, detail, search and export. See [Security](/security#column-masking). |
+| `masked` | bool | Value is masked in lists, detail, search and export — for **everyone, admins included**. Secret-shaped columns (names containing `token`, `secret`, `password`, `api_key`, `private_key`, …) mask automatically even without a field block; declaring **any** `field` block for such a column takes back control (add `masked = true` to keep it hidden). See [Security](/security#column-masking). |
 | `sql` | string | A trusted SQL expression that makes this a **computed, read-only column** (see below). |
 | `group` | string | Detail-form section this field belongs to (an alternative to `detail { section { } }`). |
 | `params` | map | Widget-specific parameters (see each widget). |
@@ -284,8 +285,12 @@ field "homepage" {
 | `fk` | A link to the referenced record, using its label. | — |
 | `array` | Each array element as a small chip. | — |
 
-Foreign-key columns are detected during introspection and render as links
-automatically; the `fk` widget is the explicit form.
+Foreign-key columns are detected during introspection and render automatically
+as links showing the **target row's label** — its name-ish column (`name`,
+`title`, `symbol`, `email`, `label`, else the first text column) — instead of
+the raw id, in lists, detail views and inlines alike. Masked FK columns and
+targets you cannot view fall back to the raw value. The `fk` widget is the
+explicit form.
 
 ## Custom widgets
 

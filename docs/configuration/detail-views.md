@@ -14,7 +14,7 @@ With **no `detail` block at all**, steward already produces a good record view:
 
 - the hero shows the title, the first `badge` field, and a copyable id;
 - fields group by their `field { group = … }` tags (or into one "Details" card);
-- identifiers, foreign keys and timestamps (`id`, `*_id`, `*_at`) are detected
+- identifiers, foreign keys and timestamps (`id`, `*_id`, `*_at`, `*_ts`) are detected
   and pulled into the meta sidebar automatically;
 - every configured table with a foreign key into this one appears as an
   [inline](#inlines) automatically;

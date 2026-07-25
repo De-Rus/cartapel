@@ -45,7 +45,10 @@ is deterministic (files sorted by path).
 - A folder's **`_group.hcl`** names and orders that sidebar group.
 - A **scripted page** is the same shape — a folder whose `screen.hcl` sets
   `module = "<name>.tsx"` next to the module. See [Pages & queries](/configuration/pages-and-queries).
-- A **`queries.hcl`** in any folder contributes named read-only queries.
+- A **`queries.hcl`** in any folder contributes named read-only queries;
+  **`variables.hcl`** and **`sources.hcl`** work the same way for template
+  variables and extra data sources. Any other file name under `screens/` is a
+  load error.
 
 ## The reserved `config/` folder
 
@@ -94,9 +97,10 @@ Top-level `[steward]` keys:
 | --- | --- | --- |
 | `brand` | string | Panel name, shown in the header. Defaults to `steward`. |
 | `brand_logo` | string | Logo URL, data URL, or a bundle asset filename served under `/static/`. |
-| `locale` | string | UI locale hint. |
+| `locale` | string | UI locale hint. Also picks per-locale `labels = { es = "…" }` overrides on tables, fields, groups and actions (tables also `labels_plural`); `label` is the fallback. |
 | `strings` | map | Override individual UI strings (`{ "key" = "value" }`). |
 | `per_page` | number | Default list page size (a table's `list.per_page` overrides it). |
+| `group_nav` | string | Default sidebar mode for groups: `expanded` (default — every table is its own entry) or `page` (one entry per group; sibling tables become tabs). A group's own `nav` in `_group.hcl` overrides it. |
 | `secret_key` | string | Session-signing root. Supports `env:`/`${}`. Overridden by `STEWARD_SECRET_KEY`. **Required** somewhere. |
 | `theme { }` | block | Theme preset, accent, per-mode CSS token overrides, logos. |
 | `source "…" { }` | block | A named data source. The `primary` postgres one is the database steward introspects. |
@@ -123,7 +127,7 @@ source and mark it `primary` — that is what steward introspects and serves.
 | `type` | `"postgres"` for the database, or `"http"` for a read-only JSON source a custom page can call. |
 | `url` | Connection URL (postgres) or endpoint (http). Supports `env:NAME` / `${NAME}`. |
 | `schemas` | List of schemas to introspect (postgres). Defaults to `["public"]`. |
-| `primary` | Marks the one postgres source steward introspects. Exactly one is required. |
+| `primary` | Marks the postgres source steward introspects. With a single postgres source it is implied; declare it explicitly when you define several. |
 | `token_env` / `header` | For `http` sources: attach a secret from this env var under `header` (default `x-admin-token`). The secret never reaches the browser. |
 | `roles` | Restrict a source to these roles (non-admins need an explicit match). |
 

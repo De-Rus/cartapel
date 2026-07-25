@@ -12,8 +12,9 @@ steward serves any file under the config directory at
 `/static/<path-relative-to-config>`, so your JS/CSS/image assets sit right next
 to the HCL that references them. Serving is path-confined (directory traversal
 and out-of-tree symlinks are rejected) and extension-allowlisted:
-`js`, `mjs`, `css`, `svg`, `png`, `webp`, `jpg`, `jpeg`, `gif`, `ico`. Config and
-secret material (`.hcl`, `.toml`, `.env`, dotfiles) is never served.
+`js`, `mjs`, `ts`, `tsx`, `css`, `svg`, `png`, `webp`, `jpg`, `jpeg`, `gif`,
+`ico`. Config and secret material (`.hcl`, `.toml`, `.env`, `.ini`, dotfiles)
+is never served.
 
 ## Custom pages
 
@@ -37,7 +38,7 @@ admin/
 label  = "Operations"
 icon   = "satellite"
 module = "ops.tsx"         # the co-located page module (.tsx / .ts / .js)
-roles  = ["support"]       # omit → admin only
+roles  = ["support"]       # omit → visible to everyone signed in
 ```
 
 | Key | Description |
@@ -45,7 +46,7 @@ roles  = ["support"]       # omit → admin only
 | `label` | Sidebar label. **Required.** |
 | `icon` | lucide icon name or an emoji. |
 | `module` | The JS module file, resolved **relative to the page's own folder**. Defaults to `<slug>.js`. |
-| `roles` | Roles that may see the page. Omit → admin only. |
+| `roles` | Roles that may see the page. Omit → visible to every signed-in user; list roles to restrict it. |
 
 The **slug is the page folder's name** and the **group is the enclosing group
 folder** — both are folder-derived, so `screen.hcl` carries neither (a stray `slug`
@@ -54,27 +55,24 @@ ungrouped.
 
 ### Writing a page module
 
-A page is a web component named `sx-page-<slug>`, rendered in the panel's own
-DOM so its CSS variables cascade in:
+A `.tsx`/`.ts` module is transpiled **in the browser** — no build step, no
+imports; every `sx` export is already in scope. `export default` your component
+(or call `sx.definePage('<slug>', C)`):
 
-```js
-// admin/screens/overview/ops/ops.js
-class OpsPage extends HTMLElement {
-  connectedCallback() {
-    this.render()
-    this.load()
-  }
-  async load() {
-    // this.api is injected: { get(path), post(path, body) }
-    const { rows } = await this.api.get('query/ops_attention')
-    // …render rows…
-  }
-  render() {
-    this.innerHTML = `<div class="p-4">…</div>`
-  }
+```tsx
+// admin/screens/overview/ops/ops.tsx
+export default ({ api }) => {
+  const fleet = useQuery(api, 'ops_fleet')
+  return html`<${Page} title="Operations">
+    <${Chart} rows=${fleet.data?.rows ?? []} x="status" y="n" kind="bar" />
+  </>`
 }
-customElements.define('sx-page-ops', OpsPage)
 ```
+
+A plain `.js` module is the raw escape hatch: it is loaded as-is and must
+define the `sx-page-<slug>` custom element itself (with `this.api` injected).
+If a module loads but registers nothing, the page shows a failure card with
+the module path and the actual error.
 
 Conventions for a page module:
 
@@ -85,6 +83,14 @@ Conventions for a page module:
 - Style only with the panel's CSS variables (`--accent`, `--ink`, `--muted`,
   `--border`, `--surface`, `--surface-3`, `--sec`, …). Dark-first — never
   hard-code a light background.
+
+### Declarative pages
+
+A page doesn't need a module at all: give its `screen.hcl` `panel { }` blocks
+instead (the same panel schema as the [dashboard](/configuration/dashboard),
+plus an optional `columns` grid count) and steward renders it as a
+query-driven grid — no JS. A screen that sets both `module` and `panel { }`
+is a load error.
 
 ### Editor autocompletion — `sx.d.ts`
 
@@ -145,7 +151,7 @@ variable "window" {
   type    = "int"                 # text (default) | int | float | ident
   options = ["7", "30", "90"]     # …or `query = "SELECT DISTINCT …"` (value, [label])
   default = "30"
-  roles   = ["support"]           # omit → admin only
+  roles   = ["support"]           # omit → in scope for everyone
 }
 ```
 
