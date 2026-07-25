@@ -57,14 +57,15 @@ pub fn default_widget(col: &DbColumn) -> &'static str {
 /// Default record title: a name-ish text column ("Ada Lovelace", never "1")
 /// when one exists; otherwise the pk — a random first text column (status,
 /// country…) makes a worse title than the id.
-fn default_display_title(dbt: &DbTable) -> String {
+fn default_display_title(dbt: &DbTable, label: &str) -> String {
     for pref in ["name", "title", "full_name", "display_name", "subject", "symbol", "email", "username", "slug", "label"] {
         if dbt.columns.iter().any(|c| c.name == pref && c.kind == Kind::Text) {
             return format!("{{{pref}}}");
         }
     }
+    // No name-ish column: "Subscription #8" reads as a record, a bare "8" doesn't.
     match &dbt.pk {
-        Some(pk) => format!("{{{pk}}}"),
+        Some(pk) => format!("{} #{{{pk}}}", capitalize(label)),
         None => format!("{{{}}}", dbt.columns[0].name),
     }
 }
@@ -557,9 +558,10 @@ pub async fn table_meta(state: &AppState, user: &CurrentUser, table: &str) -> Op
         })
         .collect();
     let read_only = dbt.is_view || dbt.pk.is_none();
+    let label = cfg.label.clone().unwrap_or_else(|| humanize(table));
     Some(json!({
         "name": table,
-        "label": cfg.label.clone().unwrap_or_else(|| humanize(table)),
+        "label": label,
         "label_plural": cfg.label_plural.clone().unwrap_or_else(|| capitalize(&humanize(table))),
         "group": state.cfg().table_group_label(table),
         "pk": dbt.pk,
@@ -572,7 +574,7 @@ pub async fn table_meta(state: &AppState, user: &CurrentUser, table: &str) -> Op
             "default_sort": default_sort(dbt, cfg),
             "per_page": cfg.list.per_page.or(state.cfg().steward.per_page).unwrap_or(100),
         },
-        "display_title": cfg.display.title.clone().unwrap_or_else(|| default_display_title(dbt)),
+        "display_title": cfg.display.title.clone().unwrap_or_else(|| default_display_title(dbt, &label)),
         "detail": {
             "mode": cfg.detail.mode,
             "columns": cfg.detail.columns,
