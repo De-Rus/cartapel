@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import clsx from 'clsx'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useClickOutside, useDebounced } from '../lib/hooks'
@@ -23,6 +24,7 @@ export function FkSelect({
   const t = useT()
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
+  const [active, setActive] = useState(0)
   const dq = useDebounced(q, 250)
   const ref = useClickOutside(() => setOpen(false))
 
@@ -32,6 +34,13 @@ export function FkSelect({
     enabled: open,
     staleTime: 30_000,
   })
+
+  useEffect(() => setActive(0), [dq, open])
+
+  const pick = (o: { value: unknown; label: string }) => {
+    onChange(o.value, o.label)
+    setOpen(false)
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -68,6 +77,23 @@ export function FkSelect({
             placeholder={t('fk_search')}
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              const n = options?.length ?? 0
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setActive((a) => Math.min(a + 1, n - 1))
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setActive((a) => Math.max(a - 1, 0))
+              } else if (e.key === 'Enter') {
+                e.preventDefault()
+                const o = options?.[active]
+                if (o) pick(o)
+              } else if (e.key === 'Escape') {
+                e.stopPropagation()
+                setOpen(false)
+              }
+            }}
           />
           <div className="max-h-56 overflow-auto py-1">
             {isFetching && (
@@ -76,15 +102,16 @@ export function FkSelect({
             {!isFetching && (options?.length ?? 0) === 0 && (
               <div className="px-2.5 py-1.5 text-[13px] text-muted">{t('fk_no_results')}</div>
             )}
-            {options?.map((o) => (
+            {options?.map((o, i) => (
               <button
                 key={String(o.value)}
                 type="button"
-                className="block w-full px-2.5 py-1.5 text-left text-[13px] text-sec hover:bg-page hover:text-ink"
-                onClick={() => {
-                  onChange(o.value, o.label)
-                  setOpen(false)
-                }}
+                className={clsx(
+                  'block w-full px-2.5 py-1.5 text-left text-[13px]',
+                  i === active ? 'bg-page text-ink' : 'text-sec hover:bg-page hover:text-ink',
+                )}
+                onMouseEnter={() => setActive(i)}
+                onClick={() => pick(o)}
               >
                 {o.label}
               </button>
