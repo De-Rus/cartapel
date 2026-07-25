@@ -215,7 +215,7 @@ impl Store {
         let losing_admin = has_admin(&current) && !new_role.is_some_and(has_admin);
         if losing_admin {
             let admins: i64 = conn.query_row(
-                "SELECT count(*) FROM users WHERE ',' || replace(role, ' ', '') || ',' LIKE '%,admin,%'",
+                "SELECT count(*) FROM users WHERE instr(',' || replace(role, ' ', '') || ',', ',admin,') > 0",
                 [],
                 |r| r.get(0),
             )?;
@@ -252,7 +252,7 @@ impl Store {
     #[allow(dead_code)]
     pub fn count_admins(&self) -> rusqlite::Result<i64> {
         self.conn.lock().unwrap().query_row(
-            "SELECT count(*) FROM users WHERE ',' || replace(role, ' ', '') || ',' LIKE '%,admin,%'",
+            "SELECT count(*) FROM users WHERE instr(',' || replace(role, ' ', '') || ',', ',admin,') > 0",
             [],
             |r| r.get(0),
         )

@@ -88,6 +88,13 @@ the UI). Permissions are the **union**, Django-groups style:
   (then the union of the lists).
 - `admin` anywhere in the list makes the user an admin.
 
+::: warning A broad role lifts restrictions
+Because restrictions need unanimity, adding a generic role (e.g. a `viewer`
+with `"*" = "read"` and no masks/filters) to a user whose other role masked
+columns or filtered rows **unmasks and unfilters everything that role can
+see**. Keep broad roles narrow, or give them the same masks.
+:::
+
 ## Coarse table access
 
 `tables` is the baseline. Two levels:

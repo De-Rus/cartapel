@@ -38,7 +38,8 @@ impl FromRequestParts<Arc<AppState>> for CurrentUser {
             .ok_or_else(AppError::unauthorized)?;
         // View-as: admins may impersonate a lesser role to verify what it sees.
         // Never escalates — only admins are honored, and `admin` itself is a no-op.
-        if role == "admin" {
+        let is_admin = role.split(',').map(str::trim).any(|r| r == "admin");
+        if is_admin {
             if let Some(as_role) = parts
                 .headers
                 .get("x-steward-as-role")

@@ -20,23 +20,23 @@ fn admin_only(user: &CurrentUser) -> Result<(), AppError> {
 }
 
 /// A user's role field may carry several comma-separated roles; every part must
-/// name a known role and the field can't be empty.
-fn ensure_roles(state: &AppState, roles: &str) -> Result<(), AppError> {
+/// name a known role and the field can't be empty. Returns the normalized csv
+/// (trimmed, deduped) — the string that gets stored.
+fn ensure_roles(state: &AppState, roles: &str) -> Result<String, AppError> {
     let known = state.effective_role_names();
-    let parts: Vec<&str> = roles
-        .split(',')
-        .map(str::trim)
-        .filter(|r| !r.is_empty())
-        .collect();
-    if parts.is_empty() {
-        return Err(AppError::bad("at least one role is required"));
-    }
-    for p in &parts {
+    let mut parts: Vec<&str> = Vec::new();
+    for p in roles.split(',').map(str::trim).filter(|r| !r.is_empty()) {
         if !known.iter().any(|k| k == p) {
             return Err(AppError::bad(format!("unknown role {p}")));
         }
+        if !parts.contains(&p) {
+            parts.push(p);
+        }
     }
-    Ok(())
+    if parts.is_empty() {
+        return Err(AppError::bad("at least one role is required"));
+    }
+    Ok(parts.join(","))
 }
 
 fn normalize_email(raw: &str) -> String {
@@ -73,8 +73,8 @@ pub async fn users_create(
             "password must be at least {MIN_PASSWORD_LEN} characters"
         )));
     }
-    ensure_roles(&state, &body.role)?;
-    let id = match state.store.create_user(&email, &body.password, &body.role) {
+    let role = ensure_roles(&state, &body.role)?;
+    let id = match state.store.create_user(&email, &body.password, &role) {
         Ok(id) => id,
         Err(UserCreateError::Duplicate) => {
             return Err(AppError(
@@ -120,7 +120,7 @@ pub async fn users_update(
     let mut changes = serde_json::Map::new();
 
     if let Some(new_role) = &body.role {
-        ensure_roles(&state, new_role)?;
+        let new_role = &ensure_roles(&state, new_role)?;
         if new_role != &current_role {
             match state.store.guarded_admin_mutation(id, Some(new_role))? {
                 crate::store::AdminGuard::LastAdmin => {
@@ -368,6 +368,9 @@ fn valid_role_name(name: &str) -> bool {
         && name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        // "Admin"/"ADMIN" would fool case-insensitive membership checks while
+        // being a different role to every case-sensitive Rust gate.
+        && !name.eq_ignore_ascii_case("admin")
 }
 
 pub async fn roles_create(
@@ -1572,6 +1575,13 @@ mod tests {
             state.row_filter(&user, "bots").as_deref(),
             Some("(kind = 'x') OR (kind = 'y')"),
         );
+    }
+
+    #[tokio::test]
+    async fn role_name_admin_case_collision_rejected() {
+        assert!(!valid_role_name("Admin"));
+        assert!(!valid_role_name("ADMIN"));
+        assert!(valid_role_name("administrator"));
     }
 
     #[tokio::test]
