@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { api } from '../api/client'
+import { api, downloadExport } from '../api/client'
 import type { Meta } from '../api/types'
 import { BASE } from '../lib/base'
 import { fuzzyRank, highlightParts } from '../lib/fuzzy'
@@ -16,6 +16,15 @@ interface RecentItem {
   label: string
   sub: string
   to: string
+  n?: number
+  ts?: number
+}
+
+/// Frecency: hit count decayed by age — a page visited daily outranks one
+/// visited many times last month.
+function frecency(r: RecentItem): number {
+  const ageDays = (Date.now() - (r.ts ?? 0)) / 86_400_000
+  return (r.n ?? 1) / (1 + ageDays)
 }
 
 const RECENT_KEY = 'steward.recent'
@@ -24,7 +33,11 @@ export function pushRecent(item: RecentItem): void {
   try {
     const raw = localStorage.getItem(RECENT_KEY)
     const list: RecentItem[] = raw ? JSON.parse(raw) : []
-    const next = [item, ...list.filter((r) => r.to !== item.to)].slice(0, 8)
+    const prev = list.find((r) => r.to === item.to)
+    const next = [
+      { ...item, n: (prev?.n ?? 0) + 1, ts: Date.now() },
+      ...list.filter((r) => r.to !== item.to),
+    ].slice(0, 12)
     localStorage.setItem(RECENT_KEY, JSON.stringify(next))
   } catch {
     /* ignore */
@@ -115,12 +128,22 @@ export function CommandPalette({
       secondary: p.group ?? t('palette_pages'),
       to: `/p/${p.id}`,
     }))
+    const admin = meta.can_manage_access
+      ? [
+          { id: 'nav:groups', primary: t('cfg_groups_title'), secondary: t('palette_admin'), to: '/_config/groups' },
+          { id: 'nav:dash-cfg', primary: t('cfg_dash_title'), secondary: t('palette_admin'), to: '/_config/dashboard' },
+          { id: 'nav:discover', primary: t('cfg_disc_title'), secondary: t('palette_admin'), to: '/_config/discover' },
+          { id: 'nav:users', primary: t('access_users'), secondary: t('palette_admin'), to: '/_access/users' },
+          { id: 'nav:roles', primary: t('access_roles'), secondary: t('palette_admin'), to: '/_access/roles' },
+        ]
+      : []
     const extra =
       mode === 'table'
         ? []
         : [
             { id: 'nav:dashboard', primary: t('nav_dashboard'), secondary: '', to: '/' },
             { id: 'nav:audit', primary: t('nav_audit'), secondary: '', to: '/audit' },
+            ...admin,
           ]
     return [...extra, ...tables, ...pages]
   }, [meta, mode, t])
@@ -130,7 +153,7 @@ export function CommandPalette({
     const out: Group[] = []
 
     if (!query) {
-      const recent = readRecent()
+      const recent = readRecent().sort((a, b) => frecency(b) - frecency(a)).slice(0, 6)
       if (recent.length && mode !== 'table') {
         out.push({
           key: 'recent',
@@ -154,8 +177,36 @@ export function CommandPalette({
 
     if (mode !== 'search' && currentTable) {
       const tb = meta.tables.find((x) => x.name === currentTable)
+      const commands: Array<{ name: string; label: string; hint: string; run: () => void }> = []
+      if (tb?.perms.create) {
+        commands.push({
+          name: '__new',
+          label: t('new_record', { label: tb.label }),
+          hint: tb.label_plural,
+          run: () => navigate(`/${currentTable}/new`),
+        })
+      }
+      if (tb) {
+        for (const fmt of ['csv', 'json'] as const) {
+          commands.push({
+            name: `__export_${fmt}`,
+            label: t('palette_export', { fmt: fmt.toUpperCase(), label: tb.label_plural }),
+            hint: t('palette_export_hint'),
+            run: () => void downloadExport(currentTable, fmt, window.location.search.slice(1)),
+          })
+        }
+      }
       const acts = (tb?.actions ?? []).filter((a) => tb!.perms.actions.includes(a.name))
-      const ranked = fuzzyRank(query, acts, (a) => a.label)
+      const all = [
+        ...commands,
+        ...acts.map((a) => ({
+          name: a.name,
+          label: `${a.label} — ${tb!.label_plural}`,
+          hint: t('palette_select_rows_hint'),
+          run: () => navigate(`/${currentTable}`),
+        })),
+      ]
+      const ranked = fuzzyRank(query, all, (a) => a.label)
       if (ranked.length) {
         out.push({
           key: 'actions',
@@ -163,9 +214,9 @@ export function CommandPalette({
           items: ranked.map((r) => ({
             kind: 'action' as const,
             id: `action:${r.item.name}`,
-            primary: `${r.item.label} — ${tb!.label_plural}`,
-            secondary: t('palette_select_rows_hint'),
-            run: () => navigate(`/${currentTable}`),
+            primary: r.item.label,
+            secondary: r.item.hint,
+            run: r.item.run,
           })),
         })
       }
