@@ -31,7 +31,28 @@ export default defineConfig({
       },
     ],
     ['meta', { property: 'og:url', content: SITE }],
-    ['meta', { name: 'twitter:card', content: 'summary' }],
+    ['meta', { property: 'og:image', content: `${SITE}og.png` }],
+    ['meta', { property: 'og:image:width', content: '1200' }],
+    ['meta', { property: 'og:image:height', content: '630' }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+    ['meta', { name: 'twitter:image', content: `${SITE}og.png` }],
+    [
+      'script',
+      { type: 'application/ld+json' },
+      JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: 'steward',
+        applicationCategory: 'DeveloperApplication',
+        operatingSystem: 'Linux, macOS, Docker',
+        description:
+          'Open-source, single-binary admin panel for PostgreSQL — introspected CRUD, roles, audit log and SQL dashboards, configured as code.',
+        license: 'https://opensource.org/licenses/MIT',
+        url: SITE,
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        codeRepository: 'https://github.com/De-Rus/steward',
+      }),
+    ],
     [
       'meta',
       {
@@ -41,6 +62,20 @@ export default defineConfig({
       },
     ],
   ],
+
+  transformPageData(pageData) {
+    const path = pageData.relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')
+    const canonical = SITE + path
+    const title = pageData.frontmatter.layout === 'home' ? 'steward — Postgres admin panel' : `${pageData.title} · steward`
+    pageData.frontmatter.head ??= []
+    pageData.frontmatter.head.push(
+      ['link', { rel: 'canonical', href: canonical }],
+      ['meta', { property: 'og:title', content: title }],
+      ...(pageData.description
+        ? [['meta', { property: 'og:description', content: pageData.description }] as [string, Record<string, string>]]
+        : []),
+    )
+  },
 
   markdown: {
     theme: { light: 'github-light', dark: 'github-dark' },
