@@ -41,11 +41,11 @@ struct Cli {
 enum Command {
     /// Run the admin server
     Serve {
-        /// Postgres connection URL. Falls back to the config `[database].url`
-        /// (which itself supports `env:NAME` / `${NAME}` interpolation).
+        /// Postgres connection URL. Falls back to the primary `source` url in
+        /// config/steward.hcl (which supports `env:NAME` / `${NAME}`).
         #[arg(long, env = "STEWARD_DB")]
         db: Option<String>,
-        /// Postgres schema to introspect. Falls back to config `[database].schema`.
+        /// Postgres schema to introspect. Falls back to the primary source's `schemas`.
         #[arg(long, env = "STEWARD_SCHEMA")]
         schema: Option<String>,
         /// Directory of HCL config files
@@ -54,8 +54,7 @@ enum Command {
         /// Directory for steward's own state (users, sessions, audit)
         #[arg(long, env = "STEWARD_DATA", default_value = "./steward-data")]
         data: PathBuf,
-        /// URL prefix the panel is served under. Defaults to `/admin` to match
-        /// the SPA's build-time base (vite.config `base`); keep the two in sync.
+        /// URL prefix the panel is served under; injected into the SPA at runtime.
         #[arg(long, env = "STEWARD_BASE_PATH", default_value = "/admin")]
         base_path: String,
         #[arg(long, env = "STEWARD_LISTEN", default_value = "127.0.0.1:8686")]
@@ -68,6 +67,19 @@ enum Command {
     User {
         #[command(subcommand)]
         command: UserCommand,
+    },
+    /// Validate a config directory (optionally cross-checked against a live
+    /// database). Exit 0 = valid; exit 1 with the errors otherwise — CI-ready.
+    Check {
+        #[arg(long, env = "STEWARD_CONFIG")]
+        config: PathBuf,
+        /// When given, every configured table is verified to exist in the
+        /// introspected schema(s), and list/search/filter/sort columns are
+        /// verified to be real columns.
+        #[arg(long, env = "STEWARD_DB")]
+        db: Option<String>,
+        #[arg(long, env = "STEWARD_SCHEMA")]
+        schema: Option<String>,
     },
 }
 
@@ -147,7 +159,20 @@ async fn connect_pg(url: &str) -> sqlx::PgPool {
             })
         });
     }
-    pool_opts.connect_with(opts).await.expect("connect postgres")
+    match pool_opts.connect_with(opts).await {
+        Ok(pool) => pool,
+        Err(e) => {
+            let host = url.parse::<PgConnectOptions>().map(|o| format!("{}:{}", o.get_host(), o.get_port())).unwrap_or_default();
+            die(&format!(
+                "cannot connect to postgres at {host}: {e}\n  · is the database reachable from here?\n  · transaction poolers (e.g. Supabase :6543) are auto-detected; force with STEWARD_DB_TX_POOL=1"
+            ));
+        }
+    }
+}
+
+fn die(msg: &str) -> ! {
+    eprintln!("✗ {msg}");
+    std::process::exit(1);
 }
 
 fn gen_password() -> String {
@@ -183,6 +208,101 @@ async fn main() {
         Command::Serve { db, schema, config, data, base_path, listen, secure_cookies } => {
             serve(db, schema, config, data, base_path, listen, secure_cookies).await;
         }
+        Command::Check { config, db, schema } => {
+            std::process::exit(check(&config, db, schema).await);
+        }
+    }
+}
+
+/// `steward check`: parse + validate the bundle, then (with --db) cross-check
+/// every configured table and referenced column against the live schema.
+async fn check(config: &std::path::Path, db: Option<String>, schema: Option<String>) -> i32 {
+    let cfg = match config::load(Some(config)) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("✗ config invalid:\n{e}");
+            return 1;
+        }
+    };
+    println!(
+        "✓ config parses: {} tables, {} groups, {} queries, {} variables, {} pages",
+        cfg.tables.len(),
+        cfg.groups.len(),
+        cfg.queries.len(),
+        cfg.variables.len(),
+        cfg.pages.len()
+    );
+    let db = db.or_else(|| {
+        cfg.primary_source()
+            .and_then(|(_, s)| config::resolve_env(&s.url))
+    });
+    let Some(db) = db else {
+        println!("· no --db / resolvable primary source url — skipping live-schema checks");
+        return 0;
+    };
+    let schemas: Vec<String> = match schema {
+        Some(s) => vec![s],
+        None => cfg
+            .primary_source()
+            .map(|(_, s)| s.schemas.clone())
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| vec!["public".into()]),
+    };
+    let pool = match sqlx::postgres::PgPoolOptions::new()
+        .max_connections(1)
+        .acquire_timeout(std::time::Duration::from_secs(10))
+        .connect(&db)
+        .await
+    {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("✗ cannot connect to the database: {e}");
+            return 1;
+        }
+    };
+    let dbs = match introspect::introspect(&pool, &schemas).await {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("✗ introspection failed: {e}");
+            return 1;
+        }
+    };
+    let mut errors = 0usize;
+    for (key, tc) in &cfg.tables {
+        let phys = tc.from.table.as_deref().unwrap_or(key);
+        let Some(dbt) = dbs.find(tc.from.schema.as_deref(), phys) else {
+            eprintln!("✗ {key}: table not found in schemas {schemas:?}");
+            errors += 1;
+            continue;
+        };
+        let mut missing = |what: &str, col: &str| {
+            let computed = tc.fields.get(col).is_some_and(|f| f.sql.is_some());
+            if dbt.column(col).is_none() && !computed {
+                eprintln!("✗ {key}: {what} column '{col}' does not exist");
+                errors += 1;
+            }
+        };
+        for c in &tc.list.columns {
+            missing("list", c);
+        }
+        for c in &tc.list.search {
+            missing("search", c);
+        }
+        for c in &tc.edit.readonly {
+            missing("edit.readonly", c);
+        }
+        if let Some(sort) = &tc.list.sort {
+            for part in sort.split(',') {
+                missing("sort", part.trim().trim_start_matches('-'));
+            }
+        }
+    }
+    if errors > 0 {
+        eprintln!("✗ {errors} error(s)");
+        1
+    } else {
+        println!("✓ live schema: every configured table and column checks out");
+        0
     }
 }
 
@@ -198,15 +318,20 @@ async fn serve(
 ) {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let base_path = base_path.trim_end_matches('/').to_string();
-    let cfg = config::load(config.as_deref()).expect("config");
+    let cfg = match config::load(config.as_deref()) {
+        Ok(cfg) => cfg,
+        Err(e) => die(&format!("config invalid:\n{e}")),
+    };
 
-    let (primary_alias, primary_src) = cfg
+    let Some((primary_alias, primary_src)) = cfg
         .primary_source()
         .map(|(a, s)| (a.to_string(), s.clone()))
-        .expect("no primary postgres source — define `source \"main\" { type = \"postgres\" primary = true }` in steward.hcl");
-    let db = db
-        .or_else(|| config::resolve_env(&primary_src.url))
-        .expect("no database url — pass --db / STEWARD_DB or set the primary source url");
+    else {
+        die("no primary postgres source — define `source \"main\" { type = \"postgres\" primary = true }` in config/steward.hcl");
+    };
+    let Some(db) = db.or_else(|| config::resolve_env(&primary_src.url)) else {
+        die("no database url — pass --db / STEWARD_DB or set the primary source url");
+    };
     let schemas: Vec<String> = match schema {
         Some(s) => vec![s],
         None if !primary_src.schemas.is_empty() => primary_src.schemas.clone(),
@@ -216,6 +341,17 @@ async fn serve(
 
     let store = store::Store::open(&data).expect("open steward data dir");
 
+    let mut pools: std::collections::HashMap<String, sqlx::PgPool> = std::collections::HashMap::new();
+    pools.insert(primary_alias.clone(), connect_pg(&db).await);
+    for (alias, src) in cfg.sources.iter() {
+        if !src.is_postgres() || alias == &primary_alias {
+            continue;
+        }
+        let url = config::resolve_env(&src.url)
+            .unwrap_or_else(|| panic!("source \"{alias}\": missing/unresolved url"));
+        pools.insert(alias.clone(), connect_pg(&url).await);
+    }
+    let pg = pools[&primary_alias].clone();
     if store.user_count().unwrap_or(0) == 0 {
         let email = std::env::var("STEWARD_ADMIN_EMAIL").unwrap_or_else(|_| "admin@localhost".into());
         let (password, generated) = match std::env::var("STEWARD_ADMIN_PASSWORD") {
@@ -236,17 +372,6 @@ async fn serve(
         }
     }
 
-    let mut pools: std::collections::HashMap<String, sqlx::PgPool> = std::collections::HashMap::new();
-    pools.insert(primary_alias.clone(), connect_pg(&db).await);
-    for (alias, src) in cfg.sources.iter() {
-        if !src.is_postgres() || alias == &primary_alias {
-            continue;
-        }
-        let url = config::resolve_env(&src.url)
-            .unwrap_or_else(|| panic!("source \"{alias}\": missing/unresolved url"));
-        pools.insert(alias.clone(), connect_pg(&url).await);
-    }
-    let pg = pools[&primary_alias].clone();
     let mut dbs: std::collections::HashMap<String, introspect::Schema> = std::collections::HashMap::new();
     let mut db_schema = introspect::introspect(&pg, &schemas).await.expect("introspect schema");
     for t in db_schema.tables.values_mut() {

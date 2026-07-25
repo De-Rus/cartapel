@@ -52,6 +52,21 @@ steward user add <email> [--role <role>] [--password <pw>] [--data <dir>]
 Running `user add` for an existing email updates that user's role and/or
 password.
 
+## `steward check`
+
+Validate a config directory without running the server — CI-ready (exit 0 =
+valid, exit 1 with the errors printed):
+
+```bash
+steward check --config ./admin                    # parse + validate the bundle
+steward check --config ./admin --db postgres://…  # + verify every configured
+                                                  #   table/column against the
+                                                  #   live schema
+```
+
+Run it in CI next to your migrations: config drift against a schema change
+becomes a red build instead of a silent broken panel.
+
 ## Environment variables
 
 Beyond the per-flag variables above, steward reads:
