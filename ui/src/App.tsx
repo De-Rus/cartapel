@@ -5,15 +5,17 @@ import { BASE } from './lib/base'
 import { ToastProvider } from './components/Toast'
 import Shell from './components/Shell'
 import { useMeta } from './lib/meta'
-import AccessRoles from './pages/AccessRoles'
-import AccessUsers from './pages/AccessUsers'
-import Audit from './pages/Audit'
-import ConfigGroups from './pages/ConfigGroups'
+import { lazy, Suspense } from 'react'
 import Dashboard from './pages/Dashboard'
-import DashboardConfig from './pages/DashboardConfig'
-import DiscoverTables from './pages/DiscoverTables'
-import Setup from './pages/Setup'
 import Login from './pages/Login'
+
+const AccessRoles = lazy(() => import('./pages/AccessRoles'))
+const AccessUsers = lazy(() => import('./pages/AccessUsers'))
+const Audit = lazy(() => import('./pages/Audit'))
+const ConfigGroups = lazy(() => import('./pages/ConfigGroups'))
+const DashboardConfig = lazy(() => import('./pages/DashboardConfig'))
+const DiscoverTables = lazy(() => import('./pages/DiscoverTables'))
+const Setup = lazy(() => import('./pages/Setup'))
 import RowCreate from './pages/RowCreate'
 import RowDetail from './pages/RowDetail'
 import SlugRoute from './pages/SlugRoute'
@@ -39,6 +41,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <BrowserRouter basename={BASE || '/'}>
+          <Suspense fallback={null}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route element={<Shell />}>
@@ -56,6 +59,7 @@ export default function App() {
               <Route path=":table/:pk" element={<RowDetail />} />
             </Route>
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </ToastProvider>
     </QueryClientProvider>

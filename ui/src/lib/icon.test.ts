@@ -13,8 +13,8 @@ describe('resolveIcon', () => {
     expect(resolveIcon('⚖️')).toEqual({ kind: 'text', text: '⚖️' })
   })
 
-  it('falls back to literal text for an unknown name', () => {
-    expect(resolveIcon('not-a-real-icon')).toEqual({ kind: 'text', text: 'not-a-real-icon' })
+  it('treats unknown kebab-case optimistically as lucide (render falls back lazily)', () => {
+    expect(resolveIcon('not-a-real-icon')).toEqual({ kind: 'lucide', name: 'not-a-real-icon' })
   })
 
   it('returns null for empty/null/undefined', () => {

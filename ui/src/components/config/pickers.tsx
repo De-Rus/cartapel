@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import clsx from 'clsx'
-import { dynamicIconImports } from 'lucide-react/dynamic'
+
 import { AppIcon } from '../../lib/icon'
 import { useClickOutside } from '../../lib/hooks'
 import { useT } from '../../lib/i18n'
@@ -59,7 +59,19 @@ export const CODE_LANGS: readonly PickerOption[] = [
   'markdown',
 ].map((l) => ({ value: l, label: l }))
 
-const ICON_NAMES: readonly string[] = Object.keys(dynamicIconImports)
+// Loaded lazily — the lucide name map is ~550KB and must stay out of the entry.
+let iconNamesCache: string[] | null = null
+function useIconNames(): readonly string[] {
+  const [names, setNames] = useState<readonly string[]>(iconNamesCache ?? [])
+  useEffect(() => {
+    if (iconNamesCache) return
+    void import('lucide-react/dynamic').then((m) => {
+      iconNamesCache = Object.keys(m.dynamicIconImports)
+      setNames(iconNamesCache)
+    })
+  }, [])
+  return names
+}
 
 export function filterOptions(
   options: readonly PickerOption[],
@@ -360,7 +372,7 @@ export function IconPicker({
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const ref = useClickOutside(() => setOpen(false))
-  const names = filterIconNames(ICON_NAMES, q)
+  const names = filterIconNames(useIconNames(), q)
 
   return (
     <div ref={ref} className={clsx('relative', compact && 'shrink-0')}>
