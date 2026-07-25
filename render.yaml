@@ -1,0 +1,38 @@
+# One-click deploy to Render (free tier): https://render.com/deploy?repo=https://github.com/De-Rus/steward
+#
+# Prompts for your postgres:// URL and admin credentials, generates the secret
+# key, seeds a minimal config on first boot and drops you into the /_setup
+# wizard over YOUR database.
+#
+# The free tier's filesystem is ephemeral: in-app config edits and the audit
+# log survive restarts of the same deploy but not redeploys. For a durable
+# instance attach a disk (paid) mounted at /data, or see the Fly.io flow in
+# docs/deployment.md.
+
+services:
+  - type: web
+    name: steward
+    runtime: image
+    image:
+      url: ghcr.io/de-rus/steward:0.5.0
+    plan: free
+    healthCheckPath: /admin/api/health
+    dockerCommand: >-
+      sh -c 'mkdir -p /data/admin/config &&
+      { [ -f /data/admin/config/steward.hcl ] ||
+      printf "source \"main\" {\n  type    = \"postgres\"\n  url     = \"env:STEWARD_DB\"\n  primary = true\n}\n"
+      > /data/admin/config/steward.hcl; } &&
+      exec steward serve --config /data/admin'
+    envVars:
+      - key: STEWARD_DB
+        sync: false # your postgres:// connection URL
+      - key: STEWARD_ADMIN_EMAIL
+        sync: false # first admin login
+      - key: STEWARD_ADMIN_PASSWORD
+        sync: false # first admin password (min 8 chars)
+      - key: STEWARD_SECRET_KEY
+        generateValue: true
+      - key: STEWARD_LISTEN
+        value: 0.0.0.0:8686
+      - key: STEWARD_SECURE_COOKIES
+        value: "true"

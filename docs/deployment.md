@@ -17,6 +17,27 @@ A running steward needs:
 5. **A data directory** — steward's own SQLite state (users, sessions, audit,
    config history). Defaults to `./steward-data`; put it on durable storage.
 
+
+## One-click deploy
+
+**Render** (free tier): [deploy from this repo](https://render.com/deploy?repo=https://github.com/De-Rus/steward)
+— the blueprint (`render.yaml`) runs the published image, prompts for your
+`postgres://` URL and admin credentials, generates the secret key and seeds a
+minimal config so you land in the `/_setup` wizard over your own database.
+The free filesystem is ephemeral (config edits survive restarts, not
+redeploys) — attach a disk at `/data` for durability.
+
+**Fly.io** in two commands, with a durable volume:
+
+```bash
+fly launch --image ghcr.io/de-rus/steward:latest --no-deploy
+fly volumes create steward_data --size 1
+# add [mounts] source="steward_data" destination="/data" to fly.toml, then:
+fly secrets set STEWARD_DB=postgres://… STEWARD_SECRET_KEY=$(openssl rand -hex 32) \
+  STEWARD_ADMIN_EMAIL=you@example.com STEWARD_ADMIN_PASSWORD=change-me
+fly deploy
+```
+
 ## Docker
 
 ```bash

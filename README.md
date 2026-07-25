@@ -8,7 +8,7 @@ Point a single binary at your existing Postgres and get a Django-admin-quality
 panel. No framework, no ORM, no Node runtime — your database schema is the
 source of truth, and customization is code you version, not a GUI you click.
 
-**[▶ Live demo](https://steward-demo-derus.fly.dev)** (log in with `demo` / `demo`) · **[📖 Docs](https://de-rus.github.io/steward/)**
+**[▶ Live demo](https://steward-demo-derus.fly.dev)** (log in with `demo` / `demo`) · **[📖 Docs](https://de-rus.github.io/steward/)** · **[🚀 Deploy to Render](https://render.com/deploy?repo=https://github.com/De-Rus/steward)**
 
 ```bash
 git clone https://github.com/De-Rus/steward && cd steward
