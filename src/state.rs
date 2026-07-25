@@ -304,14 +304,14 @@ impl AppState {
         (v, c, u, d)
     }
 
-    /// The user's coarse level on a table: the max across their roles. Kept as
-    /// the coarse probe the permission tests pin; production decisions go
-    /// through [`AppState::table_perms`].
-    #[cfg_attr(not(test), allow(dead_code))]
     pub fn can_customize(&self, user: &CurrentUser) -> bool {
         user.is_admin() || self.user_roles(user).iter().any(|r| r.customize)
     }
 
+    /// The user's coarse level on a table: the max across their roles. Kept as
+    /// the coarse probe the permission tests pin; production decisions go
+    /// through [`AppState::table_perms`].
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn role_level(&self, user: &CurrentUser, table: &str) -> Level {
         if user.is_admin() {
             return Level::Write;

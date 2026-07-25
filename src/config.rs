@@ -997,9 +997,9 @@ pub struct AuthConfig {
 #[derive(Debug, Clone, Default, Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RoleConfig {
-    /// May open Personalizar and edit TABLE configs (list/fields/actions/HCL
-    /// + their version history) — config authorship, so grant it to trusted
-    /// power users only. Groups, dashboard, discover and access stay admin-only.
+    /// May open Personalizar and edit TABLE configs (visual, raw HCL and their
+    /// version history) — config authorship, so grant it to trusted power users
+    /// only. Groups, dashboard, discover and access stay admin-only.
     #[serde(default, skip_serializing_if = "is_false")]
     pub customize: bool,
     /// Parent role this one inherits from: the parent resolves first, then this
