@@ -2,6 +2,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '../api/client'
 import type { AuditChange, AuditRow } from '../api/types'
+import { rowSnapshot } from '../lib/audit'
 import { fmtDateTime, fmtInt } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useMeta } from '../lib/meta'
@@ -28,8 +29,28 @@ function fmtVal(v: unknown): string {
   return s.length > 24 ? `${s.slice(0, 24)}…` : s
 }
 
+function SnapshotPills({ row }: { row: Record<string, unknown> }) {
+  const entries = Object.entries(row)
+  const shown = entries.slice(0, 8)
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      {shown.map(([k, v]) => (
+        <span key={k} className="inline-flex items-center gap-1 rounded-full border px-2 py-px text-xxs">
+          <span className="text-muted">{k}:</span>
+          <span className="text-ink">{fmtVal(v)}</span>
+        </span>
+      ))}
+      {entries.length > shown.length && (
+        <span className="text-xxs text-muted">+{entries.length - shown.length}</span>
+      )}
+    </span>
+  )
+}
+
 function ChangePills({ changes }: { changes: Record<string, AuditChange> | null }) {
   if (!changes) return <span className="text-muted">—</span>
+  const snap = rowSnapshot(changes)
+  if (snap) return <SnapshotPills row={snap} />
   return (
     <span className="flex flex-wrap gap-1.5">
       {Object.entries(changes).map(([k, c]) => (

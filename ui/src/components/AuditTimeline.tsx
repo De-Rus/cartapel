@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { api, ApiError } from '../api/client'
 import type { AuditChange, AuditRow } from '../api/types'
+import { rowSnapshot } from '../lib/audit'
 import { fmtDateTime, relTime } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { Skeleton } from './Skeleton'
@@ -25,6 +26,24 @@ function fmtVal(v: unknown): string {
 
 function Changes({ changes }: { changes: Record<string, AuditChange> | null }) {
   if (!changes) return null
+  const snap = rowSnapshot(changes)
+  if (snap) {
+    const entries = Object.entries(snap)
+    const shown = entries.slice(0, 6)
+    return (
+      <div className="mt-1 flex flex-wrap gap-1">
+        {shown.map(([k, v]) => (
+          <span key={k} className="inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[10px]">
+            <span className="text-muted">{k}</span>
+            <span className="text-ink">{fmtVal(v)}</span>
+          </span>
+        ))}
+        {entries.length > shown.length && (
+          <span className="text-[10px] text-muted">+{entries.length - shown.length}</span>
+        )}
+      </div>
+    )
+  }
   return (
     <div className="mt-1 flex flex-wrap gap-1">
       {Object.entries(changes).map(([k, c]) => (
