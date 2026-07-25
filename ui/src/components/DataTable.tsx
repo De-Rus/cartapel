@@ -262,7 +262,7 @@ export function DataTable({
         onMouseEnter={() => onPrefetch?.(pk)}
       >
         {hasSelection && (
-          <td className="data-cell px-2.5" onClick={(e) => e.stopPropagation()}>
+          <td className="data-cell w-px pl-2.5 pr-1" onClick={(e) => e.stopPropagation()}>
             <input
               type="checkbox"
               checked={isSel}
@@ -283,7 +283,8 @@ export function DataTable({
             <td
               key={c}
               className={clsx(
-                'data-cell whitespace-nowrap px-2.5',
+                'data-cell whitespace-nowrap',
+                c === table.pk ? 'w-px pl-1 pr-2.5 tabular-nums text-muted' : 'px-2.5',
                 numeric && 'text-right tabular-nums',
                 flash === key && 'flash-good',
                 errCell === key && 'ring-1 ring-critical',
@@ -350,7 +351,7 @@ export function DataTable({
         <thead ref={theadRef} className="sticky-head">
           <tr className="text-left">
             {hasSelection && (
-              <th className="w-9 px-2.5 py-2">
+              <th className="w-9 pl-2.5 pr-1 py-2">
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -370,7 +371,8 @@ export function DataTable({
                   key={c}
                   aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'}
                   className={clsx(
-                    'group relative select-none whitespace-nowrap px-2.5 py-2 text-xxs font-semibold uppercase tracking-wide',
+                    'group relative select-none whitespace-nowrap py-2 text-xxs font-semibold uppercase tracking-wide',
+                    c === table.pk ? 'w-px pl-1 pr-2.5' : 'px-2.5',
                     active ? 'text-ink' : 'text-muted',
                     cm && NUMERIC_WIDGETS.has(cm.widget) && 'text-right',
                   )}

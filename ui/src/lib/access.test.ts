@@ -58,6 +58,20 @@ describe('definition ↔ matrix mapping', () => {
     expect(back.row_filter).toEqual({ bots: 'owner = {actor.email}' })
   })
 
+  it('round-trips extends and omits it when unset', () => {
+    const def: RoleDefinition = {
+      extends: 'viewer',
+      tables: { bots: 'write' },
+      actions: [],
+      masked: {},
+      row_filter: {},
+    }
+    const back = matrixToDefinition(definitionToMatrix(def, TABLES))
+    expect(back.extends).toBe('viewer')
+    const bare = matrixToDefinition(definitionToMatrix(null, TABLES))
+    expect('extends' in bare).toBe(false)
+  })
+
   it('omits masked/row_filter for tables with no level but keeps them when configured', () => {
     const m = definitionToMatrix(null, TABLES)
     const bots = m.rows.find((r) => r.table === 'bots')!

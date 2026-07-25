@@ -1204,6 +1204,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
     collect_hcl(dir, &mut files)?;
     let mut page_ids: BTreeMap<String, std::path::PathBuf> = BTreeMap::new();
     let mut page_slugs: BTreeMap<String, std::path::PathBuf> = BTreeMap::new();
+    let mut group_paths: BTreeMap<String, std::path::PathBuf> = BTreeMap::new();
     let mut query_sources: BTreeMap<String, std::path::PathBuf> = BTreeMap::new();
     let mut source_files: BTreeMap<String, std::path::PathBuf> = BTreeMap::new();
     let mut variable_sources: BTreeMap<String, std::path::PathBuf> = BTreeMap::new();
@@ -1253,6 +1254,14 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                     continue;
                 }
                 let g: GroupConfig = hcl::from_str(&raw).map_err(ctx)?;
+                if let Some(prev) = group_paths.get(&slug) {
+                    return Err(format!(
+                        "duplicate group \"{slug}\": {} and {} — a group lives in ONE folder",
+                        prev.display(),
+                        path.display()
+                    ));
+                }
+                group_paths.insert(slug.clone(), path.clone());
                 cfg.groups.push(LoadedGroup {
                     slug,
                     label: g.label,
@@ -2369,7 +2378,7 @@ panel {
     /// same-id collision is also a same-slug collision, so the slug guard (which
     /// fires first) catches it — the qualified-id guard stays as belt-and-suspenders.
     #[test]
-    fn duplicate_page_id_is_a_loud_error() {
+    fn duplicate_group_slug_is_a_loud_error() {
         let root = fresh_root("dup-page");
         let a = root.join("grp");
         std::fs::create_dir_all(a.join("ops")).unwrap();
@@ -2381,8 +2390,10 @@ panel {
         std::fs::write(b.join("_group.hcl"), "label = \"Grp B\"\n").unwrap();
         std::fs::write(b.join("ops").join("page.hcl"), "label = \"B\"\nmodule = \"b.js\"\n").unwrap();
 
-        let err = load(Some(&root)).expect_err("duplicate page id must error");
-        assert!(err.contains("duplicate page slug \"ops\""), "{err}");
+        // Two groups sharing a slug is itself a loud error now (it forked the
+        // sidebar) and fires before the page-id collision it used to cause.
+        let err = load(Some(&root)).expect_err("duplicate group slug must error");
+        assert!(err.contains("duplicate group \"grp\""), "{err}");
         let _ = std::fs::remove_dir_all(&root);
     }
 

@@ -275,7 +275,11 @@ pub async fn rename_group(
         return Err(AppError(StatusCode::CONFLICT, format!("group '{to}' already exists")));
     }
     let group_hcl = std::fs::read_to_string(
-        state.config_dir.as_ref().map(|d| d.join(&slug).join("_group.hcl")).unwrap_or_default(),
+        state
+            .config_dir
+            .as_ref()
+            .map(|d| group_dir(d, &slug).join("_group.hcl"))
+            .unwrap_or_default(),
     )
     .unwrap_or_default();
     drop(cfg);
@@ -520,20 +524,32 @@ pub async fn save_layout(
                 }
             }
             None => {
+                // Ungrouped folder-form tables live under the config's root
+                // convention — screens/ when it exists, else the dir root.
+                let root = if dir.join("screens").is_dir() { dir.join("screens") } else { dir.clone() };
                 if src_is_screen {
-                    dir.join("screens").join(&stem)
+                    root.join(&stem)
                 } else {
                     dir.join(format!("{stem}.hcl"))
                 }
             }
         };
-        // A moved stem must not land on an existing DIFFERENT file in the
-        // destination — that would trip the loader's duplicate-table error.
+        // A moved stem must not land on an existing DIFFERENT file or folder in
+        // the destination — that would trip the loader's duplicate-table error
+        // (or silently merge into a page's folder).
         if to != from && to.exists() {
             return Err(AppError(
                 StatusCode::CONFLICT,
                 format!("'{stem}' already exists in the destination group"),
             ));
+        }
+        if let Some(d) = &mkdir {
+            if d.exists() {
+                return Err(AppError(
+                    StatusCode::CONFLICT,
+                    format!("folder '{stem}' already exists in the destination group"),
+                ));
+            }
         }
         if !dest_paths.insert(to.clone()) {
             return Err(AppError(

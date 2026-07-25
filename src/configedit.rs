@@ -242,10 +242,10 @@ async fn create_in_group(
     } else {
         group_dir.join(format!("{stem}.hcl"))
     };
-    if table_path.exists() {
+    if table_path.exists() || (in_screens && group_dir.join(stem).exists()) {
         return Err(AppError(
             axum::http::StatusCode::CONFLICT,
-            format!("'{stem}.hcl' already exists in group '{group}'"),
+            format!("'{stem}' already exists in group '{group}'"),
         ));
     }
 
