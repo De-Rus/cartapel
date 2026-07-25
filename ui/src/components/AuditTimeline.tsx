@@ -1,16 +1,18 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { api } from '../api/client'
+import { api, ApiError } from '../api/client'
 import type { AuditChange, AuditRow } from '../api/types'
 import { fmtDateTime, relTime } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { Skeleton } from './Skeleton'
+import { useToast } from './Toast'
 
 function dotColor(action: string): string {
   if (action.startsWith('action:')) return 'var(--warning)'
   if (action === 'create') return 'var(--accent)'
   if (action === 'delete') return 'var(--critical)'
+  if (action === 'revert') return 'var(--good)'
   return 'var(--muted)'
 }
 
@@ -37,17 +39,45 @@ function Changes({ changes }: { changes: Record<string, AuditChange> | null }) {
   )
 }
 
-function Entry({ r }: { r: AuditRow }) {
+const REVERTABLE = new Set(['update', 'revert'])
+
+function Entry({ r, table, pk }: { r: AuditRow; table: string; pk: string }) {
+  const t = useT()
+  const toast = useToast()
+  const qc = useQueryClient()
+  const revert = useMutation({
+    mutationFn: () => api.revert(table, pk, r.id),
+    onSuccess: () => {
+      toast(t('audit_reverted'), 'ok')
+      void qc.invalidateQueries({ queryKey: ['row', table, pk] })
+      void qc.invalidateQueries({ queryKey: ['rowAudit', table, pk] })
+      void qc.invalidateQueries({ queryKey: ['list', table] })
+    },
+    onError: (e) => toast(e instanceof ApiError ? e.message : String(e), 'error'),
+  })
+  const revertable = REVERTABLE.has(r.action) && r.changes && Object.keys(r.changes).length > 0
   return (
-    <li className="relative pb-4 pl-5 last:pb-0">
+    <li className="group relative pb-4 pl-5 last:pb-0">
       <span
         className="absolute left-0 top-1 h-2 w-2 rounded-full ring-2 ring-[color:var(--surface)]"
         style={{ background: dotColor(r.action) }}
       />
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate text-[13px] text-ink">{r.action}</span>
-        <span className="shrink-0 text-xxs tabular-nums text-muted" title={fmtDateTime(r.ts)}>
-          {relTime(r.ts)}
+        <span className="flex shrink-0 items-baseline gap-2">
+          {revertable && (
+            <button
+              type="button"
+              disabled={revert.isPending}
+              onClick={() => revert.mutate()}
+              className="text-xxs text-accent opacity-0 transition-opacity hover:underline focus-visible:opacity-100 disabled:opacity-50 group-hover:opacity-100"
+            >
+              {t('audit_revert')}
+            </button>
+          )}
+          <span className="text-xxs tabular-nums text-muted" title={fmtDateTime(r.ts)}>
+            {relTime(r.ts)}
+          </span>
         </span>
       </div>
       <div className="text-xxs text-muted">{r.actor}</div>
@@ -84,7 +114,7 @@ export function AuditTimeline({ table, pk }: { table: string; pk: string }) {
     <div>
       <ol className={clsx('relative', 'before:absolute before:left-[3.5px] before:top-1 before:h-full before:w-px before:bg-[color:var(--border)]')}>
         {shown.map((r) => (
-          <Entry key={r.id} r={r} />
+          <Entry key={r.id} r={r} table={table} pk={pk} />
         ))}
       </ol>
       {rows.length > 5 && (

@@ -357,6 +357,7 @@ async fn serve(
                 .delete(rows::delete_handler),
         )
         .route("/t/:table/r/:pk/audit", get(rows::row_audit_handler))
+        .route("/t/:table/r/:pk/revert/:audit_id", post(rows::revert_handler))
         .route("/t/:table/r/:pk/inline/:child", get(rows::inline_page_handler))
         .route("/t/:table/options/:col", get(rows::options_handler))
         .route(

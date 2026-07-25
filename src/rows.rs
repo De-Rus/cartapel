@@ -546,12 +546,27 @@ pub async fn update_handler(
     Path((table, pk)): Path<(String, String)>,
     Json(body): Json<Value>,
 ) -> Result<Json<Value>, AppError> {
-    let dbt = table_of(&state, &user, &table)?;
-    if !state.table_perms(&user, &table).update {
+    apply_update(&state, &user, &table, &pk, &body, "update").await
+}
+
+/// The single row-update path: permission gates, editable-set validation, the
+/// row-filtered UPDATE, masking, and the audit diff. `update_handler` and
+/// `revert_handler` both funnel through here so a revert is governed by exactly
+/// the same rules as the edit it undoes.
+async fn apply_update(
+    state: &AppState,
+    user: &CurrentUser,
+    table: &str,
+    pk: &str,
+    body: &Value,
+    action: &str,
+) -> Result<Json<Value>, AppError> {
+    let dbt = table_of(state, user, table)?;
+    if !state.table_perms(user, table).update {
         return Err(AppError::forbidden("no write access"));
     }
-    let before = fetch_one(&state, &user, &table, dbt, &pk).await?;
-    let changes = editable_set(&state, &user, &table, dbt, &body, false)?;
+    let before = fetch_one(state, user, table, dbt, pk).await?;
+    let changes = editable_set(state, user, table, dbt, body, false)?;
 
     let mut binds = Binds::new();
     let mut sets = Vec::new();
@@ -561,8 +576,8 @@ pub async fn update_handler(
         sets.push(format!("{} = {expr}", ident(col_name)));
     }
     let pk_col = dbt.pk.as_ref().and_then(|p| dbt.column(p)).unwrap();
-    let mut where_sql = pk_predicate(pk_col, &pk, &mut binds);
-    if let Some(rf) = state.row_filter(&user, &table) {
+    let mut where_sql = pk_predicate(pk_col, pk, &mut binds);
+    if let Some(rf) = state.row_filter(user, table) {
         where_sql = format!("{where_sql} AND ({rf})");
     }
     let sql = format!(
@@ -572,7 +587,7 @@ pub async fn update_handler(
     );
     let row = binds.query(&sql).fetch_one(state.pool_of(dbt)).await?;
     let mut after: Value = row.get("r");
-    present_row(&mut after, &state.masked_columns(&user, &table), &binary_cols(dbt));
+    present_row(&mut after, &state.masked_columns(user, table), &binary_cols(dbt));
 
     let mut diff = Map::new();
     for (col, _) in &changes {
@@ -583,8 +598,54 @@ pub async fn update_handler(
     }
     state
         .store
-        .audit(&user.email, &table, Some(&pk), "update", Some(&Value::Object(diff)));
+        .audit(&user.email, table, Some(pk), action, Some(&Value::Object(diff)));
     Ok(Json(json!({ "row": after })))
+}
+
+/// One-click undo of an audited edit: rebuild `{col: from}` from the stored
+/// diff and push it back through the normal update path. Refuses when the row
+/// has moved on since (any audited `to` no longer matches the current value) —
+/// a revert never guesses over someone else's later edit.
+pub async fn revert_handler(
+    State(state): State<Arc<AppState>>,
+    user: CurrentUser,
+    Path((table, pk, audit_id)): Path<(String, String, i64)>,
+) -> Result<Json<Value>, AppError> {
+    let dbt = table_of(&state, &user, &table)?;
+    if !state.table_perms(&user, &table).update {
+        return Err(AppError::forbidden("no write access"));
+    }
+    let entry = state
+        .store
+        .audit_entry(audit_id)?
+        .ok_or_else(|| AppError::not_found("audit entry not found"))?;
+    if entry.table != table || entry.pk.as_deref() != Some(&pk) {
+        return Err(AppError::bad("audit entry does not belong to this row"));
+    }
+    if !matches!(entry.action.as_str(), "update" | "revert") {
+        return Err(AppError::bad("only field edits can be reverted"));
+    }
+    let diff = entry
+        .changes
+        .as_ref()
+        .and_then(Value::as_object)
+        .filter(|d| !d.is_empty())
+        .ok_or_else(|| AppError::bad("audit entry has no revertable changes"))?;
+
+    let current = fetch_one(&state, &user, &table, dbt, &pk).await?;
+    let mut set = Map::new();
+    for (col, change) in diff {
+        let from = change.get("from").cloned().unwrap_or(Value::Null);
+        let to = change.get("to").cloned().unwrap_or(Value::Null);
+        if current.get(col.as_str()).cloned().unwrap_or(Value::Null) != to {
+            return Err(AppError(
+                axum::http::StatusCode::CONFLICT,
+                format!("{col} has changed since this edit — refresh and review before reverting"),
+            ));
+        }
+        set.insert(col.clone(), from);
+    }
+    apply_update(&state, &user, &table, &pk, &json!({ "set": set }), "revert").await
 }
 
 const MAX_BULK_PKS: usize = 5000;

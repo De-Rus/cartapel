@@ -2,7 +2,7 @@ use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, Salt
 use argon2::Argon2;
 use chrono::Utc;
 use rand::RngCore;
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use rusqlite_migration::{Migrations, M};
 use crate::config::RoleConfig;
 use serde_json::{json, Value};
@@ -22,6 +22,14 @@ use std::sync::{LazyLock, Mutex};
 pub enum UserCreateError {
     Duplicate,
     Other(String),
+}
+
+#[derive(Debug)]
+pub struct AuditEntry {
+    pub table: String,
+    pub pk: Option<String>,
+    pub action: String,
+    pub changes: Option<Value>,
 }
 
 pub struct Store {
@@ -377,6 +385,26 @@ impl Store {
                 changes.map(|c| c.to_string())
             ],
         );
+    }
+
+    pub fn audit_entry(&self, id: i64) -> rusqlite::Result<Option<AuditEntry>> {
+        self.conn
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT table_name, pk, action, changes FROM audit_log WHERE id = ?1",
+                [id],
+                |r| {
+                    let changes: Option<String> = r.get(3)?;
+                    Ok(AuditEntry {
+                        table: r.get(0)?,
+                        pk: r.get(1)?,
+                        action: r.get(2)?,
+                        changes: changes.and_then(|c| serde_json::from_str(&c).ok()),
+                    })
+                },
+            )
+            .optional()
     }
 
     pub fn audit_for_row(&self, table: &str, pk: &str) -> rusqlite::Result<Value> {

@@ -184,6 +184,8 @@ export const api = {
     mode: 'insert' | 'upsert',
   ) => request<ImportResult>('POST', `/t/${table}/import`, { format, data, mode }),
   audit: (qs: string) => request<AuditResponse>('GET', `/audit?${qs}`),
+  revert: (table: string, pk: string, auditId: number) =>
+    request<{ row: Row }>('POST', `/t/${table}/r/${encodeURIComponent(pk)}/revert/${auditId}`, {}),
   rowAudit: (table: string, pk: string) =>
     request<AuditResponse>('GET', `/t/${table}/r/${encodeURIComponent(pk)}/audit`),
   search: (q: string) =>
