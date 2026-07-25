@@ -89,7 +89,18 @@ impl From<sqlx::Error> for AppError {
             sqlx::Error::RowNotFound => AppError::not_found("row not found"),
             sqlx::Error::Database(db) => {
                 tracing::warn!("db error: {}", db.message());
-                AppError::bad("invalid value for this operation")
+                // Constraint/format violations carry actionable, user-caused
+                // messages ("null value in column …"); anything else stays opaque.
+                let code = db.code();
+                let known = matches!(
+                    code.as_deref(),
+                    Some("23502" | "23505" | "23503" | "23514" | "22P02" | "22001" | "22003" | "22007" | "22008")
+                );
+                if known {
+                    AppError::bad(db.message())
+                } else {
+                    AppError::bad("invalid value for this operation")
+                }
             }
             _ => {
                 tracing::warn!("query error: {e}");
