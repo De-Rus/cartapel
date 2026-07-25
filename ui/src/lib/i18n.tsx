@@ -339,6 +339,10 @@ const es: Dict = {
   cfg_display_insert_col: 'insertar {columna}',
   cfg_display_label: 'Etiqueta (singular)',
   cfg_display_label_plural: 'Etiqueta (plural)',
+  cfg_group: 'Grupo',
+  cfg_group_none: 'Sin grupo',
+  cfg_group_hint: 'Dónde aparece esta tabla en la barra lateral. Se aplica al instante.',
+  cfg_group_moved: 'Tabla movida de grupo',
 
   cfg_detail_hint: 'Agrupa los campos en secciones con título en la ficha.',
   cfg_detail_add_section: 'Añadir sección',
@@ -847,6 +851,10 @@ const en: Dict = {
   cfg_display_insert_col: 'insert {column}',
   cfg_display_label: 'Label (singular)',
   cfg_display_label_plural: 'Label (plural)',
+  cfg_group: 'Group',
+  cfg_group_none: 'No group',
+  cfg_group_hint: 'Where this table lives in the sidebar. Applies immediately.',
+  cfg_group_moved: 'Table moved to group',
 
   cfg_detail_hint: 'Group fields into titled sections on the record page.',
   cfg_detail_add_section: 'Add section',

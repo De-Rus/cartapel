@@ -3,6 +3,7 @@ import type { TableMeta } from '../../api/types'
 import { useT } from '../../lib/i18n'
 import { Labeled } from './parts'
 import { ColumnPicker } from './pickers'
+import { GroupSelect } from './GroupSelect'
 
 export function DisplayEditor({
   meta,
@@ -56,6 +57,8 @@ export function DisplayEditor({
           />
         </Labeled>
       </div>
+
+      <GroupSelect table={meta.name} />
     </div>
   )
 }
