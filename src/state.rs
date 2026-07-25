@@ -367,14 +367,10 @@ impl AppState {
                 continue;
             }
             any_writer = true;
-            match role.editable.get(table) {
-                None => return None,
-                Some(cols) => {
-                    for col in cols {
-                        if !union.contains(col) {
-                            union.push(col.clone());
-                        }
-                    }
+            let cols = role.editable.get(table)?;
+            for col in cols {
+                if !union.contains(col) {
+                    union.push(col.clone());
                 }
             }
         }
@@ -484,10 +480,8 @@ impl AppState {
         }
         let mut parts: Vec<String> = Vec::new();
         for role in &viewing {
-            match role.row_filter.get(table) {
-                None => return None,
-                Some(raw) => parts.push(self.fill_actor(user, raw)),
-            }
+            let raw = role.row_filter.get(table)?;
+            parts.push(self.fill_actor(user, raw));
         }
         if parts.len() == 1 {
             return parts.pop();
