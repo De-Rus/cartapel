@@ -1149,8 +1149,10 @@ mod tests {
     }
 
     fn sample() -> TableConfig {
-        let mut tc = TableConfig::default();
-        tc.label = Some("Bots".into());
+        let mut tc = TableConfig {
+            label: Some("Bots".into()),
+            ..Default::default()
+        };
         tc.list = ListConfig {
             columns: vec!["id".into(), "name".into()],
             sort: Some("-id".into()),
@@ -1362,7 +1364,7 @@ action "pause" {
         assert_eq!(g["writable"], json!(true));
         assert!(g["hcl"].as_str().is_some());
         assert!(g["model"].is_object(), "get returns a structured model");
-        assert!(state.cfg().tables.get("bots").is_none());
+        assert!(!state.cfg().tables.contains_key("bots"));
 
         let p = put_config(
             axum::extract::State(state.clone()),
@@ -1395,7 +1397,7 @@ action "pause" {
     async fn put_via_model_serializes_and_reloads() {
         let dir = tmp_dir();
         let state = state_with_dir(Some(dir.clone()));
-        let model = serde_json::to_value(&sample()).unwrap();
+        let model = serde_json::to_value(sample()).unwrap();
 
         let p = put_config(
             axum::extract::State(state.clone()),
@@ -1746,8 +1748,10 @@ action "pause" {
             Some(group.join("foo.hcl")),
         );
 
-        let mut model = TableConfig::default();
-        model.label = Some("Foo edited".into());
+        let model = TableConfig {
+            label: Some("Foo edited".into()),
+            ..Default::default()
+        };
         let p = put_config(
             axum::extract::State(state.clone()),
             admin(),
@@ -1775,8 +1779,10 @@ action "pause" {
         );
 
         // A second save + publish of the first version still targets the folder file.
-        let mut model2 = TableConfig::default();
-        model2.label = Some("Foo v2".into());
+        let model2 = TableConfig {
+            label: Some("Foo v2".into()),
+            ..Default::default()
+        };
         let _ = put_config(
             axum::extract::State(state.clone()),
             admin(),
@@ -1858,7 +1864,7 @@ action "pause" {
         let dir = tmp_dir();
         std::fs::write(dir.join("bots.hcl"), "").unwrap();
         let state = state_with_dir(Some(dir.clone()));
-        assert!(state.cfg().auth.roles.get("legacy").is_none());
+        assert!(!state.cfg().auth.roles.contains_key("legacy"));
         state
             .store
             .seed_legacy_role("legacy", r#"{"tables":{"bots":"read"}}"#);

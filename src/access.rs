@@ -317,7 +317,7 @@ fn write_auth(
 ) -> Result<(bool, Value), AppError> {
     admin_only(user)?;
     let _guard = state.config_write_lock.lock().unwrap();
-    let mut new_auth = (*state.cfg()).auth.clone();
+    let mut new_auth = state.cfg().auth.clone();
     mutate(&mut new_auth)?;
     let hcl = hcl::to_string(&new_auth)
         .map_err(|e| AppError::internal(format!("serialize auth config: {e}")))?;
@@ -909,8 +909,10 @@ mod tests {
         use crate::config::{InlineSpec, TableConfig};
 
         let mut cfg = test_cfg();
-        let mut child = TableConfig::default();
-        child.label = Some("Child".into());
+        let child = TableConfig {
+            label: Some("Child".into()),
+            ..Default::default()
+        };
         cfg.tables.insert("locked".into(), child);
         let mut bots_cfg = cfg.tables.remove("bots").unwrap();
         bots_cfg.relations.inlines = vec![InlineSpec::Full {
@@ -1394,8 +1396,10 @@ mod tests {
         viewer.tables.insert("bots".into(), "read".into());
         viewer.tables.insert("locked".into(), "read".into());
         viewer.actions.push("export".into());
-        let mut support = RoleConfig::default();
-        support.extends = Some("viewer".into());
+        let mut support = RoleConfig {
+            extends: Some("viewer".into()),
+            ..Default::default()
+        };
         support.tables.insert("bots".into(), "write".into());
         support.actions.push("notify".into());
         {
@@ -1416,8 +1420,10 @@ mod tests {
     #[tokio::test]
     async fn role_extends_unknown_parent_is_400() {
         let (state, dir) = writable_state();
-        let mut def = RoleConfig::default();
-        def.extends = Some("ghost".into());
+        let def = RoleConfig {
+            extends: Some("ghost".into()),
+            ..Default::default()
+        };
         let r = roles_create(
             State(state.clone()),
             admin(),
@@ -1427,7 +1433,7 @@ mod tests {
             }),
         )
         .await;
-        let e = r.err().expect("unknown parent must be rejected");
+        let e = r.expect_err("unknown parent must be rejected");
         assert!(e.1.contains("unknown role"), "{}", e.1);
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -1436,8 +1442,8 @@ mod tests {
     async fn role_extends_cycle_is_400() {
         let (state, dir) = writable_state();
         let mut a = RoleConfig::default();
-        a.tables.insert("bots".into(), "read".into());
-        roles_create(
+        a.tables.insert("bots".to_string(), "read".to_string());
+        let _ = roles_create(
             State(state.clone()),
             admin(),
             Json(CreateRole {
@@ -1447,9 +1453,11 @@ mod tests {
         )
         .await
         .unwrap();
-        let mut b = RoleConfig::default();
-        b.extends = Some("a".into());
-        roles_create(
+        let b = RoleConfig {
+            extends: Some("a".into()),
+            ..Default::default()
+        };
+        let _ = roles_create(
             State(state.clone()),
             admin(),
             Json(CreateRole {
@@ -1459,8 +1467,10 @@ mod tests {
         )
         .await
         .unwrap();
-        let mut a2 = RoleConfig::default();
-        a2.extends = Some("b".into());
+        let a2 = RoleConfig {
+            extends: Some("b".into()),
+            ..Default::default()
+        };
         let r = roles_update(
             State(state.clone()),
             admin(),
@@ -1468,7 +1478,7 @@ mod tests {
             Json(UpdateRole { definition: a2 }),
         )
         .await;
-        let e = r.err().expect("cycle must be rejected");
+        let e = r.expect_err("cycle must be rejected");
         assert!(e.1.contains("cycle"), "{}", e.1);
         let _ = std::fs::remove_dir_all(dir);
     }

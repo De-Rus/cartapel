@@ -1387,6 +1387,56 @@ pub async fn row_audit_handler(
     Ok(Json(state.store.audit_for_row(&table, &pk)?))
 }
 
+pub async fn options_handler(
+    State(state): State<Arc<AppState>>,
+    user: CurrentUser,
+    Path((table, col)): Path<(String, String)>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<Json<Value>, AppError> {
+    let dbt = table_of(&state, &user, &table)?;
+    let column = dbt
+        .column(&col)
+        .ok_or_else(|| AppError::bad(format!("unknown column {col}")))?;
+    let (f_table, f_col) = column
+        .fk
+        .clone()
+        .ok_or_else(|| AppError::bad(format!("{col} is not a foreign key")))?;
+    let child = table_of(&state, &user, &f_table)?;
+    let label = fk_label_col(child);
+    let mut binds = Binds::new();
+    let mut clauses: Vec<String> = Vec::new();
+    if let Some(q) = params.get("q").filter(|q| !q.is_empty()) {
+        let n = binds.push(Some(format!("%{q}%")));
+        clauses.push(format!("{}::text ILIKE ${n}", ident(&label)));
+    }
+    if let Some(rf) = state.row_filter(&user, &f_table) {
+        clauses.push(format!("({rf})"));
+    }
+    let where_sql = if clauses.is_empty() {
+        String::new()
+    } else {
+        format!("WHERE {}", clauses.join(" AND "))
+    };
+    let sql = format!(
+        "SELECT {}::text AS value, {}::text AS label FROM {} {} ORDER BY 2 LIMIT 20",
+        ident(&f_col),
+        ident(&label),
+        state.qualified_of(child),
+        where_sql
+    );
+    let rows = binds.query(&sql).fetch_all(state.pool_of(child)).await?;
+    let out: Vec<Value> = rows
+        .into_iter()
+        .map(|r| {
+            json!({
+                "value": r.get::<Option<String>, _>("value"),
+                "label": r.get::<Option<String>, _>("label"),
+            })
+        })
+        .collect();
+    Ok(Json(Value::Array(out)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1617,13 +1667,15 @@ mod tests {
     #[tokio::test]
     async fn from_table_rename_resolves_physical_but_keeps_config_by_slug() {
         let mut cfg = inline_cfg();
-        let mut active = TableConfig::default();
-        active.from = TableFrom {
-            source: None,
-            schema: Some("public".into()),
-            table: Some("bots".into()),
+        let active = TableConfig {
+            from: TableFrom {
+                source: None,
+                schema: Some("public".into()),
+                table: Some("bots".into()),
+            },
+            label: Some("Active bots".into()),
+            ..Default::default()
         };
-        active.label = Some("Active bots".into());
         cfg.tables.insert("active_bots".into(), active);
         let state = inline_state(cfg);
 
@@ -1647,11 +1699,13 @@ mod tests {
     #[tokio::test]
     async fn from_schema_mismatch_fails_closed() {
         let mut cfg = inline_cfg();
-        let mut bad = TableConfig::default();
-        bad.from = TableFrom {
-            source: None,
-            schema: Some("nope".into()),
-            table: Some("bots".into()),
+        let bad = TableConfig {
+            from: TableFrom {
+                source: None,
+                schema: Some("nope".into()),
+                table: Some("bots".into()),
+            },
+            ..Default::default()
         };
         cfg.tables.insert("bad".into(), bad);
         let state = inline_state(cfg);
@@ -1864,54 +1918,4 @@ mod tests {
             "a child the caller cannot view must not surface as an inline"
         );
     }
-}
-
-pub async fn options_handler(
-    State(state): State<Arc<AppState>>,
-    user: CurrentUser,
-    Path((table, col)): Path<(String, String)>,
-    Query(params): Query<HashMap<String, String>>,
-) -> Result<Json<Value>, AppError> {
-    let dbt = table_of(&state, &user, &table)?;
-    let column = dbt
-        .column(&col)
-        .ok_or_else(|| AppError::bad(format!("unknown column {col}")))?;
-    let (f_table, f_col) = column
-        .fk
-        .clone()
-        .ok_or_else(|| AppError::bad(format!("{col} is not a foreign key")))?;
-    let child = table_of(&state, &user, &f_table)?;
-    let label = fk_label_col(child);
-    let mut binds = Binds::new();
-    let mut clauses: Vec<String> = Vec::new();
-    if let Some(q) = params.get("q").filter(|q| !q.is_empty()) {
-        let n = binds.push(Some(format!("%{q}%")));
-        clauses.push(format!("{}::text ILIKE ${n}", ident(&label)));
-    }
-    if let Some(rf) = state.row_filter(&user, &f_table) {
-        clauses.push(format!("({rf})"));
-    }
-    let where_sql = if clauses.is_empty() {
-        String::new()
-    } else {
-        format!("WHERE {}", clauses.join(" AND "))
-    };
-    let sql = format!(
-        "SELECT {}::text AS value, {}::text AS label FROM {} {} ORDER BY 2 LIMIT 20",
-        ident(&f_col),
-        ident(&label),
-        state.qualified_of(child),
-        where_sql
-    );
-    let rows = binds.query(&sql).fetch_all(state.pool_of(child)).await?;
-    let out: Vec<Value> = rows
-        .into_iter()
-        .map(|r| {
-            json!({
-                "value": r.get::<Option<String>, _>("value"),
-                "label": r.get::<Option<String>, _>("label"),
-            })
-        })
-        .collect();
-    Ok(Json(Value::Array(out)))
 }

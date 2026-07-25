@@ -572,9 +572,9 @@ pub async fn save_layout(
                 let gd = group_dir(&dir, slug);
                 let in_screens = gd.starts_with(dir.join("screens"));
                 if src_is_screen {
-                    gd.join(&stem)
+                    gd.join(stem)
                 } else if in_screens {
-                    let td = gd.join(&stem);
+                    let td = gd.join(stem);
                     mkdir = Some(td.clone());
                     td.join("screen.hcl")
                 } else {
@@ -590,7 +590,7 @@ pub async fn save_layout(
                     dir.clone()
                 };
                 if src_is_screen {
-                    root.join(&stem)
+                    root.join(stem)
                 } else {
                     dir.join(format!("{stem}.hcl"))
                 }

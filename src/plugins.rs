@@ -257,8 +257,12 @@ mod tests {
         root
     }
 
-    async fn get(dir: &PathBuf, path: &str) -> Response {
-        serve_static(State(asset_state(dir.clone())), Path(path.to_string())).await
+    async fn get(dir: &std::path::Path, path: &str) -> Response {
+        serve_static(
+            State(asset_state(dir.to_path_buf())),
+            Path(path.to_string()),
+        )
+        .await
     }
 
     #[tokio::test]

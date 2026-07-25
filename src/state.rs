@@ -14,6 +14,9 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+/// `(table, column, row_filter)` — the cache key for enum-option queries.
+pub type OptionsCacheKey = (String, String, Option<String>);
+
 pub struct AppState {
     pub pg: PgPool,
     pub pools: std::collections::HashMap<String, PgPool>,
@@ -37,8 +40,7 @@ pub struct AppState {
     /// every outstanding session cookie.
     pub secret_key: [u8; 32],
     pub webhook_secret: Option<String>,
-    pub options_cache:
-        Mutex<HashMap<(String, String, Option<String>), (Instant, serde_json::Value)>>,
+    pub options_cache: Mutex<HashMap<OptionsCacheKey, (Instant, serde_json::Value)>>,
     pub login_limiter: Mutex<HashMap<String, (u32, Instant)>>,
     /// Serializes the read-modify-write of the on-disk config files so two
     /// concurrent admin writes can't clobber each other (last rename wins =

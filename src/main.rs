@@ -722,9 +722,10 @@ mod secret_tests {
     use super::*;
 
     fn cfg_with_key(key: Option<&str>) -> config::StewardConfig {
-        let mut cfg = config::StewardConfig::default();
-        cfg.secret_key = key.map(str::to_string);
-        cfg
+        config::StewardConfig {
+            secret_key: key.map(str::to_string),
+            ..Default::default()
+        }
     }
 
     #[test]
