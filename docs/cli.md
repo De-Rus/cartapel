@@ -4,9 +4,16 @@ description: "Every cartapel subcommand, flag and environment variable — serve
 
 # CLI & environment
 
-cartapel is one binary with three subcommands: `serve` (run the panel), `user`
-(manage panel users offline) and `check` (validate a config bundle, CI-ready). Every flag has a matching environment variable, so
-you can drive it entirely from the environment in a container.
+cartapel is one binary with three subcommands:
+
+```bash
+cartapel serve --db postgres://… --config ./admin      # run the panel
+cartapel user add you@example.com --role support       # create/update a user (offline)
+cartapel check --config ./admin --db postgres://…      # validate config — CI-ready
+```
+
+Every `serve` and `check` flag has a matching environment variable, so in a
+container you can drive them entirely from the environment.
 
 ## `cartapel serve`
 
@@ -33,9 +40,10 @@ cartapel serve \
 | `--secure-cookies` | `CARTAPEL_SECURE_COOKIES` | `true` | Sets the `Secure` attribute on session cookies. Keep on behind HTTPS; pass `--secure-cookies=false` for local plain-HTTP development. |
 
 The connection URL and schema resolve in this order: **CLI flag → environment
-variable → config file**. When more than one schema is introspected, a table
-name that is unique across them keeps its bare key; a name that collides is keyed
-as `schema.table`.
+variable → config file**.
+
+When more than one schema is introspected, a table name that is unique across
+them keeps its bare key; a name that collides is keyed as `schema.table`.
 
 ## `cartapel user add`
 
@@ -58,19 +66,24 @@ password.
 
 ## `cartapel check`
 
-Validate a config directory without running the server — CI-ready (exit 0 =
-valid, exit 1 with the errors printed):
+Validate a config directory without running the server. Exit 0 = valid; exit 1
+with the errors printed — ready for CI.
 
 ```bash
 cartapel check --config ./admin                    # parse + validate the bundle
 cartapel check --config ./admin --db postgres://…  # + verify every configured
                                                   #   table/column against the
                                                   #   live schema
-# --schema <name> narrows the live check to one schema
 ```
 
+| Flag | Env var | Default | Description |
+| --- | --- | --- | --- |
+| `--config` | `CARTAPEL_CONFIG` | — | The config directory to validate. Required. |
+| `--db` | `CARTAPEL_DB` | — | When given, every configured table is verified to exist, and list/search/sort/readonly columns are verified to be real columns. |
+| `--schema` | `CARTAPEL_SCHEMA` | primary source's `schemas` | Narrows the live check to one schema. |
+
 Run it in CI next to your migrations: config drift against a schema change
-becomes a red build instead of a silent broken panel.
+becomes a red build instead of a silently broken panel.
 
 ## Environment variables
 

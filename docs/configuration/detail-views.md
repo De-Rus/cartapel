@@ -17,9 +17,10 @@ The `detail { }` block is entirely optional — it only refines this view.
 With **no `detail` block at all**, cartapel already produces a good record view:
 
 - the hero shows the title, the first `badge` field, and a copyable id;
-- fields group by their `field { group = … }` tags (or into one "Details" card);
-- identifiers, foreign keys and timestamps (`id`, `*_id`, `*_at`, `*_ts`) are detected
-  and pulled into the meta sidebar automatically;
+- fields group by their `field { group = … }` tags, with ungrouped fields in one
+  untitled card;
+- metadata columns are detected by name (`id`, `*_id`, `*_at`, `*_ts`) and pulled
+  into the meta sidebar automatically — the primary key stays in the hero;
 - every configured table with a foreign key into this one appears as an
   [inline](#inlines) automatically;
 - everything is read-first with an Edit toggle.
@@ -113,10 +114,10 @@ reads better; they compose.
 
 ### Sidebar
 
-The meta rail is **automatic**: any identifier, foreign key or timestamp you
-don't place in a section is detected and shown there — so you rarely write a
-`sidebar` block at all. A meta field you *do* list in a section stays in that
-section.
+The meta rail is **automatic**: any metadata-named column (`id`, `*_id`, `*_at`,
+`*_ts`) you don't place in a section is detected and shown there — so you rarely
+write a `sidebar` block at all. A meta field you *do* list in a section stays in
+that section.
 
 Override the auto rail only when you want a specific, curated set:
 
@@ -166,8 +167,8 @@ relations {
 }
 ```
 
-Each inline renders the child table's own list columns (capped per page) and
-respects that child table's permissions and role rules.
+Each inline renders the child table's own list columns, paginated 50 rows at a
+time, and respects that child table's permissions and role rules.
 
 ### Full form
 
@@ -180,7 +181,7 @@ relations {
     {
       table      = "order_items"
       fk_col     = "order_id"        # explicit FK column (inferred if omitted)
-      label      = "Line items"      # section heading (defaults to the table label)
+      label      = "Line items"      # section heading (defaults to the table name, humanized)
       columns    = ["product_id", "qty", "unit_price"]
       can_create = false             # allow creating child rows inline
       can_delete = true              # allow deleting child rows inline
@@ -192,8 +193,8 @@ relations {
 | Key | Description |
 | --- | --- |
 | `table` | The child table name. **Required.** |
-| `fk_col` | The child column pointing back at this record. Inferred from FKs when omitted. |
-| `label` | Heading for the inline section. |
+| `fk_col` | The child column pointing back at this record. When omitted, inferred from the introspected FK, then guessed by name (`<parent>_id` / `<parent-singular>_id`). |
+| `label` | Heading for the inline section. Defaults to the child table name, humanized. |
 | `columns` | Child columns to show. Omit → the child's list columns. |
 | `can_create` | Whether new child rows can be created inline. |
 | `can_delete` | Whether child rows can be deleted inline. |

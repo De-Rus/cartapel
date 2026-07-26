@@ -4,38 +4,41 @@ description: "Custom pages with the sx SDK, named read-only queries, template va
 
 # Pages, queries & custom widgets
 
-Some flows aren't a single-table CRUD — reconciliation queues, moderation
-boards, ops dashboards. cartapel's plugin layer lets you add **custom pages**
-(full-screen modules), **named queries** (read-only SQL those modules call), and
-**custom field widgets**. All three live inside the config bundle as plain files;
-there is no separate build step, no npm, and no core changes.
-
-## How assets are served
-
-cartapel serves any file under the config directory at
-`/static/<path-relative-to-config>`, so your JS/CSS/image assets sit right next
-to the HCL that references them. Serving is path-confined (directory traversal
-and out-of-tree symlinks are rejected) and extension-allowlisted:
-`js`, `mjs`, `ts`, `tsx`, `css`, `svg`, `png`, `webp`, `jpg`, `jpeg`, `gif`,
-`ico`. Config and secret material (`.hcl`, `.toml`, `.env`, `.ini`, dotfiles)
-is never served.
-
-## Custom pages
-
-A custom page is a full-screen module in the sidebar. Each page is its own
-folder holding a `screen.hcl` that sets `module`, placed inside a group folder
-under `screens/` — exactly like a table:
+The mental model in one line: **a page is a folder with a `screen.hcl`**, and
+that file's contents pick one of three flavors — a **table** (no `module`, no
+`panel`: the folder name is a database table and cartapel renders full CRUD), a
+**scripted module** (`module = "…"`: a full-screen Preact page you write with
+the `sx` SDK), or **declarative panels** (`panel { }` blocks: a query-driven
+grid with zero JS). Tables are covered in [Tables & lists](/configuration/tables);
+this page covers the other two flavors plus the plumbing they share — **named
+queries** (read-only SQL), **template variables**, and **custom field widgets**.
+Everything lives inside the config bundle as plain files; there is no separate
+build step, no npm, and no core changes.
 
 ```
 admin/
   screens/
     overview/                  # a group folder (_group.hcl → "Overview")
       _group.hcl
-      ops/                     # → slug "ops", group "Overview"
+      orders/                  # flavor 1: a table (screen.hcl configures CRUD)
         screen.hcl
-        ops.tsx                # the page module (co-located)
-        queries.hcl            # queries this page reads
+      ops/                     # flavor 2: a scripted module
+        screen.hcl             #   module = "ops.tsx"
+        ops.tsx                #   the page module (co-located)
+        queries.hcl            #   queries this page reads
+      fleet/                   # flavor 3: declarative panels
+        screen.hcl             #   panel { } blocks, no JS
 ```
+
+A page's **slug is its folder name** and its **group is the enclosing group
+folder** — both folder-derived, so `screen.hcl` carries neither (a stray `slug`
+or `group` is rejected). A page folder placed directly under the config root is
+ungrouped. A screen that sets both `module` and `panel { }` is a load error —
+scripted or declarative, never both.
+
+## Scripted pages
+
+A scripted page is a full-screen module in the sidebar:
 
 ```hcl
 # admin/screens/overview/ops/screen.hcl
@@ -52,10 +55,20 @@ roles  = ["support"]       # omit → visible to everyone signed in
 | `module` | The JS module file, resolved **relative to the page's own folder**. Defaults to `<slug>.js`. |
 | `roles` | Roles that may see the page. Omit → visible to every signed-in user; list roles to restrict it. |
 
-The **slug is the page folder's name** and the **group is the enclosing group
-folder** — both are folder-derived, so `screen.hcl` carries neither (a stray `slug`
-or `group` is rejected). A page folder placed directly under the config root is
-ungrouped.
+### Editor autocompletion — `sx.d.ts`
+
+Before writing a module, grab the SDK's type declarations. Every instance
+serves them at **`{base}/sx.d.ts`** (e.g. `https://your-host/admin/sx.d.ts`) —
+download the file next to your modules and reference it for full
+autocompletion while authoring:
+
+```bash
+curl -o admin/screens/sx.d.ts https://your-host/admin/sx.d.ts
+```
+
+```ts
+/// <reference path="../sx.d.ts" />
+```
 
 ### Writing a page module
 
@@ -67,8 +80,8 @@ imports; every `sx` export is already in scope. `export default` your component
 // admin/screens/overview/ops/ops.tsx
 export default ({ api }) => {
   const fleet = useQuery(api, 'ops_fleet')
-  return html`<${Page} title="Operations">
-    <${Chart} rows=${fleet.data?.rows ?? []} x="status" y="n" kind="bar" />
+  return html`<${Page} title="Operations" loading=${fleet.loading} error=${fleet.error}>
+    <${Chart} rows=${fleet.rows} x="status" y="n" kind="bar" />
   </>`
 }
 ```
@@ -81,35 +94,55 @@ the module path and the actual error.
 Conventions for a page module:
 
 - Use light DOM (no shadow root) so the panel's CSS variables apply.
-- Fetch data from named queries via `this.api.get("query/<name>")`, which
-  resolves to `{ rows: [...] }`. Load datasets in parallel and degrade per-query
-  — show an inline error for the one that failed, not the whole page.
+- Fetch data from named queries via `useQuery(api, "<name>")` — each hook
+  returns `{ rows, data, loading, refreshing, error, refetch }`. Load datasets
+  in parallel (`useQueries(api, ["a", "b"])` adds `$loading`/`$error`/`$refetch`
+  across all of them) and degrade per-query — show an inline error for the one
+  that failed, not the whole page.
 - Style only with the panel's CSS variables (`--accent`, `--ink`, `--muted`,
   `--border`, `--surface`, `--surface-3`, `--sec`, …). Dark-first — never
   hard-code a light background.
 
-### Declarative pages
+## Declarative pages
 
-A page doesn't need a module at all: give its `screen.hcl` `panel { }` blocks
-instead (the same panel schema as the [dashboard](/configuration/dashboard),
-plus an optional `columns` grid count) and cartapel renders it as a
-query-driven grid — no JS. A screen that sets both `module` and `panel { }`
-is a load error.
+A page doesn't need a module at all: give its `screen.hcl` `panel { }` blocks —
+the same panel schema as the [dashboard](/configuration/dashboard), plus an
+optional `columns` grid count — and cartapel renders it as a query-driven grid,
+no JS:
 
-### Editor autocompletion — `sx.d.ts`
+```hcl
+# admin/screens/overview/fleet/screen.hcl
+label   = "Fleet"
+icon    = "bot"
+columns = 3
 
-Every instance serves type declarations for the global `sx` SDK at
-**`{base}/sx.d.ts`** (e.g. `https://your-host/admin/sx.d.ts`). Download it next
-to your modules and reference it for full autocompletion while authoring:
+panel {
+  type  = "stat"
+  label = "Running bots"
+  sql   = "SELECT count(*) AS v FROM bots WHERE status = 'running'"
+}
 
-```bash
-curl -o admin/screens/sx.d.ts https://your-host/admin/sx.d.ts
+panel {
+  type  = "chart"
+  label = "Signals per day"
+  chart = "bar"
+  sql   = "SELECT date_trunc('day', ts) AS t, count(*) AS v FROM bot_signals GROUP BY 1 ORDER BY 1"
+}
 ```
 
-```ts
-/// <reference path="../sx.d.ts" />
-const { definePage, html, useQuery, Page, Stat } = sx
-```
+Panel-level `roles` filter individual panels; the page-level `roles` gates the
+whole page. Template variables work in panel SQL exactly as they do on the
+dashboard.
+
+## How assets are served
+
+cartapel serves any file under the config directory at
+`/static/<path-relative-to-config>`, so your JS/CSS/image assets sit right next
+to the HCL that references them. Serving is path-confined (directory traversal
+and out-of-tree symlinks are rejected) and extension-allowlisted:
+`js`, `mjs`, `ts`, `tsx`, `css`, `svg`, `png`, `webp`, `jpg`, `jpeg`, `gif`,
+`ico`. Config and secret material (`.hcl`, `.toml`, `.env`, `.ini`, dotfiles)
+is never served.
 
 ## Named queries
 
@@ -121,12 +154,12 @@ namespace; a name defined twice is a loud load error.
 ```hcl
 # admin/screens/overview/ops/queries.hcl
 query "ops_fleet" {
-  sql = "SELECT status, count(*) AS n FROM orders GROUP BY status ORDER BY n DESC"
+  sql   = "SELECT status, count(*) AS n FROM orders GROUP BY status ORDER BY n DESC"
   roles = ["support"]       # omit → admin only
 }
 
 query "ops_revenue" {
-  sql = "SELECT date_trunc('day', placed_at) AS t, coalesce(sum(total),0) AS usd FROM orders WHERE placed_at > now() - interval '14 days' GROUP BY 1 ORDER BY 1"
+  sql   = "SELECT date_trunc('day', placed_at) AS t, coalesce(sum(total),0) AS usd FROM orders WHERE placed_at > now() - interval '14 days' GROUP BY 1 ORDER BY 1"
   roles = ["support"]
 }
 ```
@@ -135,25 +168,27 @@ query "ops_revenue" {
 | --- | --- |
 | `sql` | The read-only query. **Required.** |
 | `roles` | Roles allowed to call it. Omit → admin only. |
+| `source` | Run against a non-primary Postgres `source` alias. |
 
-Every named query runs in a **`READ ONLY` transaction with an 8-second statement
-timeout**. A page calls one with `this.api.get("query/ops_fleet")` and gets back
-`{ rows: [...] }`. Add `source = "<alias>"` to run a query against a non-primary
-Postgres source.
+Every named query runs in a **`READ ONLY` transaction with an 8-second
+statement timeout** and a 1 000-row cap. A page calls one with
+`useQuery(api, "ops_fleet")` (or `this.api.get("query/ops_fleet")` from a raw
+custom element) and gets back `{ rows: [...] }`.
 
 ## Template variables
 
 A `variables.hcl` declares URL-backed parameters that queries interpolate with
 `{{name}}`. Like queries, they merge globally from any folder. A value **never**
-string-concatenates into SQL — it is a **bound parameter** (an `ident`-typed value,
-which names a column/table, is regex-validated `^[A-Za-z0-9_]+$` and inlined).
+string-concatenates into SQL — it is a **bound parameter** (an `ident`-typed
+value, which names a column/table, is regex-validated `^[A-Za-z0-9_]+$` and
+inlined).
 
 ```hcl
 # admin/screens/overview/pulse/variables.hcl
 variable "window" {
   label   = "Window"
   type    = "int"                 # text (default) | int | float | ident
-  options = ["7", "30", "90"]     # …or `query = "SELECT DISTINCT …"` (value, [label])
+  options = ["7", "30", "90"]
   default = "30"
   roles   = ["support"]           # omit → in scope for everyone
 }
@@ -165,17 +200,33 @@ query "pulse_orders" {
 }
 ```
 
-A supplied value outside a variable's option set is a **hard 400**, never a silent
-fallback. State lives in the URL (`?v_window=90`), so a parameterized page is
-shareable by link. In a page module:
+The rules, all enforced at load time:
 
-```js
-const { VarBar, useQuery, Chart } = sx;
+- Set **exactly one** of `options` (a static list) or `query` (read-only SQL:
+  first column = value, optional second column = label; `source` picks a
+  non-primary database for it).
+- `default` must be one of the `options`. When a request supplies no value, the
+  default applies, then the first option.
+- `kind` is `single` (the default and, today, the only supported value —
+  `multi` is a load error).
+- `type = "window"` is sugar for the common time-window selector: an `int`
+  variable with `7`/`30`/`90` options, default `30`, label "Window" — each part
+  overridable by declaring it yourself.
+
+At request time, a supplied value outside a static `options` list — or, for an
+`ident` variable, outside its query's value set — is a **hard 400**, never a
+silent fallback. State lives in the URL (`?v_window=90`), so a parameterized
+page is shareable by link. In a page module:
+
+```tsx
+// admin/screens/overview/pulse/pulse.tsx
 export default ({ api }) => {
-  const q = useQuery(api, "pulse_orders");   // v_* params are folded in automatically
-  return html`<${Page} title="Pulse"><${VarBar} api=${api} />
-    <${Chart} rows=${q.rows} x="t" y="n" kind="bar" /></>`;
-};
+  const q = useQuery(api, 'pulse_orders')   // v_* params are folded in automatically
+  return html`<${Page} title="Pulse">
+    <${VarBar} api=${api} />
+    <${Chart} rows=${q.rows} x="t" y="n" kind="bar" />
+  </>`
+}
 ```
 
 `VarBar` renders one selector per in-scope variable; changing it re-runs every
@@ -188,7 +239,6 @@ formats and row drill-down from `screen.hcl`) without re-declaring anything —
 the bridge for mixing zero-config tables with bespoke UI on one screen:
 
 ```js
-const { AdminTable } = sx;
 // inside a page: same columns/formatting as the standalone Orders table
 html`<${AdminTable} api=${api} slug="orders" pp=${25} sort="-id" />`
 ```

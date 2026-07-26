@@ -10,7 +10,7 @@ hero:
       text: Get started
       link: /getting-started
     - theme: alt
-      text: Live demo — demo / demo
+      text: Live demo — no login
       link: https://demo.cartapel.com
     - theme: alt
       text: Configuration
@@ -19,30 +19,30 @@ hero:
 features:
   - icon: 🗄️
     title: Point it at Postgres
-    details: Introspects tables, primary keys, foreign keys and enums. Lists get pagination, search, sorting, Notion-style filter chips on any column, shareable saved views, a ⌘K palette and sensible widgets automatically. Views and PK-less tables degrade to read-only.
+    details: Introspects tables, keys and enums from your live schema. Lists get pagination, search, sorting, Notion-style filters, saved views and a ⌘K palette automatically.
   - icon: 📝
     title: Code-first config
-    details: A directory of HCL files. Folders become sidebar groups, one file per table. List columns, filters, field widgets, detail layouts, inline child tables and bulk actions — all reviewable in your repo.
+    details: A directory of HCL files — one per table, folders become sidebar groups. Columns, widgets, layouts and actions are all reviewable in your repo.
   - icon: 🔒
     title: Auth, roles, audit
-    details: Built-in users and sessions in cartapel's own SQLite file. Granular per-table / per-field / row-level permissions, column masking, and an audit log of every write with before/after diffs.
+    details: Built-in users and sessions. Per-table, per-field and row-level permissions, column masking, and an audit log of every write with before/after diffs.
   - icon: 📊
     title: Dashboards
-    details: SQL-defined stat tiles, sparklines, line/bar/area charts and tables — all evaluated in read-only transactions with a statement timeout.
+    details: SQL-defined stat tiles, sparklines, charts and tables — every query runs in a read-only transaction with a statement timeout.
   - icon: 🧩
     title: Extensible
-    details: A JS-plugin escape hatch. Drop custom field widgets and full-screen pages into the config bundle as web components — no rebuild, no npm.
+    details: Drop custom field widgets and full-screen pages into the config bundle as JS web components. No rebuild, no npm.
   - icon: 🚀
     title: One-file deploy
-    details: A single static binary or a Docker image. Bake the config read-only, or mount a writable volume to edit and version config live from the in-app builder.
+    details: A single static binary or Docker image. Bake the config in read-only, or mount a volume and edit it live from the in-app builder.
 ---
 
 ## What is cartapel?
 
 cartapel is an open-source, single-binary admin panel for an existing PostgreSQL
-database — a Django-admin / Forest / Retool alternative you run yourself. You
-point the Rust binary at your database, register the tables you want to expose,
-and get a polished CRUD panel: paginated lists, search, filters, detail pages,
+database — a Django-admin / Forest / Retool alternative you run yourself. Point
+the Rust binary at your database, register the tables you want to expose, and
+you get a polished CRUD panel: paginated lists, search, filters, detail pages,
 inline child rows, bulk actions, dashboards, roles and an audit log.
 
 ::: tip Try it without installing
@@ -57,14 +57,14 @@ Two ideas make it different:
   definition to keep in sync.
 - **Customization is code.** Everything you tune — which columns show in a list,
   how a field renders, who can edit what — lives in a directory of HCL files you
-  commit to your repo. There is an in-app visual builder, but it writes the same
-  HCL, versioned and reviewable.
+  commit to your repo. The in-app visual builder writes the same HCL, so even
+  click-made changes are versioned and reviewable.
 
 ## 60-second quickstart
 
 cartapel needs three things: a Postgres URL, a signing secret, and (optionally) a
-directory of config. With no config directory it still runs — but the panel is
-an **allowlist**, so you will see no tables until you register at least one.
+directory of config. It runs without config — but the panel is an **allowlist**,
+so you will see no tables until you register at least one.
 
 ::: code-group
 

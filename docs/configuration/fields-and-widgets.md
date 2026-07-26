@@ -29,6 +29,8 @@ field "price" {
 | `readonly` | bool | Field is shown but not editable (per-field variant of `edit.readonly`). |
 | `masked` | bool | Value is masked in lists, detail, search and export — for **everyone, admins included**. Secret-shaped columns (names containing `token`, `secret`, `password`, `api_key`, `private_key`, …) mask automatically even without a field block; declaring **any** `field` block for such a column takes back control (add `masked = true` to keep it hidden). See [Security](/security#column-masking). |
 | `sql` | string | A trusted SQL expression that makes this a **computed, read-only column** (see below). |
+| `sortable` | bool | Computed columns only: list sort orders by the `sql` expression (see [Computed columns](#computed-columns-sql)). |
+| `sort_by` | string | Computed columns only: sort by another **real** column instead of the expression. |
 | `group` | string | Detail-form section this field belongs to (an alternative to `detail { section { } }`). |
 | `params` | map | Widget-specific parameters (see each widget). |
 | `image` | block | Marks the field as an uploadable image (see [`image { }`](#image-uploads)). |
@@ -286,7 +288,7 @@ field "homepage" {
 
 | Widget | Renders | Notable `params` |
 | --- | --- | --- |
-| `fk` | A link to the referenced record, using its label. | — |
+| `fk` | A link to the referenced record, using its label. | `target` (table), `target_column` |
 | `array` | Each array element as a small chip. | — |
 
 Foreign-key columns are detected during introspection and render automatically
@@ -294,7 +296,9 @@ as links showing the **target row's label** — its name-ish column (`name`,
 `title`, `symbol`, `email`, `label`, else the first text column) — instead of
 the raw id, in lists, detail views and inlines alike. Masked FK columns and
 targets you cannot view fall back to the raw value. The `fk` widget is the
-explicit form.
+explicit form: set `params = { target = "..." }` to declare (or override) the
+drill-through target when no database FK exists — for example on a computed
+column — and `target_column` when the reference isn't the target's primary key.
 
 ## Custom widgets
 

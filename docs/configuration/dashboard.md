@@ -65,7 +65,7 @@ panel {
 | `compare_label` | Label for the comparison period (e.g. `prev 24h`). |
 | `spark` | A query returning an ordered series of `v` values, drawn as an inline sparkline. |
 | `good_when` | Which delta direction is favorable: `up` (default) paints a rising value green; `down` paints a falling value green (for errors, latency, …). |
-| `alert_above` / `alert_below` | Thresholds that flag the tile as warning/critical. |
+| `alert_above` / `alert_below` | Thresholds that flag the tile as critical when the value rises above / falls below them. |
 
 ### `chart` — a time or category series
 
@@ -128,8 +128,10 @@ panel {
 ```
 
 `field` keys: `key` (required), `label`, `format` (`money`/`percent`/`number`/
-`bytes`/`duration`/`date`/`datetime`/`rel` — validated at load), `align`,
-`max`, `badge` (value → tone map), `display` (`bar` | `heat`), `tone`.
+`bytes`/`duration`/`date`/`datetime`/`rel`, plus the aliases `currency`/`pct`/
+`num`/`dur` — validated at load), `align`, `max`, `badge` (value → tone map),
+`display` (`bar` | `heat`), `tone` (hue for badge-less dataviz: `accent`
+default, or `green`/`red`/`orange`/`blue`/`violet`).
 
 ### `iframe` — an embedded view
 
@@ -149,7 +151,7 @@ panel {
 | --- | --- | --- |
 | `type` | all | `stat`, `chart`, `table`, `iframe`. **Required.** |
 | `label` | all | The panel's title. **Required.** |
-| `id` | all | A stable id (assigned automatically if omitted). |
+| `id` | all | Optional stable id; when omitted the panel is identified by its position. |
 | `category` | all | Heading this panel groups under. |
 | `w` / `h` | all | Column / row span in the grid. |
 | `roles` | all | Restrict the panel to these roles. Omit → visible to all who can see the dashboard. |
@@ -158,8 +160,13 @@ panel {
 
 ## Template variables
 
-`{{name}}` placeholders work in **every panel's `sql`, `compare_sql` and
-`spark`**. They reference the global
+Declare a variable once and every panel that references it grows a live
+selector at the top of the dashboard — flip it and the whole grid re-queries in
+place. The selection lives in the URL, so "the dashboard, last 90 days" is a
+link you can send to a teammate.
+
+Mechanically: `{{name}}` placeholders work in **every panel's `sql`,
+`compare_sql` and `spark`**. They reference the global
 [template variables](/configuration/pages-and-queries#template-variables)
 declared in a `variables.hcl`, and are resolved **per request** from `v_<name>`
 URL parameters (falling back to each variable's default) and bound as SQL
@@ -174,10 +181,10 @@ panel {
 ```
 
 Whenever any variables are in scope, the dashboard renders a selector bar above
-the grid — a **segmented control** when a variable has few options, a select
-otherwise. Changing a value re-runs every panel that references it and updates
-the URL (`?v_window=90`), so a parameterized dashboard view is shareable by
-link. A supplied value outside a variable's option set is a hard 400.
+the grid — a **segmented control** when a variable has up to six options, a
+select otherwise. Changing a value re-runs every panel that references it and
+updates the URL (`?v_window=90`). A supplied value outside a variable's static
+option set is a hard 400.
 
 The common case has a shorthand — `type = "window"` declares a ready-made
 time-window selector (7/30/90 days, default 30, label "Window", `int`
@@ -198,7 +205,8 @@ variable "days" {
 ## Safety
 
 Every dashboard and panel query runs in a **read-only transaction** with a
-statement timeout and row caps. The visual dashboard editor additionally offers a
+5-second statement timeout and hard row caps (500 chart points, 100 sparkline
+points, 50 table rows). The visual dashboard editor additionally offers a
 **preview** that runs a panel through the same read-only path and returns the
 rendered result without writing anything to config. Like all config, the
 dashboard is versioned — see [Architecture](/architecture#config-versioning).

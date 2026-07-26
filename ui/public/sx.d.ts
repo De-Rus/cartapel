@@ -8,10 +8,12 @@ type VNode = any
 type ComponentType<P = any> = (props: P) => VNode
 
 interface SxFetched<T = any> {
-  data: T | null
-  error: string | null
   loading: boolean
-  reload: () => void
+  refreshing: boolean
+  data: T | null
+  rows: any[]
+  error: string | null
+  refetch: () => void
 }
 
 interface SxFetchOpts {
@@ -69,7 +71,13 @@ declare const sx: {
   useSource(api: SxWidgetApi | undefined, alias: string, path?: string, opts?: SxFetchOpts): SxFetched
   /** Fetch a named SQL query from queries.hcl; current template variables travel along. */
   useQuery(api: SxWidgetApi | undefined, name: string, opts?: SxFetchOpts): SxFetched
-  useQueries(api: SxWidgetApi | undefined, names: string[], opts?: SxFetchOpts): Record<string, SxFetched>
+  /** One hook per name; the names array must be stable across renders. The
+   *  result also carries $loading / $error / $refetch aggregates. */
+  useQueries(
+    api: SxWidgetApi | undefined,
+    names: string[],
+    opts?: SxFetchOpts,
+  ): Record<string, SxFetched> & { $loading: boolean; $error: string | null; $refetch: () => void }
   /** Page a configured table: `sx.useTable(api, 'bots', { pp: 50, sort: '-id' })`. */
   useTable(
     api: SxWidgetApi | undefined,

@@ -27,32 +27,38 @@ admin/
 │   └── widgets/               #   shared custom-widget JS (served at /static)
 │       └── sparkline.js
 └── screens/                    # every table and page lives here
-    ├── customers/              # a folder under screens/ IS a sidebar group
+    ├── customers/              # a sidebar group (it has a _group.hcl)
     │   ├── _group.hcl         #   its label, icon, order, table order
     │   ├── customers/         #   one folder per table — the folder name is the table
     │   │   └── screen.hcl     #     list/fields/actions (empty = introspected defaults)
     │   └── subscriptions/
     │       └── screen.hcl
     └── overview/
+        ├── _group.hcl
         └── summary/            # a scripted page instead of a table
             ├── screen.hcl     #   module = "summary.tsx"
             ├── summary.tsx     #   the page module (co-located)
             └── queries.hcl     #   named read-only queries the page calls
 ```
 
-The folder a table lives in (under `screens/`) is its sidebar group — the single
-source of truth for grouping. Config files are discovered recursively; load order
-is deterministic (files sorted by path).
+Config files are discovered recursively; load order is deterministic (files
+sorted by path). The rules the diagram doesn't show:
 
 - A **table** is a folder holding a `screen.hcl`; the **folder name is the table
   name**. An empty `screen.hcl` renders the table from introspected defaults.
-- A folder's **`_group.hcl`** names and orders that sidebar group.
-- A **scripted page** is the same shape — a folder whose `screen.hcl` sets
-  `module = "<name>.tsx"` next to the module. See [Pages & queries](/configuration/pages-and-queries).
+- A **`_group.hcl`** makes its folder a sidebar group and sets its label, icon
+  and order. Tables in a folder without one land in a trailing "Ungrouped"
+  group. See [Groups & navigation](/configuration/groups-and-nav).
+- A **page** is the same shape — a folder whose `screen.hcl` sets
+  `module = "<name>.tsx"` (scripted) or holds `panel { }` blocks (declarative),
+  never both. `page.hcl` is an accepted synonym for such a file. See
+  [Pages & queries](/configuration/pages-and-queries).
 - A **`queries.hcl`** in any folder contributes named read-only queries;
   **`variables.hcl`** and **`sources.hcl`** work the same way for template
-  variables and extra data sources. Any other file name under `screens/` is a
-  load error.
+  variables and extra data sources. Names must be unique across the bundle.
+- The file set under `screens/` is closed — `screen.hcl`, `page.hcl`,
+  `_group.hcl`, `queries.hcl`, `variables.hcl`, `sources.hcl`. Any other
+  `.hcl` name there is a load error.
 
 ## The reserved `config/` folder
 
@@ -103,7 +109,7 @@ Top-level `[cartapel]` keys:
 | `brand_logo` | string | Logo URL, data URL, or a bundle asset filename served under `/static/`. |
 | `locale` | string | The instance language — picks the UI dictionary, date/number formatting and per-locale `labels` overrides. See [Localization](/localization). |
 | `strings` | map | Override individual UI strings (`{ "key" = "value" }`). |
-| `per_page` | number | Default list page size (a table's `list.per_page` overrides it). |
+| `per_page` | number | Default list page size — `100` when unset. A table's `list.per_page` overrides it. |
 | `group_nav` | string | Default sidebar mode for groups: `expanded` (default — every table is its own entry) or `page` (one entry per group; sibling tables become tabs). A group's own `nav` in `_group.hcl` overrides it. |
 | `secret_key` | string | Session-signing root. Supports `env:`/`${}`. Overridden by `CARTAPEL_SECRET_KEY`. **Required** somewhere. |
 | `theme { }` | block | Theme preset, accent, per-mode CSS token overrides, logos — see [Theming](/theming). |
@@ -140,9 +146,10 @@ same bundle can run against dev, staging or prod by swapping one env var.
 
 ## Environment interpolation
 
-Any config value of the form `env:NAME` or `${NAME}` is replaced at load time
-with the environment variable `NAME`. Use it to keep secrets out of committed
-config:
+`secret_key` and every `source`'s `url` accept `env:NAME` or `${NAME}`,
+replaced at load time with the environment variable `NAME`. (An `http` source's
+`token_env` names an env var directly, no prefix.) Use it to keep secrets out
+of committed config:
 
 ```hcl
 source "main" {

@@ -39,14 +39,16 @@ table_order = ["customers", "subscriptions"]
 
 ## Grouping rules
 
-- A folder may hold only a `_group.hcl` — an empty, table-less group is valid.
+- A folder may hold only a `_group.hcl` — an empty, table-less group is valid
+  config. It appears in the sidebar once it has members.
 - A folder without a `_group.hcl` is not a sidebar group — its tables fall
   into the trailing "Ungrouped" section. Add a `_group.hcl` to name the group.
 - The same group slug in two folders is a **load error** — a group lives in
   exactly one folder.
-- `screens` and a handful of framework names (`config`, `page`, `queries`,
-  `groups`, `dashboard`, `discover`, `versions`) are **reserved** and can
-  never be group slugs.
+- The top-level `config/` folder is reserved for globals and is never a group.
+  The in-app groups editor also refuses the framework names `page`, `queries`,
+  `groups`, `dashboard`, `discover`, `versions` and `screens` as group slugs —
+  don't use them for folders either.
 - Folders whose name begins with an underscore are never sidebar groups. A
   `_group.hcl` in such a folder is ignored with a warning.
 
