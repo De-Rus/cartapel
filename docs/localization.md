@@ -16,13 +16,14 @@ locale = "en"     # "es" (default) | "en"
 ```
 
 The chrome ships fully translated in Spanish and English. `locale` picks the
-dictionary for every built-in string; anything a locale is missing falls back
-to the default.
+dictionary for every built-in string; a missing string — or an unknown
+`locale` value — falls back to the Spanish default.
 
 ### Overriding individual strings
 
-Any built-in string can be replaced with `strings` — useful for
-house terminology without forking a dictionary:
+Any built-in string can be replaced with `strings` — the override wins over
+the dictionary for that key, in any locale. Useful for house terminology
+without forking a dictionary (keep placeholders like `{label}` intact):
 
 ```hcl
 locale  = "en"
@@ -70,7 +71,8 @@ stays reviewable: the translation lives next to the thing it names.
   per-user preference — an admin panel typically serves one team. Run two
   instances off the same config bundle with different `locale` env-interpolated
   values if you truly need both.
-- **Dates, numbers and money** follow the instance `locale` automatically
-  (`Intl` formatting) — no configuration needed.
+- **Dates, numbers and money** follow the instance `locale` automatically —
+  the frontend feeds it to `Intl.NumberFormat` / `Intl.DateTimeFormat` before
+  anything renders. No configuration needed.
 - **Dashboard/panel labels** are author content (plain strings in
   `dashboard.hcl`) — write them in your team's language directly.

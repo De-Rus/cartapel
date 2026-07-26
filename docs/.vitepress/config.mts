@@ -99,6 +99,7 @@ export default defineConfig({
         items: [
           { text: 'What is cartapel?', link: '/' },
           { text: 'Getting started', link: '/getting-started' },
+          { text: 'vs the alternatives', link: '/comparisons' },
           { text: 'CLI & environment', link: '/cli' },
         ],
       },

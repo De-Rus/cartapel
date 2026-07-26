@@ -4,8 +4,11 @@ description: "How cartapel works inside: one Rust binary, introspection, hot-rel
 
 # Architecture
 
-cartapel is deliberately small: one Rust binary, your Postgres, and a directory of
-config. This page explains how those pieces fit together.
+cartapel is deliberately small: **one binary, three stores**. The binary serves
+everything; the stores it touches are **your Postgres** (read-mostly — written
+only when a user edits data), **cartapel's own SQLite state** (users, sessions,
+audit, config history), and **the config directory** (files, hot-reloaded).
+This page explains how those pieces fit together.
 
 ## The self-contained binary
 
@@ -27,12 +30,11 @@ At startup cartapel:
 4. Serves the SPA, the API under `{base}/api`, and static assets under
    `{base}/static`.
 
-## Two databases
+## Three stores, strictly apart
 
-cartapel touches two separate stores, and keeps them strictly apart:
-
-- **Your Postgres** — the data you administer. cartapel only ever writes to it in
-  response to a user editing a row, running an action, or importing data.
+- **Your Postgres** — the data you administer. Read-mostly: cartapel only ever
+  writes to it in response to a user editing a row, running an action, or
+  importing data.
 - **cartapel's SQLite state** (`--data`) — its own bookkeeping, never mixed into
   your database:
   - **users** — panel accounts (argon2id password hashes).
@@ -40,6 +42,7 @@ cartapel touches two separate stores, and keeps them strictly apart:
   - **saved_views** — saved list filters, personal or shared with the whole team.
   - **audit_log** — every write, with actor, timestamp and before/after diffs.
   - **config_versions** — the history of config edits (see below).
+- **The config directory** (`--config`) — plain files, described next.
 
 This separation is the reason cartapel is safe to point at a production database:
 its own state never contaminates yours.
@@ -57,17 +60,17 @@ reviewable in pull requests.
 
 ## Config hot-reload
 
-The config directory is **watched** (notify-based): edits from the in-app
-builder, your editor, a `git checkout` or a volume sync all hot-swap the live
-configuration with no restart. The swap is safe by construction:
+The config directory is **watched** (notify-based, `.hcl` and widget/page
+`.ts`/`.tsx`/`.js` files): edits from your editor, a `git checkout` or a volume
+sync all hot-swap the live configuration with no restart. In-app builder edits
+don't need the watcher — they are trial-parsed, written atomically (temp file +
+rename) and reloaded synchronously; the watcher just re-runs an idempotent load
+after them. The swap is safe by construction:
 
-- A write is trial-parsed before it is applied.
-- The whole directory is re-read; if that fails, the previous good config is
-  kept.
-- Files are written atomically (temp file + rename).
-- Disk changes are debounced (a save's tmp-write + rename collapse to one
-  reload); a change that fails to load is ignored and logged, keeping the
-  last good config.
+- The whole directory is re-read on every change; if that load fails, the
+  previous good config is kept and the error is logged.
+- Disk events are debounced (a save's tmp-write + rename collapse to one
+  reload).
 
 A bad edit therefore can never replace the running config.
 
@@ -112,9 +115,10 @@ becomes a read-only viewer that hands you the HCL to commit yourself.
 ```
 Browser ──▶ {base}/api/*        JSON API (auth, meta, rows, config, dashboard, queries)
         ──▶ {base}/static/*     path-confined bundle assets (widget/page JS, logos)
+        ──▶ {base}/assets/*     the hashed SPA bundle (immutable, cached for a year)
         ──▶ {base}/sx.d.ts      type declarations for the `sx` page/widget SDK
         ──▶ {base}/*            the embedded SPA (client-side routing)
-        ──▶ /assets/*           the hashed SPA bundle (served from the root)
+        ──▶ /                   redirects to {base}/
 ```
 
 Every API call carries the signed session cookie; every mutation additionally
@@ -124,11 +128,14 @@ carries the `X-Cartapel` CSRF header. See [Security](/security).
 
 `{base}` above is the runtime `--base-path` / `CARTAPEL_BASE_PATH` (default
 `/admin`, `''` for the domain root). It is **not baked in at build time**: Vite
-builds with `base: '/'` (so the hashed bundle lives at `/assets/…`), and the
-server injects the live prefix into `index.html` at serve time — it replaces a
-placeholder so the SPA reads `window.__CARTAPEL_BASE__` and threads it through the
-router basename, the API base, and every link. The API and static routes are
-nested under the prefix; `GET /` redirects to it.
+builds with `base: '/'`, and the server injects the live prefix into
+`index.html` at serve time — it replaces a placeholder so the SPA reads
+`window.__CARTAPEL_BASE__` and threads it through the router basename, the API
+base, and every link. Asset URLs follow the same rule: the server rewrites
+`index.html`'s entry references to `{base}/assets/…`, and lazy JS chunks resolve
+through `window.__cartapelAsset` — so *everything* lives under the prefix and a
+sub-path reverse proxy only ever forwards `{base}/*`. The API and static routes
+are nested under the prefix; `GET /` redirects to it.
 
 The upshot: **one published image serves under any path with no rebuild** — pull
 `ghcr.io/de-rus/cartapel` and set `CARTAPEL_BASE_PATH` to `/admin`, `/panel`, or

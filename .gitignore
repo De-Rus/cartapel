@@ -1,9 +1,12 @@
-/target
 **/node_modules
-/ui/dist
-/cartapel-data
 *.db
-*.db-wal
 *.db-shm
-.env
+*.db-wal
 .claude/
+.env
+/cartapel-data
+/docs/.vitepress/cache
+/docs/.vitepress/dist
+/site/dist
+/target
+/ui/dist

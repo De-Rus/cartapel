@@ -29,24 +29,31 @@ export CARTAPEL_SECRET_KEY="$(openssl rand -hex 32)"
 
 ## Sessions & cookies
 
-- The session cookie is `HttpOnly` and `SameSite=Lax`, and (by default) `Secure`.
+- The session cookie (`cartapel_session`) is `HttpOnly`, `SameSite=Lax` and (by
+  default) `Secure`, with a 30-day lifetime. Sessions live in cartapel's SQLite
+  store; logout deletes the server-side session.
 - Its value is HMAC-SHA256-signed with the secret key. The signature is verified
   in constant time **before any database session lookup**, so a tampered or
   unsigned cookie is treated as no session.
-- Every route except login requires a valid session (returns 401 otherwise).
+- Every API route except login and `/health` requires a valid session (returns
+  401 otherwise). With `public_role` configured, a sessionless request acts as
+  that role instead — see
+  [Roles & permissions](/roles-and-permissions#public-access-no-login).
 - Behind HTTPS, keep `--secure-cookies` on (the default). For local plain-HTTP
   development, pass `--secure-cookies=false`.
 
 ## CSRF
 
-Every mutating request (POST / PATCH / DELETE) must carry the `X-Cartapel: 1`
-header. The bundled SPA sends it automatically; the `api` object injected into
-custom widgets and pages sends it for you too.
+Every mutating request (POST / PUT / PATCH / DELETE) must carry the
+`X-Cartapel: 1` header — a custom header a cross-site form cannot set. The
+bundled SPA sends it automatically; the `api` object injected into custom
+widgets and pages sends it for you too.
 
 ## Authentication
 
 - Passwords are hashed with **argon2id**.
-- Login is **rate-limited per IP** — repeated failures are throttled.
+- Login is **rate-limited per IP**: 10 failed attempts in a 15-minute window,
+  then 429 until the window expires.
 
 ## Column masking
 
@@ -105,11 +112,14 @@ non-admin caller.
 Custom widget and page assets are served from the config bundle at `{base}/static/*`,
 but only safely:
 
-- Directory traversal (`..`) and out-of-tree symlinks are rejected.
+- Directory traversal (`..`), backslashes, empty path segments and dotfile
+  segments are rejected up front; the resolved path is then canonicalized and
+  must stay inside the canonical config dir, so out-of-tree symlinks fail too.
 - Only an extension allowlist is served: `js`, `mjs`, `css`, `svg`, `png`,
-  `webp`, `jpg`, `jpeg`, `gif`, `ico`.
-- Config and secret material (`.hcl`, `.toml`, `.env`, dotfiles) is **never**
-  served.
+  `webp`, `jpg`, `jpeg`, `gif`, `ico` — plus `ts`/`tsx`, served as plain text
+  for the page-module loader.
+- Config and secret material (`.hcl`, `.toml`, `.env`, `.ini`, dotfiles) is
+  **never** served.
 
 Config-write paths apply the same discipline: they reject `/`, `\`, `..` and the
 reserved stems (`config`, `_group`, `page`, `queries`).
@@ -118,8 +128,9 @@ reserved stems (`config`, `_group`, `page`, `queries`).
 
 A `kind = "webhook"` action proxies the selected primary keys to a URL you
 configure — an escape hatch into your real backend rather than a direct DB write.
-When `CARTAPEL_WEBHOOK_SECRET` is set, outbound webhooks are signed with an
-`X-Cartapel-Signature` (HMAC-SHA256) header your backend can verify. Webhooks
+When the `CARTAPEL_WEBHOOK_SECRET` env var is set, each outbound request carries
+an `X-Cartapel-Signature` header — the hex HMAC-SHA256 of the exact JSON body —
+for your backend to verify. Webhooks
 can be disabled outright with `disable_webhooks` — see
 [Hardening toggles](#hardening-toggles).
 

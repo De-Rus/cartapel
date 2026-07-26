@@ -3,6 +3,33 @@ const GH = 'https://github.com/De-Rus/cartapel'
 const DEMO = 'https://demo.cartapel.com'
 const DOCS = 'https://docs.cartapel.com'
 const RENDER = 'https://render.com/deploy?repo=https://github.com/De-Rus/cartapel'
+
+const faq = [
+  {
+    q: 'Is cartapel free?',
+    a: 'Yes. cartapel is MIT-licensed and free — the whole thing, including roles, audit log and dashboards. There is no paid tier and no per-user pricing.',
+  },
+  {
+    q: 'Does it write to my database?',
+    a: 'Never on its own. Your Postgres is only written to when a panel user edits a row, runs a bulk action, or imports data. All of cartapel’s own state — users, sessions, audit log — lives in a separate SQLite directory.',
+  },
+  {
+    q: 'Can I use it with an existing production database?',
+    a: 'That is the whole point: cartapel introspects your live schema, so there is no model layer to generate or keep in sync. Tables are an allowlist — nothing is exposed until you register it — every value is a bound parameter, and dashboard SQL runs in read-only transactions with a statement timeout.',
+  },
+  {
+    q: 'How is it different from Django admin or Retool?',
+    a: 'Django admin needs a Django app and ORM models kept in sync with your schema; cartapel reads the schema directly and runs beside any stack. Retool is a broader GUI app builder with per-user pricing; cartapel is a free single binary configured as HCL you review in pull requests.',
+  },
+  {
+    q: 'Does it need Node?',
+    a: 'No. The frontend is compiled once and embedded in the binary, so at runtime the only dependency is your Postgres. Even custom .tsx pages are transpiled in the browser — no build step, no npm.',
+  },
+  {
+    q: 'How do I deploy it?',
+    a: 'Run the Docker image or the bare binary with a Postgres URL and a secret key, and put the small SQLite data directory on durable storage. There is also a one-click deploy to Render that drops you into the setup wizard.',
+  },
+]
 ---
 
 <html lang="en">
@@ -36,6 +63,18 @@ const RENDER = 'https://render.com/deploy?repo=https://github.com/De-Rus/cartape
         url: 'https://cartapel.com/',
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
         codeRepository: GH,
+      })}
+    />
+    <script
+      type="application/ld+json"
+      set:html={JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faq.map(({ q, a }) => ({
+          '@type': 'Question',
+          name: q,
+          acceptedAnswer: { '@type': 'Answer', text: a },
+        })),
       })}
     />
   </head>
@@ -151,6 +190,22 @@ action "refund" {
       </p>
     </section>
 
+    <section class="faq">
+      <h2>Questions</h2>
+      <dl>
+        {faq.map(({ q, a }) => (
+          <div class="qa">
+            <dt>{q}</dt>
+            <dd>{a}</dd>
+          </div>
+        ))}
+      </dl>
+      <p class="faq-more">
+        Weighing alternatives? Read the honest
+        <a href={`${DOCS}/comparisons`}> comparison with Django admin, Retool, Metabase &amp; friends</a>.
+      </p>
+    </section>
+
     <footer>
       <img src="/logo.svg" alt="" width="20" height="20" />
       <span>cartapel — MIT licensed</span>
@@ -234,6 +289,13 @@ action "refund" {
   .deploy { text-align: center; max-width: 760px; }
   .deploy pre { text-align: left; margin-top: 18px; }
   .deploy p { margin-top: 16px; }
+
+  .faq { max-width: 760px; }
+  .faq dl { margin-top: 6px; }
+  .qa { border-top: 1px solid var(--border); padding: 18px 0; }
+  .qa dt { color: var(--ink); font-weight: 600; font-size: 16px; }
+  .qa dd { margin-top: 6px; font-size: 14.5px; }
+  .faq-more { margin-top: 18px; font-size: 14px; color: var(--muted); }
 
   footer {
     display: flex; align-items: center; gap: 12px; justify-content: center;

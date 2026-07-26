@@ -13,6 +13,15 @@ screen edits that same file: creates, edits and deletes write `config/auth.hcl`
 atomically and hot-swap the live config (on a read-only bundle it hands you the
 HCL to commit yourself).
 
+::: tip How a permission is decided
+1. Each role's coarse `tables` level sets a baseline (`read` / `write` / none).
+2. The role's `perm "<table>"` block refines it per capability (view / create / update / delete).
+3. With several roles, capabilities **OR** together — privileges add up, restrictions need unanimity.
+4. The result is **AND**ed with the table config's `permissions { }` ceiling (writes only).
+5. A view or PK-less table is structurally read-only — no role, admin included, can write it.
+6. Masking, row filters and `editable` then narrow *what* an allowed request can touch.
+:::
+
 ## Public access (no login)
 
 ```hcl
@@ -21,7 +30,8 @@ public_role = "viewer"
 ```
 
 With `public_role` set, anonymous visitors act as that role without logging
-in — kiosk dashboards, read-only status panels, hosted demos. A real session
+in — kiosk dashboards, read-only status panels, hosted demos. It accepts a
+comma-separated list of roles, exactly like a user's assignment. A real session
 always wins over the anonymous identity, log in normally to switch. Naming an
 unknown role is a load error. Point it at a write-capable role only if you
 truly mean it: **everyone on the network gets that power**.
@@ -29,9 +39,11 @@ truly mean it: **everyone on the network gets that power**.
 ## The `admin` role
 
 `admin` is built in. It has full access to everything and cannot be edited or
-deleted. It bypasses the per-table and per-column refinements below — but it is
-still bound by structural read-only-ness (a view or a PK-less table is never
-writable, even for an admin).
+deleted. It bypasses the role-side refinements below (levels, `perm`, `editable`,
+role masking, row filters) — but not the table itself: a table config's
+`permissions { }` ceiling and structural read-only-ness (a view or a PK-less
+table) bind admins too, and so do automatic and field-level
+[column masking](/security#column-masking).
 
 ## `config/auth.hcl`
 
@@ -104,11 +116,11 @@ the UI). Permissions are the **union**, Django-groups style:
 
 - **Privileges add up**: table levels take the highest (`read` + `write` =
   `write`), granular `perm` capabilities OR together, `actions` union.
-- **Restrictions hold only when every view-granting role imposes them**: a
-  column stays masked only if masked in ALL roles that can see the table;
-  `row_filter`s OR together (a role with no filter lifts the restriction);
-  an `editable` whitelist applies only if every write-granting role has one
-  (then the union of the lists).
+- **Restrictions hold only when every relevant role imposes them**: a column
+  stays masked only if masked in ALL view-granting roles for that table;
+  `row_filter`s OR together (a view-granting role with no filter lifts the
+  restriction entirely); an `editable` whitelist applies only if every
+  write-granting role has one (then the union of the lists).
 - `admin` anywhere in the list makes the user an admin.
 
 ::: warning A broad role lifts restrictions
@@ -153,15 +165,18 @@ role "support" {
 }
 ```
 
-The effective capability is always **intersected** with the table's own
+Every **write** capability is then intersected with the table's own
 `permissions { }` ceiling and the structural read-only gate:
 
 ```
-effective = (perm.capability ?? coarse level) AND table ceiling AND not read-only
+update = (perm.update ?? coarse) AND ceiling.write                     AND not read-only
+create = (perm.create ?? coarse) AND ceiling.write AND ceiling.create AND not read-only
+delete = (perm.delete ?? coarse) AND ceiling.write AND ceiling.delete AND not read-only
+view   = (perm.view   ?? coarse)          # reads have no ceiling
 ```
 
 So `create = true` on a role means nothing if the table config sets
-`permissions { create = false }` — the ceiling wins.
+`permissions { create = false }` (or `write = false`) — the ceiling wins.
 
 ## Editable-column whitelist
 
@@ -212,11 +227,12 @@ role "support" {
 ```
 
 The current row is aliased `t`. The token `{actor.email}` is substituted with the
-signed-in user's email (safely escaped), so you can scope rows to their owner:
+signed-in user's email as a complete quoted, escaped SQL string literal — write
+it **without** surrounding quotes:
 
 ```hcl
 row_filter = {
-  "orders" = "t.customer_id IN (SELECT id FROM customers WHERE email = '{actor.email}')"
+  "orders" = "t.customer_id IN (SELECT id FROM customers WHERE email = {actor.email})"
 }
 ```
 
@@ -243,7 +259,10 @@ cartapel's SQLite state. Guardrails:
 - A role other roles `extends` cannot be deleted — remove the inheritance first.
 - You cannot delete or demote the **last** admin user.
 - Role definitions are validated against the live schema — every referenced
-  table, column and action must exist.
+  table, action and `editable` column must exist (and be configured in the
+  admin; a role cannot reference a table cartapel doesn't expose).
+- A user assigned a role name that no longer exists simply gets nothing from
+  it — stale assignments fail closed, never error.
 - On a read-only config bundle, role edits change nothing — the screen returns
   the would-be HCL for you to commit.
 

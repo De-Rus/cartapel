@@ -58,11 +58,17 @@ The token vocabulary:
 | `page` | App background. |
 | `surface`, `surface-1`…`surface-3` | Card / panel layers, lightest to most elevated. |
 | `ink`, `sec`, `muted` | Text: primary, secondary, de-emphasized. |
-| `accent`, `accent-btn`, `accent-btn-ink` | Highlight color, primary buttons, their text. |
+| `accent`, `accent-btn`, `accent-btn-ink` | Highlight color, primary buttons, their text (defaults to white). |
 | `border`, `gridline`, `hover`, `press`, `selected` | Lines and interaction states. |
-| `good`, `warning`, `serious`, `critical` | Semantic status colors (badges, alerts, deltas). |
-| `band`, `band-ink`, `band-border` | The table header band. |
-| `s1`…`s5` | Chart series palette. |
+| `good`, `warning`, `serious`, `critical` | Semantic status colors (alerts, cell color rules). |
+| `delta-good` | Favorable-delta color on stat tiles. |
+| `band`, `band-ink`, `band-border` | The table header band. Defaults track `surface`/`ink`/`border`; the `django` preset colors them. |
+| `s1`…`s8` | Chart series palette. |
+| `badge-blue`, `badge-green`, `badge-orange`, `badge-red`, `badge-violet`, `badge-gray` | Enum badge colors. |
+
+Any key you put in a `light { }` / `dark { }` map is emitted as `--<key>` — the
+vocabulary above is what the built-in UI consumes, but you can define extra
+variables for your own custom pages the same way.
 
 Custom pages and widgets built with the [sx SDK](/configuration/pages-and-queries)
 consume the same tokens (`var(--accent)`, `var(--surface-2)`, …), so they
