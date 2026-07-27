@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: cartapel
-  text: An admin panel for your existing Postgres
+  text: An admin panel for your existing database
   tagline: One binary. No ORM, no framework, no Node runtime. Your schema is the source of truth, and every customization is code you version — not a GUI you click.
   actions:
     - theme: brand
@@ -18,7 +18,7 @@ hero:
 
 features:
   - icon: 🗄️
-    title: Point it at Postgres
+    title: Point it at your database
     details: Introspects tables, keys and enums from your live schema. Lists get pagination, search, sorting, Notion-style filters, saved views and a ⌘K palette automatically.
   - icon: 📝
     title: Code-first config
@@ -39,7 +39,7 @@ features:
 
 ## What is cartapel?
 
-cartapel is an open-source, single-binary admin panel for an existing PostgreSQL
+cartapel is an open-source, single-binary admin panel for an existing PostgreSQL, MySQL or MariaDB
 database — a Django-admin / Forest / Retool alternative you run yourself. Point
 the Rust binary at your database, register the tables you want to expose, and
 you get a polished CRUD panel: paginated lists, search, filters, detail pages,
@@ -52,7 +52,7 @@ A hosted demo runs the bundled Acme dataset at
 
 Two ideas make it different:
 
-- **Your database is the schema.** cartapel introspects your live Postgres for
+- **Your database is the schema.** cartapel introspects your live database for
   columns, types, primary keys and foreign keys. There is no separate model
   definition to keep in sync.
 - **Customization is code.** Everything you tune — which columns show in a list,

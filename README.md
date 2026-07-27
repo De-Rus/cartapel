@@ -3,7 +3,7 @@
 
   # cartapel
 
-  **An admin panel for your existing Postgres.**
+  **An admin panel for your existing database — Postgres, MySQL or MariaDB.**
   One Rust binary · config as code · no framework, no ORM, no Node runtime.
 
   [![CI](https://github.com/De-Rus/cartapel/actions/workflows/ci.yml/badge.svg)](https://github.com/De-Rus/cartapel/actions/workflows/ci.yml)
@@ -23,8 +23,9 @@ framework-locked (Django admin) or become a second codebase to maintain.
 
 cartapel takes a different bet: **your database schema is the source of truth,
 and every customization is code you version** — a directory of small HCL files
-reviewed in pull requests, not a GUI you click. The binary introspects Postgres
-and renders a complete panel; config only refines it.
+reviewed in pull requests, not a GUI you click. The binary introspects your
+database — Postgres, MySQL or MariaDB, picked from the connection URL — and
+renders a complete panel; config only refines it.
 
 ```hcl
 # screens/sales/orders/screen.hcl — this is the whole customization

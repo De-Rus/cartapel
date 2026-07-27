@@ -1,5 +1,5 @@
 ---
-description: "From a fresh binary to a working Postgres admin panel: install, connect your database, and register tables with the setup wizard."
+description: "From a fresh binary to a working admin panel over Postgres, MySQL or MariaDB: install, connect your database, and register tables with the setup wizard."
 ---
 
 # Getting started
@@ -50,9 +50,9 @@ cartapel serve \
   --data ./cartapel-data
 ```
 
-- `--db` — the Postgres connection URL. Also settable via `CARTAPEL_DB`, or as
+- `--db` — the database connection URL (`postgres://…` or `mysql://…` — the scheme picks the engine). Also settable via `CARTAPEL_DB`, or as
   the URL of the primary `source` in config (see below).
-- `--schema` — the Postgres schema to introspect. Defaults to `public`; set the
+- `--schema` — the Postgres schema to introspect (a MySQL source is scoped to the database in its URL). Defaults to `public`; set the
   source's `schemas` list for more than one.
 - `--config` — a directory of HCL config files (see below). Optional, but
   without it no tables are exposed.
@@ -73,7 +73,7 @@ serves at the root, `--base-path /panel` at a sub-path. It's applied at runtime,
 so one binary or image serves any prefix.
 
 ::: warning cartapel never writes to your database on its own
-Your Postgres is only written to when a panel user edits a row, runs a bulk
+Your database is only written to when a panel user edits a row, runs a bulk
 action, or imports data. All of cartapel's own bookkeeping lives in the separate
 SQLite state directory.
 :::

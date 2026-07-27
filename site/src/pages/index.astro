@@ -11,7 +11,7 @@ const faq = [
   },
   {
     q: 'Does it write to my database?',
-    a: 'Never on its own. Your Postgres is only written to when a panel user edits a row, runs a bulk action, or imports data. All of cartapel’s own state — users, sessions, audit log — lives in a separate SQLite directory.',
+    a: 'Never on its own. Your database is only written to when a panel user edits a row, runs a bulk action, or imports data. All of cartapel’s own state — users, sessions, audit log — lives in a separate SQLite directory.',
   },
   {
     q: 'Can I use it with an existing production database?',
@@ -23,11 +23,11 @@ const faq = [
   },
   {
     q: 'Does it need Node?',
-    a: 'No. The frontend is compiled once and embedded in the binary, so at runtime the only dependency is your Postgres. Even custom .tsx pages are transpiled in the browser — no build step, no npm.',
+    a: 'No. The frontend is compiled once and embedded in the binary, so at runtime the only dependency is your database. Even custom .tsx pages are transpiled in the browser — no build step, no npm.',
   },
   {
     q: 'How do I deploy it?',
-    a: 'Run the Docker image or the bare binary with a Postgres URL and a secret key, and put the small SQLite data directory on durable storage. There is also a one-click deploy to Render that drops you into the setup wizard.',
+    a: 'Run the Docker image or the bare binary with a database URL (postgres:// or mysql://) and a secret key, and put the small SQLite data directory on durable storage. There is also a one-click deploy to Render that drops you into the setup wizard.',
   },
 ]
 ---
@@ -36,7 +36,7 @@ const faq = [
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>cartapel — an admin panel for your existing Postgres</title>
+    <title>cartapel — an admin panel for your existing database</title>
     <meta
       name="description"
       content="Open-source, single-binary admin panel for PostgreSQL. Introspected CRUD, roles, audit and dashboards — configured with HCL you version like code. A Django-admin alternative in one Rust binary."
@@ -44,8 +44,8 @@ const faq = [
     <link rel="icon" href="/logo.svg" />
     <link rel="canonical" href="https://cartapel.com/" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="cartapel — an admin panel for your existing Postgres" />
-    <meta property="og:description" content="One Rust binary, config as code. Introspected CRUD, roles, audit log and SQL dashboards for any Postgres database." />
+    <meta property="og:title" content="cartapel — an admin panel for your existing database" />
+    <meta property="og:description" content="One Rust binary, config as code. Introspected CRUD, roles, audit log and SQL dashboards for Postgres, MySQL and MariaDB." />
     <meta property="og:url" content="https://cartapel.com/" />
     <meta property="og:image" content="https://cartapel.com/og.png" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -92,10 +92,11 @@ const faq = [
     </nav>
 
     <header>
-      <h1>An admin panel for your <em>existing</em> Postgres</h1>
+      <h1>An admin panel for your <em>existing</em> database</h1>
       <p class="sub">
-        One Rust binary. No framework, no ORM, no Node runtime. Point cartapel at your database and
-        get a Django-admin-quality panel — every customization is HCL you version like code.
+        One Rust binary. No framework, no ORM, no Node runtime. Point cartapel at your Postgres,
+        MySQL or MariaDB and get a Django-admin-quality panel — every customization is HCL you
+        version like code.
       </p>
       <div class="cta">
         <a class="btn primary" href={DEMO}>Try the live demo</a>
