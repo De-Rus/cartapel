@@ -39,7 +39,29 @@ async fn option_values(state: &AppState, var: &Variable) -> Result<Vec<String>, 
 
 /// The option set as `{value, label}` for the var-bar. `query` vars run their SQL
 /// (first column = value, optional second = label); static `options` map 1:1.
-pub async fn option_pairs(state: &AppState, var: &Variable) -> Result<Vec<Value>, AppError> {
+pub async fn option_pairs(
+    state: &AppState,
+    user: &CurrentUser,
+    var: &Variable,
+) -> Result<Vec<Value>, AppError> {
+    if let (Some(field), Some(alias)) = (&var.field, &var.source) {
+        let mut seen: std::collections::BTreeSet<String> = Default::default();
+        for row in crate::plugins::source_rows(state, user, alias, "", None).await? {
+            if let Some(v) = row.get(field.as_str()) {
+                let s = match v {
+                    Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                };
+                if !s.is_empty() {
+                    seen.insert(s);
+                }
+            }
+        }
+        return Ok(seen
+            .into_iter()
+            .map(|v| serde_json::json!({ "value": v, "label": v }))
+            .collect());
+    }
     if var.query.is_none() {
         return Ok(var
             .options

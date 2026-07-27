@@ -25,6 +25,30 @@ async fn read_only_rows_on(
     Ok(rows.into_iter().map(Value::Object).collect())
 }
 
+/// Filter then fold a listing's rows. Both are no-ops unless the panel asks
+/// for them, so a plain `source` panel still renders the rows as they came.
+fn shape_rows(
+    rows: Vec<Value>,
+    w: &crate::config::PanelConfig,
+    env: &crate::vars::Resolved,
+) -> Result<Vec<Value>, String> {
+    let pairs: std::collections::BTreeMap<String, String> = w
+        .filter
+        .iter()
+        .map(|(k, v)| (k.clone(), crate::interp::substitute(v, &env.values)))
+        .collect();
+    let rows = crate::agg::filter(rows, &pairs);
+    let specs: Vec<&String> = w.value.iter().chain(w.agg.iter()).collect();
+    if specs.is_empty() && w.group_by.is_none() {
+        return Ok(rows);
+    }
+    let aggs = specs
+        .iter()
+        .map(|s| crate::agg::parse(s))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(crate::agg::fold(&rows, w.group_by.as_deref(), &aggs))
+}
+
 /// A panel's rows, from whichever origin it declares: inline `sql`, a named
 /// `query` (which carries its own source), or an http `source`. `table` panels
 /// never reach here — the browser fetches the configured list itself.
@@ -57,7 +81,7 @@ async fn panel_rows(
         )
         .await
         .map_err(|e| e.1)?;
-        return Ok(rows);
+        return shape_rows(rows, w, env);
     }
     let sql = w.sql.as_ref().ok_or("panel has no sql, query or source")?;
     read_only_rows_on(state, w.source.as_deref(), sql, cap, env).await

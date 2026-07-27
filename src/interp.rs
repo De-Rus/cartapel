@@ -44,6 +44,25 @@ fn is_ident(s: &str) -> bool {
 /// Errors — loud, never a silent passthrough — on: an unknown variable name, a
 /// missing supplied value, an `Ident` value that is not `^[A-Za-z0-9_]+$`, or an
 /// `Int`/`Float` value that does not parse. An unterminated `{{` is left verbatim.
+/// Plain `{{var}}` text substitution — for config values that are not SQL and
+/// therefore need no binding (a panel's filter value, say). Unknown names
+/// resolve to empty, which for a filter means "not filtering".
+pub fn substitute(template: &str, values: &std::collections::BTreeMap<String, String>) -> String {
+    let mut out = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(open) = rest.find("{{") {
+        out.push_str(&rest[..open]);
+        let Some(close) = rest[open + 2..].find("}}") else {
+            break;
+        };
+        let name = rest[open + 2..open + 2 + close].trim();
+        out.push_str(values.get(name).map(String::as_str).unwrap_or(""));
+        rest = &rest[open + 2 + close + 2..];
+    }
+    out.push_str(rest);
+    out
+}
+
 /// `{{var}}` substitution with dialect placeholders: bound values render as
 /// `$n` on Postgres and `?` on MySQL; `ident` variables inline (validated).
 pub fn interpolate_for(

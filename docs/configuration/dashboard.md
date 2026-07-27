@@ -182,6 +182,55 @@ panel {
 A `sql` panel may also carry `source` to run against a secondary database
 rather than the primary one.
 
+### Aggregating and filtering a listing
+
+A SQL panel groups in SQL. A `files` or `s3` listing has no SQL to group in, so
+a panel can fold the rows itself with a deliberately small vocabulary —
+`count`, `count_distinct:col`, `sum:col`, `min:col`, `max:col`, each optionally
+`as <alias>`:
+
+```hcl
+panel {
+  type   = "stat"
+  label  = "Total size"
+  source = "cache"
+  value  = "sum:bytes"
+  format = "bytes"
+}
+
+panel {
+  type     = "table"
+  label    = "By feed"
+  source   = "cache"
+  group_by = "source"
+  agg      = ["count as series", "count_distinct:symbol as symbols", "sum:bytes as bytes"]
+}
+
+panel {
+  type   = "table"
+  label  = "Series"
+  source = "cache"
+  filter = { source = "{{feed}}" }   # empty variable → no filtering
+  pp     = 400
+}
+```
+
+The control that drives that filter is an ordinary
+[template variable](/configuration/dashboard#template-variables) whose options
+come from the listing itself:
+
+```hcl
+variable "feed" {
+  label  = "Feed"
+  source = "cache"
+  field  = "source"     # distinct values of this column become the options
+}
+```
+
+If you find yourself wanting a richer aggregate than the five above, that is a
+sign the data wants a database in front of it — point a query engine at the
+files and declare it as a database source instead.
+
 ## Common panel keys
 
 | Key | Applies to | Description |

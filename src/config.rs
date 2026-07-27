@@ -273,9 +273,13 @@ pub struct Variable {
     pub var_type: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    /// Data source for `query` (a `source` alias); default = primary.
+    /// Data source for `query` (a `source` alias); default = primary. With a
+    /// `files`/`s3` source, set `field` instead of `query` and the options are
+    /// that column's distinct values in the listing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub roles: Vec<String>,
 }
@@ -306,9 +310,22 @@ impl Variable {
     }
 
     fn validate(&self, name: &str) -> Result<(), String> {
-        if self.query.is_some() != self.options.is_empty() {
+        let sources = [
+            self.query.is_some(),
+            self.field.is_some(),
+            !self.options.is_empty(),
+        ]
+        .iter()
+        .filter(|x| **x)
+        .count();
+        if sources != 1 {
             return Err(format!(
-                "variable \"{name}\": set exactly one of `query` or `options`"
+                "variable \"{name}\": set exactly one of `query`, `field` or `options`"
+            ));
+        }
+        if self.field.is_some() && self.source.is_none() {
+            return Err(format!(
+                "variable \"{name}\": `field` reads a listing, so it needs a `source`"
             ));
         }
         if let Some(t) = &self.var_type {
@@ -1190,6 +1207,21 @@ pub struct PanelConfig {
     /// columns, widgets and permissions — instead of raw query rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub table: Option<String>,
+    /// Listing panels only: fold the rows before rendering. `group_by` names
+    /// the column to group on (omit for a single total row) and `agg` lists
+    /// `count`, `count_distinct:col`, `sum:col`, `min:col` or `max:col`,
+    /// each optionally `as <alias>`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_by: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub agg: Vec<String>,
+    /// A stat tile's aggregate over a listing, e.g. `value = "sum:bytes"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    /// Keep only rows matching these `column = value` pairs; a value may be a
+    /// `{{variable}}`, and an empty one filters nothing.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub filter: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1774,7 +1806,19 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                         "variable \"{name}\": source \"{alias}\" is not a defined source"
                     ))
                 }
-                Some(s) if !s.is_postgres() && !s.is_mysql() && !s.is_clickhouse() => {
+                // A `field` variable reads a listing; a `query` one needs SQL.
+                Some(s) if var.field.is_some() && !s.is_listing() => {
+                    return Err(format!(
+                        "variable \"{name}\": `field` reads a listing, but source \"{alias}\" is a {} source",
+                        s.kind
+                    ))
+                }
+                Some(s)
+                    if var.field.is_none()
+                        && !s.is_postgres()
+                        && !s.is_mysql()
+                        && !s.is_clickhouse() =>
+                {
                     return Err(format!(
                         "variable \"{name}\": source \"{alias}\" is not a database source"
                     ))

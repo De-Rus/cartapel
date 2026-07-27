@@ -1328,7 +1328,7 @@ async fn variables_meta(state: &AppState, user: &CurrentUser) -> Vec<Value> {
     };
     let mut out = Vec::new();
     for (name, var) in vars {
-        let options = crate::vars::option_pairs(state, &var)
+        let options = crate::vars::option_pairs(state, user, &var)
             .await
             .unwrap_or_default();
         out.push(json!({

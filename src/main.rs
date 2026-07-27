@@ -1,5 +1,6 @@
 mod access;
 mod actions;
+mod agg;
 mod assets;
 mod auth;
 mod config;
