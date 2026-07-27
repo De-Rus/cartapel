@@ -212,7 +212,7 @@ function DeclaredCell({ col, value, frac }: { col: TableColumn; value: unknown; 
 function DeclaredTable({ w }: { w: QueryTableWidget }) {
   const t = useT()
   const cols = w.cols ?? []
-  const paged = usePaged(w.rows, w.pp)
+  const paged = useSearchAndPage(w.rows, w.pp, w.search ?? undefined)
 
   const scales = useMemo(() => {
     const m: Record<string, { min: number; max: number }> = {}
@@ -235,6 +235,7 @@ function DeclaredTable({ w }: { w: QueryTableWidget }) {
 
   return (
     <div className="-mx-1 overflow-x-auto">
+      {w.search && <SearchBox value={paged.q} onChange={paged.setQ} />}
       <table className="w-full text-[13px]">
         <thead>
           <tr className="text-left text-xxs font-medium uppercase tracking-wide text-muted">
@@ -284,10 +285,31 @@ function DeclaredTable({ w }: { w: QueryTableWidget }) {
           })}
         </tbody>
       </table>
+      <TableFooter w={w} paged={paged} />
+    </div>
+  )
+}
+
+function TableFooter({
+  w,
+  paged,
+}: {
+  w: QueryTableWidget
+  paged: ReturnType<typeof useSearchAndPage>
+}) {
+  const t = useT()
+  const total = w.total ?? w.rows.length
+  const narrowed = paged.matched !== w.rows.length || w.total != null
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="px-2 pt-1.5 text-xxs text-muted">
+        {narrowed ? t('showing_of', { shown: String(paged.matched), total: String(total) }) : null}
+      </div>
       <Pager page={paged.page} pages={paged.pages} setPage={paged.setPage} />
     </div>
   )
 }
+
 
 
 const ISO_LIKE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
@@ -349,29 +371,49 @@ function WidgetTable({ w }: { w: TableWidget }) {
   return w.table !== undefined ? <ScreenTable w={w} /> : <QueryTable w={w} />
 }
 
-function TruncatedNote({ w }: { w: QueryTableWidget }) {
-  const t = useT()
-  if (!w.total) return null
-  return (
-    <div className="px-2 pt-1.5 text-xxs text-muted">
-      {t('showing_of', { shown: String(w.rows.length), total: String(w.total) })}
-    </div>
-  )
-}
-
-/// Panel tables can carry hundreds of rows (a listing does), so they page in
-/// place rather than scrolling forever. `pp` sets the page size.
-function usePaged(rows: Row[], pp?: number | null) {
-  const size = Math.max(1, pp ?? 50)
+/// Panel tables can carry thousands of rows (a listing does), so they search
+/// and page in place rather than scrolling forever. `pp` sets the page size;
+/// `search = true` adds the box. Both work on the rows the panel already has.
+function useSearchAndPage(rows: Row[], pp?: number | null, searchable?: boolean) {
+  const [q, setQ] = useState('')
   const [page, setPage] = useState(0)
-  const pages = Math.max(1, Math.ceil(rows.length / size))
+  const size = Math.max(1, pp ?? 50)
+  const needle = q.trim().toLowerCase()
+  const matched = useMemo(() => {
+    if (!searchable || !needle) return rows
+    return rows.filter((r) =>
+      Object.values(r).some((v) => v != null && String(v).toLowerCase().includes(needle)),
+    )
+  }, [rows, needle, searchable])
+  const pages = Math.max(1, Math.ceil(matched.length / size))
   const current = Math.min(page, pages - 1)
   return {
-    slice: rows.slice(current * size, current * size + size),
+    slice: matched.slice(current * size, current * size + size),
+    matched: matched.length,
     page: current,
     pages,
     setPage,
+    q,
+    setQ: (v: string) => {
+      setQ(v)
+      setPage(0)
+    },
   }
+}
+
+function SearchBox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const t = useT()
+  return (
+    <div className="px-2 pb-1.5">
+      <input
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={t('search_rows')}
+        className="w-full rounded border border-line bg-surface px-2 py-1 text-xs text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+      />
+    </div>
+  )
 }
 
 function Pager({
@@ -413,10 +455,7 @@ function QueryTable({ w }: { w: QueryTableWidget }) {
   const t = useT()
   if (w.cols && w.cols.length > 0)
     return (
-      <>
-        <DeclaredTable w={w} />
-        <TruncatedNote w={w} />
-      </>
+      <DeclaredTable w={w} />
     )
   const table = meta.tables.find((tb) => tb.name === w.link)
   return (

@@ -153,6 +153,8 @@ export function fmtByFormat(value: number, format?: string, currency?: string): 
       return fmtPercent(value)
     case 'duration':
       return fmtDuration(value)
+    case 'bytes':
+      return fmtBytes(value)
     default:
       return fmtCompact(value)
   }

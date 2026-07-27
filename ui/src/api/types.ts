@@ -383,6 +383,8 @@ export interface QueryTableWidget extends WidgetSpan {
   pk?: string | null
   /** Rows per page inside the panel. */
   pp?: number | null
+  /** Show a search box that filters the rows the panel carries. */
+  search?: boolean | null
   /** Set when the panel shows only part of a larger result. */
   total?: number | null
   table?: undefined

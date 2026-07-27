@@ -60,7 +60,7 @@ panel {
 | Key | Description |
 | --- | --- |
 | `sql` | Returns a single numeric column `v` — the headline value. |
-| `format` | `number`, `money`, `percent`, or `duration`. |
+| `format` | `number`, `money`, `percent`, `duration` or `bytes`. |
 | `compare_sql` | A second `v` query for the comparison baseline; the tile shows the delta. |
 | `compare_label` | Label for the comparison period (e.g. `prev 24h`). |
 | `spark` | A query returning an ordered series of `v` values, drawn as an inline sparkline. |
@@ -159,7 +159,7 @@ save you from repeating yourself or reach data that is not in the database.
 
 On a table panel, `max` is how many rows travel to the browser (50 by default,
 20000 at most) and `pp` is how many show at once — the panel pages through the
-rest in place. A listing with thousands of rows wants both: `max` high enough to
+rest in place, and `search = true` adds a box that filters them. A listing with thousands of rows wants both: `max` high enough to
 carry them, `pp` small enough to read.
 
 ```hcl
@@ -243,6 +243,7 @@ files and declare it as a database source instead.
 | `w` / `h` | all | Column / row span in the grid. |
 | `roles` | all | Restrict the panel to these roles. Omit → visible to all who can see the dashboard. |
 | `max` / `pp` | table | Rows carried, and rows per page inside the panel. |
+| `search` | table | Adds a search box that filters the rows the panel carries. |
 | `link` | table | Target table for row links. |
 | `url` | iframe | The embedded URL. |
 

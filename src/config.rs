@@ -1227,6 +1227,9 @@ pub struct PanelConfig {
     /// Rows per page inside the panel (default 50).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pp: Option<u32>,
+    /// Show a search box over the rows the panel carries.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub search: bool,
     /// How many rows the panel keeps at all — the payload it carries. Paging
     /// happens within these, so raising it is what shows more of a big listing.
     #[serde(default, skip_serializing_if = "Option::is_none")]

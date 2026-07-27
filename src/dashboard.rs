@@ -295,7 +295,7 @@ pub async fn render_panel(
                     json!({
                         "id": id, "type": "table", "label": w.label,
                         "link": w.link, "columns": columns, "cols": cols, "rows": rows, "pk": pk,
-                        "pp": w.pp,
+                        "pp": w.pp, "search": w.search,
                         "total": truncated.then_some(total),
                     })
                 }
