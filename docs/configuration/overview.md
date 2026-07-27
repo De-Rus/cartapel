@@ -129,9 +129,11 @@ Top-level `[cartapel]` keys:
 
 ### `source "…" { }`
 
-Databases are declared as named sources. Define at least one `postgres`
-source and mark it `primary` — that is what cartapel introspects and serves by
-default. Additional sources (more Postgres databases, or MySQL/MariaDB ones)
+Databases are declared as named sources. The `primary` one is what cartapel
+introspects and serves by default — and when no source is declared at all, the
+`--db` / `CARTAPEL_DB` URL becomes the primary implicitly, its engine picked
+from the scheme (`postgres://…` or `mysql://…`). That is why the one-command
+run needs nothing but the URL. Additional sources (more Postgres databases, or MySQL/MariaDB ones)
 plug extra tables into the same panel: point a table at one with
 `from { source = "…" }`, and lists, detail pages, editing, filters, search,
 import/export and audit all work the same way.
@@ -141,7 +143,7 @@ import/export and audit all work the same way.
 | `type` | `"postgres"`, `"mysql"` (also accepts `"mariadb"`), or `"http"` for a read-only JSON source a custom page can call. |
 | `url` | Connection URL (`postgres://…`, `mysql://…`) or endpoint (http). Supports `env:NAME` / `${NAME}`. |
 | `schemas` | List of schemas to introspect (postgres). Defaults to `["public"]`. A MySQL source is scoped to the database in its URL. |
-| `primary` | Marks the postgres source cartapel introspects. With a single postgres source it is implied; declare it explicitly when you define several. |
+| `primary` | Marks the source cartapel introspects and serves by default. With a single database source it is implied; declare it explicitly when you define several. |
 | `token_env` / `header` | For `http` sources: attach a secret from this env var under `header` (default `x-admin-token`). The secret never reaches the browser. |
 | `roles` | Restrict a source to these roles (non-admins need an explicit match). |
 
@@ -149,8 +151,9 @@ import/export and audit all work the same way.
 same bundle can run against dev, staging or prod by swapping one env var.
 
 ::: info MySQL & MariaDB
-MySQL 8.0+ and MariaDB 10.6+ are supported as table sources and for named
-queries and query-backed variables (dashboards run on the primary source).
+MySQL 8.0+ and MariaDB 10.6+ are supported everywhere a database goes: as the
+primary (`CARTAPEL_DB=mysql://…` just works), as extra table sources, and for
+named queries and query-backed variables.
 The differences that matter are handled for you — `tinyint(1)` renders as a
 boolean, `enum` values become text, MariaDB's `json`-as-`longtext` is detected,
 and unsigned ids are read losslessly. Two honest limits: array columns don't

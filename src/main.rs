@@ -183,6 +183,19 @@ async fn connect_pg(url: &str) -> sqlx::PgPool {
     }
 }
 
+/// The URL's scheme picks the engine — one `CARTAPEL_DB` works for both.
+async fn connect_any(alias: &str, url: &str) -> crate::db::DbPool {
+    if url.starts_with("mysql://") || url.starts_with("mariadb://") {
+        connect_mysql(alias, url).await
+    } else if url.starts_with("postgres://") || url.starts_with("postgresql://") {
+        crate::db::DbPool::Pg(connect_pg(url).await)
+    } else {
+        die(&format!(
+            "source \"{alias}\": unrecognized database url — use postgres:// or mysql://"
+        ))
+    }
+}
+
 async fn connect_mysql(alias: &str, url: &str) -> crate::db::DbPool {
     let url = url.replacen("mariadb://", "mysql://", 1);
     let opts: sqlx::mysql::MySqlConnectOptions = url.parse().expect("parse mysql url");
@@ -320,6 +333,10 @@ async fn check(config: &std::path::Path, db: Option<String>, schema: Option<Stri
             .filter(|v| !v.is_empty())
             .unwrap_or_else(|| vec!["public".into()]),
     };
+    if !db.starts_with("postgres://") && !db.starts_with("postgresql://") {
+        println!("· non-postgres primary url — live-schema checks are postgres-only, skipping");
+        return 0;
+    }
     let pool = match sqlx::postgres::PgPoolOptions::new()
         .max_connections(1)
         .acquire_timeout(std::time::Duration::from_secs(10))
@@ -442,11 +459,14 @@ async fn serve(
         Err(e) => die(&format!("config invalid:\n{e}")),
     };
 
-    let Some((primary_alias, primary_src)) = cfg
-        .primary_source()
-        .map(|(a, s)| (a.to_string(), s.clone()))
-    else {
-        die("no primary postgres source — define `source \"main\" { type = \"postgres\" primary = true }` in config/cartapel.hcl");
+    let (primary_alias, primary_src) = match cfg.primary_source() {
+        Some((a, s)) => (a.to_string(), s.clone()),
+        None => match &db {
+            Some(url) => ("main".to_string(), config::NamedSource::from_url(url)),
+            None => die(
+                "no database — pass --db / CARTAPEL_DB (postgres:// or mysql://), or define a `source \"main\" { primary = true }` in config/cartapel.hcl",
+            ),
+        },
     };
     let Some(db) = db.or_else(|| config::resolve_env(&primary_src.url)) else {
         die("no database url — pass --db / CARTAPEL_DB or set the primary source url");
@@ -464,7 +484,7 @@ async fn serve(
         std::collections::HashMap::new();
     pools.insert(
         primary_alias.clone(),
-        crate::db::DbPool::Pg(connect_pg(&db).await),
+        connect_any(&primary_alias, &db).await,
     );
     for (alias, src) in cfg.sources.iter() {
         if alias == &primary_alias {
@@ -475,12 +495,7 @@ async fn serve(
         }
         let url = config::resolve_env(&src.url)
             .unwrap_or_else(|| panic!("source \"{alias}\": missing/unresolved url"));
-        let pool = if src.is_mysql() {
-            connect_mysql(alias, &url).await
-        } else {
-            crate::db::DbPool::Pg(connect_pg(&url).await)
-        };
-        pools.insert(alias.clone(), pool);
+        pools.insert(alias.clone(), connect_any(alias, &url).await);
     }
     let pg = pools[&primary_alias].clone();
     if store.user_count().unwrap_or(0) == 0 {
@@ -508,9 +523,18 @@ async fn serve(
 
     let mut dbs: std::collections::HashMap<String, introspect::Schema> =
         std::collections::HashMap::new();
-    let mut db_schema = introspect::introspect(pg.pg(), &schemas)
-        .await
-        .expect("introspect schema");
+    let mut db_schema = match &pg {
+        crate::db::DbPool::Pg(pool) => introspect::introspect(pool, &schemas)
+            .await
+            .expect("introspect schema"),
+        crate::db::DbPool::MySql(pool, flavor) => {
+            let s = introspect::introspect_mysql(pool)
+                .await
+                .expect("introspect schema");
+            tracing::info!("introspected {} tables ({flavor:?})", s.tables.len());
+            s
+        }
+    };
     for t in db_schema.tables.values_mut() {
         t.source = primary_alias.clone();
     }

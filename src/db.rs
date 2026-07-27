@@ -54,10 +54,9 @@ pub enum MyFlavor {
     MariaDb,
 }
 
-/// One handle per configured source. Every `.pg()` call marks a site that still
-/// assumes Postgres — the dialect port works by making those calls disappear
-/// behind seams; reaching one with a MySQL source is a routing bug upstream
-/// (config load refuses bindings the port hasn't reached yet).
+/// One handle per configured source. There is deliberately no accessor to the
+/// raw inner pool: every statement flows through the dispatched verbs below,
+/// which is what keeps the rest of the codebase dialect-free.
 #[derive(Clone)]
 pub enum DbPool {
     Pg(sqlx::PgPool),
@@ -65,13 +64,6 @@ pub enum DbPool {
 }
 
 impl DbPool {
-    pub fn pg(&self) -> &sqlx::PgPool {
-        match self {
-            DbPool::Pg(p) => p,
-            DbPool::MySql(..) => unreachable!("MySQL source reached a Postgres-only path"),
-        }
-    }
-
     pub fn dialect(&self) -> Dialect {
         match self {
             DbPool::Pg(_) => Dialect::Pg,
@@ -318,6 +310,41 @@ pub async fn read_only_json_rows(
             let res = q.fetch_all(&mut *conn).await;
             let _ = sqlx::Executor::execute(&mut *conn, "ROLLBACK").await;
             res?.iter().map(my_row_to_json).collect()
+        }
+    }
+}
+
+/// Planner/statistics row estimates for every table at once — the setup
+/// wizard's table sizes.
+pub async fn estimate_all_rows(
+    pool: &DbPool,
+) -> Result<std::collections::HashMap<String, i64>, sqlx::Error> {
+    match pool {
+        DbPool::Pg(pg) => {
+            let rows = sqlx::query_as::<_, (String, String, i64)>(
+                "SELECT n.nspname, c.relname, c.reltuples::bigint FROM pg_class c
+                 JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r','v','m')",
+            )
+            .fetch_all(pg)
+            .await?;
+            Ok(rows
+                .into_iter()
+                .filter(|(_, _, r)| *r >= 0)
+                .map(|(sch, t, r)| (format!("{sch}.{t}"), r))
+                .collect())
+        }
+        DbPool::MySql(my, _) => {
+            let rows = sqlx::query_as::<_, (String, String, i64)>(
+                "SELECT CAST(TABLE_SCHEMA AS CHAR), CAST(TABLE_NAME AS CHAR),
+                        CAST(COALESCE(TABLE_ROWS, 0) AS SIGNED)
+                 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()",
+            )
+            .fetch_all(my)
+            .await?;
+            Ok(rows
+                .into_iter()
+                .map(|(sch, t, r)| (format!("{sch}.{t}"), r))
+                .collect())
         }
     }
 }

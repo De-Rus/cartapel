@@ -403,11 +403,37 @@ impl NamedSource {
     }
 }
 
+impl NamedSource {
+    /// The implicit source a bare `--db` / `CARTAPEL_DB` run gets when no
+    /// config declares one — the URL's scheme picks the engine.
+    pub fn from_url(url: &str) -> Self {
+        let kind = if url.starts_with("mysql://") || url.starts_with("mariadb://") {
+            "mysql"
+        } else {
+            "postgres"
+        };
+        Self {
+            kind: kind.into(),
+            url: url.into(),
+            schemas: Vec::new(),
+            primary: true,
+            token_env: None,
+            header: None,
+            roles: Vec::new(),
+        }
+    }
+}
+
 impl ConfigDir {
     pub fn primary_source(&self) -> Option<(&str, &NamedSource)> {
-        let pg = || self.sources.iter().filter(|(_, s)| s.is_postgres());
-        pg().find(|(_, s)| s.primary)
-            .or_else(|| pg().next())
+        let sql = || {
+            self.sources
+                .iter()
+                .filter(|(_, s)| s.is_postgres() || s.is_mysql())
+        };
+        sql()
+            .find(|(_, s)| s.primary)
+            .or_else(|| sql().next())
             .map(|(n, s)| (n.as_str(), s))
     }
 }

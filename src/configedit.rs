@@ -401,19 +401,9 @@ pub async fn discover(
         }
     }
 
-    let rows: HashMap<String, i64> = sqlx::query_as::<_, (String, String, i64)>(
-        "SELECT n.nspname, c.relname, c.reltuples::bigint FROM pg_class c
-         JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r','v','m')",
-    )
-    .fetch_all(state.pg.pg())
-    .await
-    .map(|rs| {
-        rs.into_iter()
-            .filter(|(_, _, r)| *r >= 0)
-            .map(|(s, n, r)| (format!("{s}.{n}"), r))
-            .collect()
-    })
-    .unwrap_or_default();
+    let rows: HashMap<String, i64> = crate::db::estimate_all_rows(&state.pg)
+        .await
+        .unwrap_or_default();
 
     let tables: Vec<Value> = unconfigured
         .iter()
