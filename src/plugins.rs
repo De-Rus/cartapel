@@ -215,7 +215,7 @@ pub async fn source_rows(
     path: &str,
     rows_at: Option<&str>,
 ) -> Result<Vec<Value>, AppError> {
-    if let Some(rows) = files_source_rows(state, user, name).await? {
+    if let Some(rows) = listing_source_rows(state, user, name).await? {
         return Ok(rows);
     }
     let (status, body) = fetch_source(state, user, name, path).await?;
@@ -242,56 +242,90 @@ pub async fn source_rows(
     }
 }
 
-/// A `files` source's listing, reused within its ttl. `None` when the source
-/// is not a files source, so callers fall through to the http path.
-async fn files_source_rows(
+/// A listing source (`files` or `s3`) as rows, reused within its ttl. `None`
+/// when the source lists nothing, so callers fall through to the http path.
+async fn listing_source_rows(
     state: &AppState,
     user: &CurrentUser,
     name: &str,
 ) -> Result<Option<Vec<Value>>, AppError> {
-    let (root, pattern, ttl, max_entries) = {
+    let src = {
         let cfg = state.cfg();
         let Some(src) = cfg.sources.get(name) else {
             return Ok(None);
         };
-        if !src.is_files() {
+        if !src.is_listing() {
             return Ok(None);
         }
         if !user.may(&src.roles, crate::state::Access::AdminOnly) {
             return Err(AppError::forbidden("source not allowed for your role"));
         }
-        let root = src
-            .root
-            .as_deref()
-            .and_then(crate::config::resolve_env)
-            .ok_or_else(|| AppError::bad(format!("source \"{name}\": missing root")))?;
-        let pattern = src
-            .pattern
-            .clone()
-            .ok_or_else(|| AppError::bad(format!("source \"{name}\": missing pattern")))?;
-        (
-            root,
-            pattern,
-            crate::files::cache_ttl(src.ttl_secs),
-            src.max_entries.unwrap_or(crate::files::DEFAULT_MAX_ENTRIES),
-        )
+        src.clone()
     };
+    let ttl = crate::files::cache_ttl(src.ttl_secs);
+    let max_entries = src.max_entries.unwrap_or(crate::files::DEFAULT_MAX_ENTRIES);
+    let bad = |e: String| AppError::bad(format!("source \"{name}\": {e}"));
+    let pattern_src = src
+        .pattern
+        .clone()
+        .ok_or_else(|| AppError::bad(format!("source \"{name}\": missing pattern")))?;
     if let Some((at, rows)) = state.files_cache.lock().unwrap().get(name) {
         if at.elapsed() < ttl {
             return Ok(Some(rows.clone()));
         }
     }
-    let scanned = tokio::task::spawn_blocking(move || {
-        crate::files::scan(std::path::Path::new(&root), &pattern, max_entries)
-    })
-    .await
-    .map_err(|e| AppError::internal(format!("listing failed: {e}")))?
-    .map_err(|e| AppError::bad(format!("source \"{name}\": {e}")))?;
-    state.files_cache.lock().unwrap().insert(
-        name.to_string(),
-        (std::time::Instant::now(), scanned.clone()),
-    );
-    Ok(Some(scanned))
+    let rows = if src.is_files() {
+        let root = src
+            .root
+            .as_deref()
+            .and_then(crate::config::resolve_env)
+            .ok_or_else(|| AppError::bad(format!("source \"{name}\": missing root")))?;
+        tokio::task::spawn_blocking(move || {
+            crate::files::scan(std::path::Path::new(&root), &pattern_src, max_entries)
+        })
+        .await
+        .map_err(|e| AppError::internal(format!("listing failed: {e}")))?
+        .map_err(bad)?
+    } else {
+        let env_of = |key: &Option<String>| {
+            key.as_deref()
+                .and_then(|k| std::env::var(k).ok())
+                .unwrap_or_default()
+        };
+        let creds = crate::s3::Creds {
+            access_key: env_of(&src.access_key_env),
+            secret_key: env_of(&src.secret_key_env),
+            region: src.region.clone().unwrap_or_else(|| "auto".into()),
+        };
+        if creds.access_key.is_empty() || creds.secret_key.is_empty() {
+            return Err(AppError::bad(format!(
+                "source \"{name}\": the credential env vars are unset"
+            )));
+        }
+        let endpoint = src
+            .endpoint
+            .as_deref()
+            .and_then(crate::config::resolve_env)
+            .ok_or_else(|| AppError::bad(format!("source \"{name}\": missing endpoint")))?;
+        let pattern = crate::files::parse_pattern(&pattern_src).map_err(bad)?;
+        crate::s3::list(
+            &state.http,
+            &endpoint,
+            src.bucket.as_deref().unwrap_or_default(),
+            src.prefix.as_deref().unwrap_or_default(),
+            &creds,
+            &pattern,
+            max_entries,
+        )
+        .await
+        .map_err(bad)?
+    };
+    state
+        .files_cache
+        .lock()
+        .unwrap()
+        .insert(name.to_string(), (std::time::Instant::now(), rows.clone()));
+    Ok(Some(rows))
 }
 
 async fn proxy_source(
@@ -300,7 +334,7 @@ async fn proxy_source(
     name: &str,
     rest: &str,
 ) -> Result<Response, AppError> {
-    if let Some(rows) = files_source_rows(state, user, name).await? {
+    if let Some(rows) = listing_source_rows(state, user, name).await? {
         return Ok(Json(Value::Array(rows)).into_response());
     }
     let (status, body) = fetch_source(state, user, name, rest).await?;

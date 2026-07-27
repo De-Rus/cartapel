@@ -15,6 +15,7 @@ mod introspect;
 mod meta;
 mod plugins;
 mod rows;
+mod s3;
 mod search;
 mod sqlval;
 mod state;

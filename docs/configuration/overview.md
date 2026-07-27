@@ -140,7 +140,7 @@ import/export and audit all work the same way.
 
 | Key | Description |
 | --- | --- |
-| `type` | `"postgres"`, `"mysql"` (also accepts `"mariadb"`), `"clickhouse"` (read-only), `"http"` (a JSON endpoint cartapel proxies server-side), or `"files"` (a directory listing). |
+| `type` | `"postgres"`, `"mysql"` (also accepts `"mariadb"`), `"clickhouse"` (read-only), `"http"` (a JSON endpoint cartapel proxies server-side), `"files"` (a directory listing) or `"s3"` (an object listing). |
 | `url` | Connection URL (`postgres://…`, `mysql://…`) or endpoint (http). Supports `env:NAME` / `${NAME}`. |
 | `schemas` | List of schemas to introspect (postgres). Defaults to `["public"]`. A MySQL source is scoped to the database in its URL. |
 | `primary` | Marks the source cartapel introspects and serves by default. With a single database source it is implied; declare it explicitly when you define several. |
@@ -184,6 +184,31 @@ panel {
   }
 }
 ```
+
+### `s3` — a bucket as rows
+
+The same pattern applies to object keys, because a key *is* a path. Works
+against any S3-compatible endpoint (AWS, R2, MinIO, Backblaze); Cloudflare R2
+wants `region = "auto"`.
+
+```hcl
+source "ohlcv" {
+  type           = "s3"
+  endpoint       = "env:AWS_ENDPOINT_URL"
+  bucket         = "feed-cache"
+  region         = "auto"
+  prefix         = "candles/"            # optional, stripped before matching
+  pattern        = "{source}/{symbol}/{tf}.parquet"
+  access_key_env = "R2_ACCESS_KEY_ID"    # the env var, never the key itself
+  secret_key_env = "R2_SECRET_ACCESS_KEY"
+}
+```
+
+Rows carry the same columns a `files` source produces — the captures plus
+`path`, `bytes` and `modified_ms` — so a panel does not care which store
+answered. Listing only: cartapel signs a `ListObjectsV2` and reads names, sizes
+and mtimes, never object bodies. Credentials come from the environment, so they
+stay out of the config you commit.
 
 **Metadata only.** cartapel reports names, sizes and mtimes and never reads a
 file's contents — a listing must not become a way to read arbitrary files.

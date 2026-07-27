@@ -394,8 +394,22 @@ pub struct NamedSource {
     /// `files`: path template whose `{name}` segments become columns.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pattern: Option<String>,
-    /// `files`: how long a listing is reused before rescanning (default 60s) —
-    /// walking a deep tree is expensive.
+    /// `s3`: the S3-compatible endpoint, bucket, region and the env vars that
+    /// hold the credentials. R2 wants `region = "auto"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bucket: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefix: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub access_key_env: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret_key_env: Option<String>,
+    /// `files`/`s3`: how long a listing is reused before rescanning (default
+    /// 60s) — walking a deep tree or paging a bucket is expensive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ttl_secs: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -428,6 +442,15 @@ impl NamedSource {
     pub fn is_files(&self) -> bool {
         self.kind == "files"
     }
+
+    pub fn is_s3(&self) -> bool {
+        self.kind == "s3"
+    }
+
+    /// Sources that produce rows from a key pattern rather than from SQL.
+    pub fn is_listing(&self) -> bool {
+        self.is_files() || self.is_s3()
+    }
 }
 
 impl NamedSource {
@@ -442,6 +465,12 @@ impl NamedSource {
         Self {
             kind: kind.into(),
             url: url.into(),
+            endpoint: None,
+            bucket: None,
+            region: None,
+            prefix: None,
+            access_key_env: None,
+            secret_key_env: None,
             root: None,
             pattern: None,
             ttl_secs: None,
@@ -1773,16 +1802,28 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
         }
     }
     for (name, s) in &cfg.sources {
-        if s.is_files() {
-            if s.root.is_none() {
-                return Err(format!("source \"{name}\": a files source needs a root"));
+        if s.is_listing() && s.pattern.is_none() {
+            return Err(format!(
+                "source \"{name}\": a {} source needs a pattern, e.g. \"{{dir}}/{{file}}.csv\"",
+                s.kind
+            ));
+        }
+        if s.is_files() && s.root.is_none() {
+            return Err(format!("source \"{name}\": a files source needs a root"));
+        }
+        if s.is_s3() {
+            for (key, val) in [
+                ("endpoint", &s.endpoint),
+                ("bucket", &s.bucket),
+                ("access_key_env", &s.access_key_env),
+                ("secret_key_env", &s.secret_key_env),
+            ] {
+                if val.is_none() {
+                    return Err(format!("source \"{name}\": an s3 source needs {key}"));
+                }
             }
-            if s.pattern.is_none() {
-                return Err(format!(
-                    "source \"{name}\": a files source needs a pattern, e.g. \"{{dir}}/{{file}}.csv\""
-                ));
-            }
-        } else if s.url.is_empty() {
+        }
+        if !s.is_listing() && s.url.is_empty() {
             return Err(format!("source \"{name}\": missing url"));
         }
     }

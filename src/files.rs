@@ -87,9 +87,11 @@ fn modified_ms(meta: &std::fs::Metadata) -> Option<i64> {
         .map(|d| d.as_millis() as i64)
 }
 
-/// Walk `root` collecting entries that match `pattern`. Returns rows carrying
-/// the captured columns plus `path`, `bytes` and `modified_ms`.
-pub fn scan(root: &Path, pattern: &str, max_entries: usize) -> Result<Vec<Value>, String> {
+/// A parsed `{a}/{b}.ext` pattern. The same shape matches a filesystem path and
+/// an object key — a key is a path, which is what lets one pattern serve both.
+pub struct Pattern(Vec<Vec<Part>>);
+
+pub fn parse_pattern(pattern: &str) -> Result<Pattern, String> {
     let segments: Vec<Vec<Part>> = pattern
         .trim_matches('/')
         .split('/')
@@ -98,6 +100,34 @@ pub fn scan(root: &Path, pattern: &str, max_entries: usize) -> Result<Vec<Value>
     if segments.is_empty() {
         return Err("pattern is empty".into());
     }
+    Ok(Pattern(segments))
+}
+
+impl Pattern {
+    pub fn depth(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Bind captures for a whole key, e.g. `binance/BTCUSDT/1h.parquet`.
+    pub fn match_key(&self, key: &str) -> Option<Map<String, Value>> {
+        let parts: Vec<&str> = key.trim_matches('/').split('/').collect();
+        if parts.len() != self.0.len() {
+            return None;
+        }
+        let mut out = Map::new();
+        for (seg, name) in self.0.iter().zip(parts) {
+            if !match_segment(seg, name, &mut out) {
+                return None;
+            }
+        }
+        Some(out)
+    }
+}
+
+/// Walk `root` collecting entries that match `pattern`. Returns rows carrying
+/// the captured columns plus `path`, `bytes` and `modified_ms`.
+pub fn scan(root: &Path, pattern: &str, max_entries: usize) -> Result<Vec<Value>, String> {
+    let segments = parse_pattern(pattern)?.0;
     let base = root
         .canonicalize()
         .map_err(|e| format!("root {}: {e}", root.display()))?;
@@ -111,6 +141,13 @@ pub fn scan(root: &Path, pattern: &str, max_entries: usize) -> Result<Vec<Value>
         max_entries,
         &mut out,
     )?;
+    // Truncation must never look like "that is all there is".
+    if out.len() >= max_entries {
+        tracing::warn!(
+            "listing of {} hit the {max_entries}-entry cap — raise max_entries to see the rest",
+            base.display()
+        );
+    }
     Ok(out)
 }
 
