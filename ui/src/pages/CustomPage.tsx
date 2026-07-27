@@ -25,11 +25,10 @@ export default function CustomPage() {
     let cancelled = false
     const tag = pageElementName(page.slug)
     loadWidgetModule(page.module, page.slug)
-      .then(() => customElements.whenDefined(tag))
       .then(() => {
         if (cancelled) return
         if (!customElements.get(tag)) {
-          setFailed(`custom element <${tag}> was never defined — does the module call sx.definePage('${page.slug}', …)?`)
+          setFailed(`the module defined no <${tag}> — does it call sx.definePage('${page.slug}', …)?`)
           return
         }
         setReady(true)

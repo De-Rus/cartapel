@@ -52,8 +52,6 @@ interface SxCol {
 declare const sx: {
   /** Register a screen module: `sx.definePage('summary', ({ api }) => html`…`)`. */
   definePage(slug: string, Component: ComponentType<{ api: SxWidgetApi }>): void
-  /** Register a named widget usable from declarative `panel {}` blocks. */
-  define(name: string, C: ComponentType): void
 
   /** htm-bound JSX-in-template-literals: `html`<div>${x}</div>``. */
   html(strings: TemplateStringsArray, ...values: any[]): VNode

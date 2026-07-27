@@ -582,8 +582,6 @@ export function Page(p: { title: any; sub?: any; actions?: any; loading?: boolea
   </div>`
 }
 
-export const components: Record<string, ComponentType<any>> = {}
-export const define = (name: string, C: ComponentType<any>) => { components[name] = C }
 
 /** Register a custom page as a Preact component. cartapel mounts `sx-page-<slug>`;
  *  the component receives `{ api }` and re-renders reactively. */

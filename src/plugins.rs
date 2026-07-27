@@ -31,8 +31,12 @@ fn content_type(ext: &str) -> Option<&'static str> {
 /// admin-relative path. The resolved file must stay within the canonical config
 /// dir (traversal + symlink-escape rejected), carry an allowlisted extension, and
 /// never be config/secret material (`.hcl`/`.toml`/`.env`/dotfiles).
+/// Page modules and bundle assets. Behind the session like every other
+/// endpoint: a module's source reveals query names, source aliases and the
+/// logic of a role-scoped page.
 pub async fn serve_static(
     State(state): State<Arc<AppState>>,
+    _user: CurrentUser,
     Path(path): Path<String>,
 ) -> Response {
     let Some(dir) = &state.config_dir else {
@@ -57,18 +61,6 @@ pub async fn serve_static(
     };
     let (real, base) = match (dir.join(&path).canonicalize(), dir.canonicalize()) {
         (Ok(real), Ok(base)) => (real, base),
-        // The shared components hook is optional in every config — an empty
-        // module keeps the browser console clean instead of a permanent 404.
-        _ if path == "config/widgets/components.js" => {
-            return (
-                [
-                    (header::CONTENT_TYPE, "text/javascript".to_string()),
-                    (header::CACHE_CONTROL, "no-cache".to_string()),
-                ],
-                "export {}\n",
-            )
-                .into_response()
-        }
         _ => return (StatusCode::NOT_FOUND, "asset not found").into_response(),
     };
     if !real.starts_with(&base) {
@@ -99,7 +91,7 @@ pub async fn named_query(
             .queries
             .get(&name)
             .ok_or_else(|| AppError::not_found(format!("unknown query {name}")))?;
-        if !user.is_admin() && (q.roles.is_empty() || !q.roles.contains(&user.role)) {
+        if !user.may(&q.roles, crate::state::Access::AdminOnly) {
             return Err(AppError::forbidden("query not allowed for your role"));
         }
         (q.sql.clone(), q.source.clone())
@@ -111,7 +103,14 @@ pub async fn named_query(
         crate::interp::interpolate_for(&sql, &env.types, &env.values, pool.dialect())
             .map_err(AppError::bad)?;
 
-    let rows = crate::db::config_query_rows(pool, &sql, &binds, QUERY_CAP, 8000).await?;
+    // Named queries are config-authored and read-only: naming the query in the
+    // failure is the whole debugging signal for whoever wrote it.
+    let rows = crate::db::config_query_rows(pool, &sql, &binds, QUERY_CAP, 8000)
+        .await
+        .map_err(|e| {
+            tracing::warn!("query \"{name}\" failed: {e}");
+            AppError::bad(format!("query \"{name}\" failed — see the server log"))
+        })?;
     let rows: Vec<Value> = rows.into_iter().map(Value::Object).collect();
     Ok(Json(json!({ "rows": rows })))
 }
@@ -147,7 +146,7 @@ async fn proxy_source(
         .get(name)
         .ok_or_else(|| AppError::not_found(format!("unknown source {name}")))?;
     // Same role gate as named_query: non-admins need an explicit role match.
-    if !user.is_admin() && (src.roles.is_empty() || !src.roles.contains(&user.role)) {
+    if !user.may(&src.roles, crate::state::Access::AdminOnly) {
         return Err(AppError::forbidden("source not allowed for your role"));
     }
     match src.kind.as_str() {
@@ -193,6 +192,13 @@ async fn proxy_source(
 mod tests {
     use super::*;
     use axum::http::header::CONTENT_TYPE;
+
+    fn test_user() -> crate::state::CurrentUser {
+        crate::state::CurrentUser {
+            email: "a@b.c".into(),
+            role: "admin".into(),
+        }
+    }
 
     fn asset_state(dir: PathBuf) -> Arc<AppState> {
         let pg = sqlx::postgres::PgPoolOptions::new()
@@ -247,6 +253,7 @@ mod tests {
     async fn get(dir: &std::path::Path, path: &str) -> Response {
         serve_static(
             State(asset_state(dir.to_path_buf())),
+            test_user(),
             Path(path.to_string()),
         )
         .await
@@ -326,7 +333,12 @@ mod tests {
             login_limiter: Default::default(),
             config_write_lock: Default::default(),
         });
-        let r = serve_static(State(state), Path("overview/ops/ops.js".to_string())).await;
+        let r = serve_static(
+            State(state),
+            test_user(),
+            Path("overview/ops/ops.js".to_string()),
+        )
+        .await;
         assert_eq!(r.status(), StatusCode::NOT_FOUND, "no config dir => 404");
     }
 

@@ -785,7 +785,7 @@ pub(crate) fn derive_nav_groups(
 pub(crate) fn pages_meta(cfg: &crate::config::ConfigDir, user: &CurrentUser) -> Vec<Value> {
     cfg.pages
         .iter()
-        .filter(|p| user.is_admin() || p.roles.is_empty() || p.roles.contains(&user.role))
+        .filter(|p| user.may(&p.roles, crate::state::Access::Everyone))
         .map(|p| {
             let group = p.group.as_deref().and_then(|slug| cfg.group_label(slug));
             json!({
@@ -1329,7 +1329,7 @@ async fn variables_meta(state: &AppState, user: &CurrentUser) -> Vec<Value> {
         let cfg = state.cfg();
         cfg.variables
             .iter()
-            .filter(|(_, v)| user.is_admin() || v.roles.is_empty() || v.roles.contains(&user.role))
+            .filter(|(_, v)| user.may(&v.roles, crate::state::Access::Everyone))
             .map(|(n, v)| (n.clone(), v.clone()))
             .collect()
     };

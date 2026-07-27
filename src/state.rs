@@ -162,6 +162,13 @@ pub struct CurrentUser {
     pub role: String,
 }
 
+/// What an empty `roles = []` list means for a given config object.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Access {
+    Everyone,
+    AdminOnly,
+}
+
 impl CurrentUser {
     /// A user may carry several roles, comma-separated ("support,billing").
     pub fn roles(&self) -> impl Iterator<Item = &str> {
@@ -169,6 +176,19 @@ impl CurrentUser {
             .split(',')
             .map(str::trim)
             .filter(|r| !r.is_empty())
+    }
+
+    /// Does this user hold any of `allowed`? Admins always do. `empty_means`
+    /// decides the polarity of an empty list — pages, panels and variables are
+    /// open to everyone by default, queries and sources are admin-only.
+    pub fn may(&self, allowed: &[String], empty_means: Access) -> bool {
+        if self.is_admin() {
+            return true;
+        }
+        if allowed.is_empty() {
+            return empty_means == Access::Everyone;
+        }
+        self.roles().any(|r| allowed.iter().any(|a| a == r))
     }
 
     pub fn is_admin(&self) -> bool {
@@ -613,5 +633,31 @@ impl AppState {
             return Err(AppError::forbidden("no access to this table"));
         }
         Ok(dbt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn user(role: &str) -> CurrentUser {
+        CurrentUser {
+            email: "a@b.c".into(),
+            role: role.into(),
+        }
+    }
+
+    #[test]
+    fn multi_role_users_match_any_of_their_roles() {
+        let u = user("support,billing");
+        let support = vec!["support".to_string()];
+        let ops = vec!["ops".to_string()];
+        assert!(u.may(&support, Access::Everyone), "the second role counts");
+        assert!(u.may(&support, Access::AdminOnly));
+        assert!(!u.may(&ops, Access::Everyone));
+        // An empty list means the opposite thing for pages vs queries.
+        assert!(u.may(&[], Access::Everyone));
+        assert!(!u.may(&[], Access::AdminOnly));
+        assert!(user("admin").may(&ops, Access::AdminOnly));
     }
 }

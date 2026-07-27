@@ -15,7 +15,7 @@ pub struct Resolved {
 }
 
 fn visible(var: &Variable, user: &CurrentUser) -> bool {
-    user.is_admin() || var.roles.is_empty() || var.roles.contains(&user.role)
+    user.may(&var.roles, crate::state::Access::Everyone)
 }
 
 /// Read the option VALUES of a `query`-backed variable (first column), read-only.

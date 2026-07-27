@@ -36,6 +36,17 @@ or `group` is rejected). A page folder placed directly under the config root is
 ungrouped. A screen that sets both `module` and `panel { }` is a load error —
 scripted or declarative, never both.
 
+The page is served at **`{base}/p/<group>/<slug>`** — the example above is
+`/admin/p/overview/ops`. An ungrouped page is at `{base}/p/<slug>`. The sidebar
+links there for you; you only need this when writing a link by hand.
+
+::: tip Which flavour?
+**Start declarative.** A grid of `panel { }` blocks needs no JavaScript, keeps
+the SQL server-side, and gets money/percent formatting, in-cell bars, deep links
+and comparison sparklines for free. Reach for a `module` when you need layout or
+interaction that panels cannot express.
+:::
+
 ## Scripted pages
 
 A scripted page is a full-screen module in the sidebar:
@@ -283,26 +294,6 @@ customElements.define('sx-widget-sparkline', Sparkline)
 A `custom:<name>` widget renders in **both** the list cell and the detail field.
 An unknown custom widget falls back to the raw value — never a crash.
 
-### Bundled widgets
-
-cartapel's reference bundle ships three drop-in custom widgets under
-`config/widgets/`:
-
-- **`sparkline`** — inline SVG trend line.
-  `params = { field, color, width, height }`; `field` names a column holding a
-  JSON array of numbers.
-- **`statuspill`** — a colored pill from a value → tone mapping.
-  `params`: `field` (column to read, defaults to the cell value), `map`
-  (`{ "<value>": "<tone>" | { label, tone } }` with tone ∈
-  `green|red|blue|gray|orange|violet|yellow`), `fallback` (tone when no key
-  matches, default `gray`), `labels` (optional value → label overrides). Booleans
-  and numbers match by their string form (`"true"`, `"3"`).
-- **`minibar`** — a tiny horizontal magnitude bar + number.
-  `params`: `field`, `max` (full scale, default 100), `width` (px), `color`,
-  `suffix`, plus `warn_at` / `warn_color` to recolor once `value ≥ warn_at`.
-
-All three use the panel's CSS variables so they track the active theme
-automatically.
 
 ```hcl
 field "has_subscription" {

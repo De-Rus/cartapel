@@ -76,8 +76,14 @@ export function loadWidgetModule(moduleFile: string, pageSlug?: string): Promise
     script.onerror = () => reject(new Error(`failed to load ${url}`))
     document.head.appendChild(script)
   })
-  moduleCache.set(moduleFile, p)
-  return p
+  moduleCache.set(
+    moduleFile,
+    p.catch((e) => {
+      moduleCache.delete(moduleFile)
+      throw e
+    }),
+  )
+  return moduleCache.get(moduleFile) as Promise<void>
 }
 
 /** TSX/TS page modules: fetched as source, transpiled in the browser (sucrase,
@@ -96,15 +102,25 @@ async function loadTsxModule(url: string, pageSlug?: string): Promise<void> {
     jsxFragmentPragma: 'Fragment',
     production: true,
   })
-  const blobUrl = URL.createObjectURL(new Blob([prelude + code], { type: 'text/javascript' }))
+  const sourced = `${prelude}${code}\n//# sourceURL=${url}\n`
+  const blobUrl = URL.createObjectURL(new Blob([sourced], { type: 'text/javascript' }))
+  let mod: Record<string, unknown>
   try {
-    const mod = (await import(/* @vite-ignore */ blobUrl)) as { default?: unknown }
-    if (pageSlug && typeof mod.default === 'function') {
-      ;(sx.definePage as (slug: string, c: unknown) => void)(pageSlug, mod.default)
-    }
+    mod = (await import(/* @vite-ignore */ blobUrl)) as Record<string, unknown>
   } finally {
     URL.revokeObjectURL(blobUrl)
   }
+  if (!pageSlug) return
+  if (typeof mod.default === 'function') {
+    ;(sx.definePage as (slug: string, c: unknown) => void)(pageSlug, mod.default)
+    return
+  }
+  if (customElements.get(pageElementName(pageSlug))) return
+  const found = Object.keys(mod).filter((k) => k !== 'default')
+  throw new Error(
+    `loaded but exported no page. Add \`export default\` (or call sx.definePage('${pageSlug}', C)).` +
+      (found.length ? ` Found exports: ${found.join(', ')}.` : ''),
+  )
 }
 
 export function widgetElementName(name: string): string {

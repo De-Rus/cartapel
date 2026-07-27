@@ -204,7 +204,7 @@ async fn render_panels(
 ) -> Vec<Value> {
     let mut widgets = Vec::new();
     for (i, w) in dc.widgets.iter().enumerate() {
-        if !w.roles.is_empty() && !w.roles.contains(&user.role) && !user.is_admin() {
+        if !user.may(&w.roles, crate::state::Access::Everyone) {
             continue;
         }
         if let Some(widget) = render_panel(state, w, &format!("w{i}"), env).await {
@@ -240,12 +240,12 @@ pub async fn page_widgets_handler(
         .iter()
         .find(|p| p.id() == id && p.is_declarative())
         .ok_or_else(|| AppError::not_found("unknown declarative page"))?;
-    if !page.roles.is_empty() && !page.roles.contains(&user.role) && !user.is_admin() {
+    if !user.may(&page.roles, crate::state::Access::Everyone) {
         return Err(AppError::forbidden("no access to this page"));
     }
     let mut widgets = Vec::new();
     for (i, w) in page.widgets.iter().enumerate() {
-        if !w.roles.is_empty() && !w.roles.contains(&user.role) && !user.is_admin() {
+        if !user.may(&w.roles, crate::state::Access::Everyone) {
             continue;
         }
         if let Some(widget) = render_panel(&state, w, &format!("w{i}"), &env).await {
