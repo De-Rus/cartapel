@@ -51,6 +51,9 @@ sorted by path). The rules the diagram doesn't show:
 - A **page** is the same shape — a folder whose `screen.hcl` holds `panel { }`
   blocks instead of table config. `page.hcl` is an accepted synonym for such a
   file. See [Pages & queries](/configuration/pages-and-queries).
+- **Template variables render only where they are read** — a control appears on
+  a page or the dashboard when one of its panels actually references
+  `{{that_variable}}`, not merely because the variable exists in the bundle.
 - A **`queries.hcl`** in any folder contributes named read-only queries;
   **`variables.hcl`** and **`sources.hcl`** work the same way for template
   variables and extra data sources. Names must be unique across the bundle.

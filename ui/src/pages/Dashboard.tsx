@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
@@ -32,6 +32,10 @@ function gridColsClass(columns: number): string {
       return 'grid-cols-1 md:grid-cols-2'
     case 3:
       return 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
+    case 5:
+      return 'grid-cols-1 md:grid-cols-2 xl:grid-cols-5'
+    case 6:
+      return 'grid-cols-1 md:grid-cols-2 xl:grid-cols-6'
     default:
       return 'grid-cols-1 md:grid-cols-2 xl:grid-cols-4'
   }
@@ -41,13 +45,17 @@ function spanClass(w: Widget, columns: number): string {
   const want = w.w ?? (w.type === 'stat' ? 1 : 2)
   const cols = Math.min(want, columns)
   const base =
-    cols >= 4
-      ? 'md:col-span-2 xl:col-span-4'
-      : cols === 3
-        ? 'md:col-span-2 xl:col-span-3'
-        : cols === 2
-          ? 'md:col-span-2 xl:col-span-2'
-          : ''
+    cols >= 6
+      ? 'md:col-span-2 xl:col-span-6'
+      : cols === 5
+        ? 'md:col-span-2 xl:col-span-5'
+        : cols === 4
+          ? 'md:col-span-2 xl:col-span-4'
+          : cols === 3
+            ? 'md:col-span-2 xl:col-span-3'
+            : cols === 2
+              ? 'md:col-span-2 xl:col-span-2'
+              : ''
   const rows = w.h === 2 ? 'xl:row-span-2' : ''
   return clsx(base, rows)
 }
@@ -204,6 +212,7 @@ function DeclaredCell({ col, value, frac }: { col: TableColumn; value: unknown; 
 function DeclaredTable({ w }: { w: QueryTableWidget }) {
   const t = useT()
   const cols = w.cols ?? []
+  const paged = usePaged(w.rows, w.pp)
 
   const scales = useMemo(() => {
     const m: Record<string, { min: number; max: number }> = {}
@@ -247,7 +256,7 @@ function DeclaredTable({ w }: { w: QueryTableWidget }) {
               </td>
             </tr>
           )}
-          {w.rows.map((row: Row, i) => {
+          {paged.slice.map((row: Row, i) => {
             const href = rowHref(w, row)
             return (
               <tr key={i} className={clsx('border-t', href && 'cursor-pointer hover:bg-hover')}>
@@ -275,6 +284,7 @@ function DeclaredTable({ w }: { w: QueryTableWidget }) {
           })}
         </tbody>
       </table>
+      <Pager page={paged.page} pages={paged.pages} setPage={paged.setPage} />
     </div>
   )
 }
@@ -345,6 +355,55 @@ function TruncatedNote({ w }: { w: QueryTableWidget }) {
   return (
     <div className="px-2 pt-1.5 text-xxs text-muted">
       {t('showing_of', { shown: String(w.rows.length), total: String(w.total) })}
+    </div>
+  )
+}
+
+/// Panel tables can carry hundreds of rows (a listing does), so they page in
+/// place rather than scrolling forever. `pp` sets the page size.
+function usePaged(rows: Row[], pp?: number | null) {
+  const size = Math.max(1, pp ?? 50)
+  const [page, setPage] = useState(0)
+  const pages = Math.max(1, Math.ceil(rows.length / size))
+  const current = Math.min(page, pages - 1)
+  return {
+    slice: rows.slice(current * size, current * size + size),
+    page: current,
+    pages,
+    setPage,
+  }
+}
+
+function Pager({
+  page,
+  pages,
+  setPage,
+}: {
+  page: number
+  pages: number
+  setPage: (n: number) => void
+}) {
+  const t = useT()
+  if (pages <= 1) return null
+  return (
+    <div className="flex items-center justify-end gap-2 px-2 pt-1.5 text-xxs text-muted">
+      <button
+        type="button"
+        className="rounded px-1.5 py-0.5 hover:bg-hover disabled:opacity-40"
+        onClick={() => setPage(page - 1)}
+        disabled={page === 0}
+      >
+        ‹
+      </button>
+      <span className="tabular-nums">{t('page_of', { page: String(page + 1), pages: String(pages) })}</span>
+      <button
+        type="button"
+        className="rounded px-1.5 py-0.5 hover:bg-hover disabled:opacity-40"
+        onClick={() => setPage(page + 1)}
+        disabled={page + 1 >= pages}
+      >
+        ›
+      </button>
     </div>
   )
 }
@@ -599,7 +658,7 @@ export default function Dashboard() {
   if (isLoading) return <LoadingGrid />
   return (
     <div className="space-y-4">
-      <VarBar />
+      <VarBar only={data?.variables} />
       {error ? (
         <div className="card p-4 text-[13px] text-critical">{String(error)}</div>
       ) : (
@@ -626,7 +685,7 @@ export function PageDashboard() {
   return (
     <div className="space-y-4">
       {data?.label && <h1 className="text-lg font-semibold text-ink">{data.label}</h1>}
-      <VarBar />
+      <VarBar only={data?.variables} />
       <DashboardView widgets={data?.widgets ?? []} columns={data?.columns ?? DEFAULT_COLS} />
     </div>
   )

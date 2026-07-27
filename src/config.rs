@@ -1224,8 +1224,13 @@ pub struct PanelConfig {
     pub filter: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort: Option<String>,
+    /// Rows per page inside the panel (default 50).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pp: Option<u32>,
+    /// How many rows the panel keeps at all — the payload it carries. Paging
+    /// happens within these, so raising it is what shows more of a big listing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub compare_sql: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

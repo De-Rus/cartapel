@@ -157,9 +157,10 @@ save you from repeating yourself or reach data that is not in the database.
 | `source` | An `http` source alias: cartapel fetches it server-side (the secret never reaches the browser) and renders the JSON array it returns. Pair with `path` for a sub-path and `rows_at` for a dotted path to the array inside the payload. |
 | `table` | A configured table slug: the panel renders **that screen's own list** — its columns, widgets, formats and permissions — instead of raw query rows. `sort` and `pp` tune it. |
 
-`pp` also raises the row cap on a `sql`, `query` or `source` table panel (50 by
-default, 2000 at most) — useful when a listing source has more rows than a
-dashboard tile would normally show.
+On a table panel, `max` is how many rows travel to the browser (50 by default,
+20000 at most) and `pp` is how many show at once — the panel pages through the
+rest in place. A listing with thousands of rows wants both: `max` high enough to
+carry them, `pp` small enough to read.
 
 ```hcl
 panel {
@@ -241,6 +242,7 @@ files and declare it as a database source instead.
 | `category` | all | Heading this panel groups under. |
 | `w` / `h` | all | Column / row span in the grid. |
 | `roles` | all | Restrict the panel to these roles. Omit → visible to all who can see the dashboard. |
+| `max` / `pp` | table | Rows carried, and rows per page inside the panel. |
 | `link` | table | Target table for row links. |
 | `url` | iframe | The embedded URL. |
 

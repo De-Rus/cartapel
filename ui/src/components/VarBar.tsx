@@ -13,10 +13,13 @@ export function useVarQuery(): string {
 
 const SEGMENT_MAX = 6
 
-export function VarBar() {
+/// `only` narrows the bar to the variables the current surface actually reads —
+/// a control that changes nothing on the page you are looking at is noise.
+export function VarBar({ only }: { only?: string[] }) {
   const meta = useMeta()
   const [sp, setSp] = useSearchParams()
-  const vars: VarDef[] = meta.variables ?? []
+  const all: VarDef[] = meta.variables ?? []
+  const vars = only ? all.filter((v) => only.includes(v.name)) : all
   if (vars.length === 0) return null
 
   const set = (name: string, value: string) =>

@@ -381,6 +381,8 @@ export interface QueryTableWidget extends WidgetSpan {
   cols?: TableColumn[] | null
   rows: Row[]
   pk?: string | null
+  /** Rows per page inside the panel. */
+  pp?: number | null
   /** Set when the panel shows only part of a larger result. */
   total?: number | null
   table?: undefined
@@ -408,6 +410,8 @@ export interface IframeWidget extends WidgetSpan {
 export type Widget = StatWidget | ChartWidget | TableWidget | IframeWidget
 
 export interface DashboardResponse {
+  /** Names of the variables this surface's panels actually read. */
+  variables?: string[]
   label?: string
   widgets: Widget[]
   columns?: number | null

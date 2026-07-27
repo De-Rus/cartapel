@@ -25,6 +25,34 @@ async fn read_only_rows_on(
     Ok(rows.into_iter().map(Value::Object).collect())
 }
 
+/// The variable names a set of panels actually reads. A control that changes
+/// nothing on the page you are looking at is worse than no control.
+fn referenced_vars(panels: &[crate::config::PanelConfig]) -> Vec<String> {
+    let mut out = std::collections::BTreeSet::new();
+    for w in panels {
+        let texts = w
+            .sql
+            .iter()
+            .chain(w.compare_sql.iter())
+            .chain(w.spark.iter())
+            .chain(w.filter.values())
+            .cloned()
+            .chain(w.query.clone())
+            .collect::<Vec<_>>();
+        for t in texts {
+            let mut rest = t.as_str();
+            while let Some(open) = rest.find("{{") {
+                let Some(close) = rest[open + 2..].find("}}") else {
+                    break;
+                };
+                out.insert(rest[open + 2..open + 2 + close].trim().to_string());
+                rest = &rest[open + 2 + close + 2..];
+            }
+        }
+    }
+    out.into_iter().collect()
+}
+
 /// Filter then fold a listing's rows. Both are no-ops unless the panel asks
 /// for them, so a plain `source` panel still renders the rows as they came.
 fn shape_rows(
@@ -228,9 +256,12 @@ pub async fn render_panel(
             if w.sql.is_none() && w.query.is_none() && w.source.is_none() {
                 return None;
             }
-            // A listing can be thousands of rows; `pp` lets a panel ask for
-            // more than the dashboard default without it being the default.
-            let cap = w.pp.map(|n| n as i64).unwrap_or(TABLE_CAP).clamp(1, 2000);
+            // `max` is how many rows travel; `pp` is how many show at once.
+            let cap = w
+                .max
+                .map(|n| n as i64)
+                .unwrap_or(TABLE_CAP)
+                .clamp(1, 20_000);
             match panel_rows(state, user, w, cap, env).await {
                 Ok(mut rows) => {
                     // Showing part of a listing must never read as the whole of
@@ -264,6 +295,7 @@ pub async fn render_panel(
                     json!({
                         "id": id, "type": "table", "label": w.label,
                         "link": w.link, "columns": columns, "cols": cols, "rows": rows, "pk": pk,
+                        "pp": w.pp,
                         "total": truncated.then_some(total),
                     })
                 }
@@ -314,9 +346,11 @@ pub async fn dashboard_handler(
     let env = crate::vars::resolve(&state, &user, &params).await?;
     let cfg = state.cfg();
     let widgets = render_panels(&state, &cfg.dashboard, &user, &env).await;
-    Ok(Json(
-        json!({ "widgets": widgets, "columns": cfg.dashboard.columns }),
-    ))
+    Ok(Json(json!({
+        "widgets": widgets,
+        "columns": cfg.dashboard.columns,
+        "variables": referenced_vars(&cfg.dashboard.widgets),
+    })))
 }
 
 pub async fn page_widgets_handler(
@@ -346,6 +380,7 @@ pub async fn page_widgets_handler(
     }
     Ok(Json(json!({
         "label": page.label, "widgets": widgets, "columns": page.columns,
+        "variables": referenced_vars(&page.widgets),
     })))
 }
 
