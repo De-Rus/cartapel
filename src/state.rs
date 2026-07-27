@@ -350,9 +350,7 @@ impl AppState {
             .map(|t| t.permissions.clone())
             .unwrap_or_default();
         let read_only_table = self
-            .db
-            .tables
-            .get(table)
+            .resolve_table(table)
             .map(|t| t.is_view || t.pk.is_none())
             .unwrap_or(true);
         let writable = caps.write && !read_only_table;
