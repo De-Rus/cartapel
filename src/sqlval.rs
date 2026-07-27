@@ -50,6 +50,16 @@ impl Binds {
     }
 }
 
+/// The left side of a pk IN-list: Postgres compares as text (pre-existing
+/// shape); MySQL compares the raw column so the index stays usable — its
+/// per-value coercion handles int and text pks alike.
+pub fn pk_in_lhs(dialect: crate::db::Dialect, pk_ident: &str) -> String {
+    match dialect {
+        crate::db::Dialect::Pg => format!("{pk_ident}::text"),
+        crate::db::Dialect::MySql => pk_ident.to_string(),
+    }
+}
+
 /// `expr` rendered as text in this dialect (Postgres `::text`, MySQL CAST).
 pub fn text_cast(dialect: crate::db::Dialect, expr: &str) -> String {
     match dialect {
@@ -85,8 +95,7 @@ pub fn value_expr(col: &DbColumn, value: &Value, binds: &mut Binds) -> Result<St
         if !col.nullable {
             return Err(AppError::bad(format!("{} is not nullable", col.name)));
         }
-        let n = binds.ph(None);
-        return Ok(format!("{n}::{}", cast_of(col)));
+        return Ok(binds.typed(None, &cast_of(col)));
     }
     match col.kind {
         Kind::Json => {
@@ -146,10 +155,21 @@ pub fn cast_of(col: &DbColumn) -> String {
     }
 }
 
-/// WHERE pk = <typed bind> from its URL string form.
-pub fn pk_predicate(pk_col: &DbColumn, pk: &str, binds: &mut Binds) -> String {
+/// WHERE pk = <typed bind> from its URL string form. Numeric pks are validated
+/// here: MySQL would otherwise coerce "1abc" to 1 with only a warning and the
+/// request would silently hit the wrong row.
+pub fn pk_predicate(pk_col: &DbColumn, pk: &str, binds: &mut Binds) -> Result<String, AppError> {
+    match pk_col.kind {
+        Kind::Int if pk.trim().parse::<i128>().is_err() => {
+            return Err(AppError::bad(format!("{pk:?} is not a valid id")));
+        }
+        Kind::Float if pk.trim().parse::<f64>().is_err() => {
+            return Err(AppError::bad(format!("{pk:?} is not a valid id")));
+        }
+        _ => {}
+    }
     let p = binds.typed(Some(pk.to_string()), &pk_col.udt);
-    format!("{} = {p}", ident(&pk_col.name))
+    Ok(format!("{} = {p}", ident(&pk_col.name)))
 }
 
 /// Post-process a materialized row: mask fields, shrink bytea to a size marker.

@@ -44,11 +44,21 @@ fn is_ident(s: &str) -> bool {
 /// Errors — loud, never a silent passthrough — on: an unknown variable name, a
 /// missing supplied value, an `Ident` value that is not `^[A-Za-z0-9_]+$`, or an
 /// `Int`/`Float` value that does not parse. An unterminated `{{` is left verbatim.
-pub fn interpolate(
+/// `{{var}}` substitution with dialect placeholders: bound values render as
+/// `$n` on Postgres and `?` on MySQL; `ident` variables inline (validated).
+pub fn interpolate_for(
     sql: &str,
     types: &BTreeMap<String, VarType>,
     supplied: &BTreeMap<String, String>,
+    dialect: crate::db::Dialect,
 ) -> Result<(String, Vec<BoundVal>), String> {
+    let ph = |out: &mut String, n: usize| match dialect {
+        crate::db::Dialect::Pg => {
+            out.push('$');
+            out.push_str(&n.to_string());
+        }
+        crate::db::Dialect::MySql => out.push('?'),
+    };
     let mut out = String::with_capacity(sql.len());
     let mut binds: Vec<BoundVal> = Vec::new();
     let bytes = sql.as_bytes();
@@ -79,8 +89,7 @@ pub fn interpolate(
                             .parse()
                             .map_err(|_| format!("variable {name}: {value:?} is not an integer"))?;
                         binds.push(BoundVal::Int(n));
-                        out.push('$');
-                        out.push_str(&binds.len().to_string());
+                        ph(&mut out, binds.len());
                     }
                     VarType::Float => {
                         let n: f64 = value
@@ -88,13 +97,11 @@ pub fn interpolate(
                             .parse()
                             .map_err(|_| format!("variable {name}: {value:?} is not a number"))?;
                         binds.push(BoundVal::Float(n));
-                        out.push('$');
-                        out.push_str(&binds.len().to_string());
+                        ph(&mut out, binds.len());
                     }
                     VarType::Text => {
                         binds.push(BoundVal::Text(value.clone()));
-                        out.push('$');
-                        out.push_str(&binds.len().to_string());
+                        ph(&mut out, binds.len());
                     }
                 }
                 i += 2 + close + 2;
@@ -148,10 +155,11 @@ mod tests {
 
     #[test]
     fn text_and_int_become_bound_params_in_order() {
-        let (sql, binds) = interpolate(
+        let (sql, binds) = interpolate_for(
             "SELECT * FROM t WHERE venue = {{venue}} AND days > {{days}}",
             &types(&[("venue", VarType::Text), ("days", VarType::Int)]),
             &supplied(&[("venue", "BINANCE"), ("days", "30")]),
+            crate::db::Dialect::Pg,
         )
         .unwrap();
         assert_eq!(sql, "SELECT * FROM t WHERE venue = $1 AND days > $2");
@@ -163,10 +171,11 @@ mod tests {
 
     #[test]
     fn injection_value_stays_a_bound_param() {
-        let (sql, binds) = interpolate(
+        let (sql, binds) = interpolate_for(
             "WHERE v = {{v}}",
             &types(&[("v", VarType::Text)]),
             &supplied(&[("v", "x'; DROP TABLE users;--")]),
+            crate::db::Dialect::Pg,
         )
         .unwrap();
         assert_eq!(sql, "WHERE v = $1");
@@ -178,19 +187,21 @@ mod tests {
 
     #[test]
     fn ident_is_inlined_only_when_safe() {
-        let (sql, binds) = interpolate(
+        let (sql, binds) = interpolate_for(
             "ORDER BY {{col}}",
             &types(&[("col", VarType::Ident)]),
             &supplied(&[("col", "created_at")]),
+            crate::db::Dialect::Pg,
         )
         .unwrap();
         assert_eq!(sql, "ORDER BY created_at");
         assert!(binds.is_empty());
 
-        let err = interpolate(
+        let err = interpolate_for(
             "ORDER BY {{col}}",
             &types(&[("col", VarType::Ident)]),
             &supplied(&[("col", "created_at; DROP TABLE t")]),
+            crate::db::Dialect::Pg,
         )
         .unwrap_err();
         assert!(err.contains("not a valid identifier"), "{err}");
@@ -198,16 +209,23 @@ mod tests {
 
     #[test]
     fn unknown_variable_is_a_loud_error() {
-        let err = interpolate("SELECT {{ghost}}", &types(&[]), &supplied(&[])).unwrap_err();
+        let err = interpolate_for(
+            "SELECT {{ghost}}",
+            &types(&[]),
+            &supplied(&[]),
+            crate::db::Dialect::Pg,
+        )
+        .unwrap_err();
         assert!(err.contains("unknown template variable"), "{err}");
     }
 
     #[test]
     fn non_numeric_int_value_rejected() {
-        let err = interpolate(
+        let err = interpolate_for(
             "x > {{n}}",
             &types(&[("n", VarType::Int)]),
             &supplied(&[("n", "not-a-number")]),
+            crate::db::Dialect::Pg,
         )
         .unwrap_err();
         assert!(err.contains("not an integer"), "{err}");
@@ -215,10 +233,11 @@ mod tests {
 
     #[test]
     fn repeated_var_binds_each_occurrence() {
-        let (sql, binds) = interpolate(
+        let (sql, binds) = interpolate_for(
             "a = {{v}} OR b = {{v}}",
             &types(&[("v", VarType::Int)]),
             &supplied(&[("v", "5")]),
+            crate::db::Dialect::Pg,
         )
         .unwrap();
         assert_eq!(sql, "a = $1 OR b = $2");
@@ -226,8 +245,27 @@ mod tests {
     }
 
     #[test]
+    fn mysql_placeholders_are_question_marks() {
+        let (sql, binds) = interpolate_for(
+            "a = {{v}} OR b = {{v}}",
+            &types(&[("v", VarType::Int)]),
+            &supplied(&[("v", "5")]),
+            crate::db::Dialect::MySql,
+        )
+        .unwrap();
+        assert_eq!(sql, "a = ? OR b = ?");
+        assert_eq!(binds, vec![BoundVal::Int(5), BoundVal::Int(5)]);
+    }
+
+    #[test]
     fn unterminated_braces_left_verbatim() {
-        let (sql, binds) = interpolate("SELECT {{ from t", &types(&[]), &supplied(&[])).unwrap();
+        let (sql, binds) = interpolate_for(
+            "SELECT {{ from t",
+            &types(&[]),
+            &supplied(&[]),
+            crate::db::Dialect::Pg,
+        )
+        .unwrap();
         assert_eq!(sql, "SELECT {{ from t");
         assert!(binds.is_empty());
     }

@@ -44,7 +44,7 @@ async fn resolve_path(
 
     let pool = state.pool_of(dbt);
     let mut binds = crate::sqlval::Binds::for_dialect(pool.dialect());
-    let mut where_sql = crate::sqlval::pk_predicate(pk_col, pk, &mut binds);
+    let mut where_sql = crate::sqlval::pk_predicate(pk_col, pk, &mut binds)?;
     if let Some(rf) = state.row_filter(user, table) {
         where_sql = format!("{where_sql} AND ({rf})");
     }

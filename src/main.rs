@@ -210,7 +210,9 @@ async fn connect_mysql(alias: &str, url: &str) -> crate::db::DbPool {
                 sqlx::query("SET time_zone = '+00:00'")
                     .execute(&mut *conn)
                     .await?;
-                sqlx::query("SET SESSION sql_mode = CONCAT(@@sql_mode, ',ANSI_QUOTES')")
+                sqlx::query(
+                    "SET SESSION sql_mode = CONCAT(@@sql_mode, ',ANSI_QUOTES,NO_BACKSLASH_ESCAPES')",
+                )
                     .execute(&mut *conn)
                     .await
                     .map(|_| ())

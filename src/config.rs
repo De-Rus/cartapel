@@ -1704,6 +1704,23 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
             }
         }
     }
+    for (name, var) in &cfg.variables {
+        if let Some(alias) = &var.source {
+            match cfg.sources.get(alias) {
+                None => {
+                    return Err(format!(
+                        "variable \"{name}\": source \"{alias}\" is not a defined source"
+                    ))
+                }
+                Some(s) if !s.is_postgres() && !s.is_mysql() => {
+                    return Err(format!(
+                        "variable \"{name}\": source \"{alias}\" is not a postgres or mysql source"
+                    ))
+                }
+                _ => {}
+            }
+        }
+    }
     validate_role_inheritance(&cfg.auth.roles)?;
     if let Some(pr) = &cfg.auth.public_role {
         let known = pr

@@ -466,7 +466,7 @@ async fn fetch_one(
         .ok_or_else(|| AppError::bad("table has no primary key"))?;
     let pool = state.pool_of(dbt);
     let mut binds = Binds::for_dialect(pool.dialect());
-    let mut where_sql = pk_predicate(pk_col, pk, &mut binds);
+    let mut where_sql = pk_predicate(pk_col, pk, &mut binds)?;
     if let Some(rf) = state.row_filter(user, key) {
         where_sql = format!("{where_sql} AND ({rf})");
     }
@@ -589,7 +589,7 @@ async fn attach_fk_labels(
     }
     let pool = state.pool_of(dbt);
     let mut binds = Binds::for_dialect(pool.dialect());
-    let where_sql = pk_predicate(pk_col, pk, &mut binds);
+    let where_sql = pk_predicate(pk_col, pk, &mut binds)?;
     let sql = format!(
         "SELECT {} FROM {} t WHERE {where_sql}",
         pairs.join(", "),
@@ -737,18 +737,18 @@ async fn apply_update(
     // RETURNING to_jsonb), and the lock-select must not evaluate computed
     // expressions (FOR UPDATE rejects window functions).
     let items = crate::meta::select_items_for(dbt, &Default::default(), dialect).join(", ");
-    let row_scope = |binds: &mut Binds| {
-        let mut w = pk_predicate(pk_col, pk, binds);
+    let row_scope = |binds: &mut Binds| -> Result<String, AppError> {
+        let mut w = pk_predicate(pk_col, pk, binds)?;
         if let Some(rf) = state.row_filter(user, table) {
             w = format!("{w} AND ({rf})");
         }
-        w
+        Ok(w)
     };
 
     let mut tx = pool.begin_tx().await?;
 
     let mut binds = Binds::for_dialect(dialect);
-    let where_sql = row_scope(&mut binds);
+    let where_sql = row_scope(&mut binds)?;
     let lock = if dbt.is_view { "" } else { " FOR UPDATE" };
     let sql = format!(
         "SELECT {items} FROM {} t WHERE {where_sql}{lock}",
@@ -784,7 +784,7 @@ async fn apply_update(
         let expr = value_expr(col, val, &mut binds)?;
         sets.push(format!("{} = {expr}", ident(col_name)));
     }
-    let mut where_sql = row_scope(&mut binds);
+    let mut where_sql = row_scope(&mut binds)?;
     if dbt.is_view {
         if let Some(g) = guard {
             if dialect != crate::db::Dialect::Pg {
@@ -814,7 +814,7 @@ async fn apply_update(
     }
 
     let mut binds = Binds::for_dialect(dialect);
-    let where_sql = pk_predicate(pk_col, pk, &mut binds);
+    let where_sql = pk_predicate(pk_col, pk, &mut binds)?;
     let sql = format!(
         "SELECT {items} FROM {} t WHERE {where_sql}",
         state.qualified_of(dbt)
@@ -955,7 +955,7 @@ pub async fn bulk_handler(
     }
     let mut where_sql = format!(
         "{} IN ({})",
-        crate::sqlval::text_cast(pool.dialect(), &ident(&pk_col.name)),
+        crate::sqlval::pk_in_lhs(pool.dialect(), &ident(&pk_col.name)),
         placeholders.join(", ")
     );
     if let Some(rf) = state.row_filter(&user, &table) {
@@ -1032,21 +1032,25 @@ pub async fn create_handler(
             );
             let mut tx = pool.begin_tx().await?;
             let res = tx.execute(&sql, &binds).await?;
-            let pk_val = changes
-                .iter()
-                .find(|(c, _)| c == &pk_col.name)
-                .map(|(_, v)| match v {
-                    Value::String(s) => s.clone(),
-                    other => other.to_string(),
-                })
+            // last_insert_id wins when the server generated one — a submitted
+            // "0"/"" on an auto-increment column is a generation request, and
+            // MySQL reports 0 when the client supplied the value itself.
+            let pk_val = res
+                .last_insert_id
+                .filter(|id| *id > 0)
+                .map(|id| id.to_string())
                 .or_else(|| {
-                    res.last_insert_id
-                        .filter(|id| *id > 0)
-                        .map(|id| id.to_string())
+                    changes
+                        .iter()
+                        .find(|(c, _)| c == &pk_col.name)
+                        .map(|(_, v)| match v {
+                            Value::String(s) => s.clone(),
+                            other => other.to_string(),
+                        })
                 })
                 .ok_or_else(|| AppError::bad("could not determine the new row's primary key"))?;
             let mut binds = Binds::for_dialect(dialect);
-            let where_sql = pk_predicate(pk_col, &pk_val, &mut binds);
+            let where_sql = pk_predicate(pk_col, &pk_val, &mut binds)?;
             let sql = format!(
                 "SELECT {items} FROM {} t WHERE {where_sql}",
                 state.qualified_of(dbt)
@@ -1097,12 +1101,14 @@ pub async fn delete_handler(
     let pk_col = dbt.pk.as_ref().and_then(|p| dbt.column(p)).unwrap();
     let pool = state.pool_of(dbt);
     let mut binds = Binds::for_dialect(pool.dialect());
-    let mut where_sql = pk_predicate(pk_col, &pk, &mut binds);
+    let mut where_sql = pk_predicate(pk_col, &pk, &mut binds)?;
     if let Some(rf) = state.row_filter(&user, &table) {
         where_sql = format!("{where_sql} AND ({rf})");
     }
     let sql = format!("DELETE FROM {} WHERE {where_sql}", state.qualified_of(dbt));
-    crate::db::execute(pool, &sql, &binds).await?;
+    if crate::db::execute(pool, &sql, &binds).await?.rows_affected == 0 {
+        return Err(sqlx::Error::RowNotFound.into());
+    }
     state.store.audit(
         &user.email,
         &table,
@@ -1302,6 +1308,14 @@ fn build_import_row(
                 // silently widen the user's write surface.
                 if state.row_filter(user, table).is_some() {
                     return Err("upsert is not available on MySQL tables with a row filter".into());
+                }
+                // …and it fires on ANY unique key, so with a second unique key
+                // an import row could silently rewrite an unrelated row.
+                if dbt.extra_unique {
+                    return Err(
+                        "upsert is not available on MySQL tables with unique keys besides the primary key"
+                            .into(),
+                    );
                 }
                 let assigns: Vec<String> = nonpk
                     .iter()
@@ -1794,6 +1808,7 @@ mod tests {
                 schema: "public".into(),
                 source: String::new(),
                 is_view: false,
+                extra_unique: false,
                 pk: Some("id".into()),
                 columns: vec![col("id", "int8", Kind::Int), tcol("owner_email")],
             },
@@ -1805,6 +1820,7 @@ mod tests {
                 schema: "public".into(),
                 source: String::new(),
                 is_view: false,
+                extra_unique: false,
                 pk: Some("id".into()),
                 columns: vec![
                     col("id", "int8", Kind::Int),
@@ -1821,6 +1837,7 @@ mod tests {
                 schema: "public".into(),
                 source: String::new(),
                 is_view: false,
+                extra_unique: false,
                 pk: Some("symbol".into()),
                 columns: vec![tcol("symbol")],
             },
@@ -1910,6 +1927,7 @@ mod tests {
             schema: "public".into(),
             source: String::new(),
             is_view: false,
+            extra_unique: false,
             pk: Some("id".into()),
             columns: vec![
                 col("id", "int8", Kind::Int),

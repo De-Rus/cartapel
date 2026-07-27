@@ -87,18 +87,18 @@ pub fn my_row_to_json(row: &sqlx::mysql::MySqlRow) -> Result<Map<String, Value>,
 fn my_value(row: &sqlx::mysql::MySqlRow, i: usize, ty: &str) -> Result<Value, sqlx::Error> {
     let v = match ty {
         "BOOLEAN" | "BOOL" => row.try_get::<Option<bool>, _>(i)?.map(Value::from),
-        "TINYINT" | "SMALLINT" | "MEDIUMINT" | "INT" | "BIGINT" | "YEAR" => {
+        "TINYINT" | "SMALLINT" | "MEDIUMINT" | "INT" | "BIGINT" => {
             row.try_get::<Option<i64>, _>(i)?.map(Value::from)
         }
         "TINYINT UNSIGNED" | "SMALLINT UNSIGNED" | "MEDIUMINT UNSIGNED" | "INT UNSIGNED"
-        | "BIGINT UNSIGNED" | "BIT" => row.try_get::<Option<u64>, _>(i)?.map(Value::from),
+        | "BIGINT UNSIGNED" | "BIT" | "YEAR" => row.try_get::<Option<u64>, _>(i)?.map(Value::from),
         "FLOAT" | "DOUBLE" => row.try_get::<Option<f64>, _>(i)?.map(json_float),
-        "DECIMAL" => row
-            .try_get::<Option<rust_decimal::Decimal>, _>(i)?
-            .map(|d| match d.to_string().parse::<Number>() {
+        "DECIMAL" => row.try_get::<Option<BigDecimal>, _>(i)?.map(|d| {
+            match d.to_string().parse::<Number>() {
                 Ok(n) => Value::Number(n),
                 Err(_) => Value::String(d.to_string()),
-            }),
+            }
+        }),
         "DATETIME" | "TIMESTAMP" => row
             .try_get::<Option<NaiveDateTime>, _>(i)?
             .map(|dt| Value::String(fmt_pg_ts(dt))),
@@ -106,21 +106,24 @@ fn my_value(row: &sqlx::mysql::MySqlRow, i: usize, ty: &str) -> Result<Value, sq
             .try_get::<Option<NaiveDate>, _>(i)?
             .map(|d| Value::String(d.format("%Y-%m-%d").to_string())),
         "TIME" => row
-            .try_get::<Option<String>, _>(i)
-            .or_else(|_| {
-                row.try_get::<Option<Vec<u8>>, _>(i)
-                    .map(|b| b.map(|b| String::from_utf8_lossy(&b).into_owned()))
-            })?
-            .map(Value::String),
+            .try_get::<Option<sqlx::mysql::types::MySqlTime>, _>(i)?
+            .map(|t| Value::String(fmt_mysql_time(&t))),
         "JSON" => row.try_get::<Option<Value>, _>(i)?,
-        "BLOB" | "TINYBLOB" | "MEDIUMBLOB" | "LONGBLOB" | "BINARY" | "VARBINARY" => {
-            match row.try_get::<Option<Value>, _>(i) {
-                Ok(v) => v,
-                Err(_) => row
-                    .try_get::<Option<Vec<u8>>, _>(i)?
-                    .map(|b| Value::String(format!("\\x{}", hex::encode(b)))),
-            }
-        }
+        // Text with a *_bin collation and MariaDB json both arrive wearing the
+        // BINARY wire flag. Valid UTF-8 renders as text — parsed as JSON only
+        // when it is shaped like a document; real bytes fall back to hex.
+        "BLOB" | "TINYBLOB" | "MEDIUMBLOB" | "LONGBLOB" | "BINARY" | "VARBINARY" => row
+            .try_get::<Option<Vec<u8>>, _>(i)?
+            .map(|b| match String::from_utf8(b) {
+                Ok(s) => {
+                    let doc = matches!(s.trim_start().as_bytes().first(), Some(b'{' | b'['));
+                    match doc.then(|| serde_json::from_str::<Value>(&s)) {
+                        Some(Ok(v)) => v,
+                        _ => Value::String(s),
+                    }
+                }
+                Err(e) => Value::String(format!("\\x{}", hex::encode(e.into_bytes()))),
+            }),
         _ => match row.try_get::<Option<String>, _>(i) {
             Ok(s) => s.map(Value::String),
             Err(e) => {
@@ -294,23 +297,43 @@ pub async fn read_only_json_rows(
             rows.iter().map(pg_row_to_json).collect()
         }
         DbPool::MySql(my, flavor) => {
-            let mut conn = my.acquire().await?;
-            sqlx::Executor::execute(&mut *conn, "START TRANSACTION READ ONLY").await?;
-            let timed = match flavor {
-                MyFlavor::MySql => mysql_timeout_hint(sql, timeout_ms),
-                MyFlavor::MariaDb => format!(
-                    "SET STATEMENT max_statement_time={} FOR {sql}",
-                    timeout_ms as f64 / 1000.0
-                ),
-            };
-            let mut q = sqlx::query(&timed);
-            for v in &binds.values {
-                q = q.bind(v.as_deref());
-            }
-            let res = q.fetch_all(&mut *conn).await;
-            let _ = sqlx::Executor::execute(&mut *conn, "ROLLBACK").await;
-            res?.iter().map(my_row_to_json).collect()
+            let timed = my_timeout_sql(*flavor, sql, timeout_ms);
+            let my = my.clone();
+            let values = binds.values.clone();
+            shielded(async move {
+                let mut conn = my.acquire().await?;
+                sqlx::Executor::execute(&mut *conn, "START TRANSACTION READ ONLY").await?;
+                let mut q = sqlx::query(&timed);
+                for v in &values {
+                    q = q.bind(v.as_deref());
+                }
+                let res = q.fetch_all(&mut *conn).await;
+                let _ = sqlx::Executor::execute(&mut *conn, "ROLLBACK").await;
+                res?.iter().map(my_row_to_json).collect()
+            })
+            .await
         }
+    }
+}
+
+/// Runs MySQL raw-transaction work on its own task: if the request future is
+/// dropped mid-query, the ROLLBACK still executes before the connection goes
+/// back to the pool (sqlx only rolls back on Drop for its own `Transaction`).
+async fn shielded<T: Send + 'static>(
+    work: impl std::future::Future<Output = Result<T, sqlx::Error>> + Send + 'static,
+) -> Result<T, sqlx::Error> {
+    tokio::spawn(work)
+        .await
+        .map_err(|e| sqlx::Error::Protocol(format!("query task failed: {e}")))?
+}
+
+fn my_timeout_sql(flavor: MyFlavor, sql: &str, timeout_ms: u32) -> String {
+    match flavor {
+        MyFlavor::MySql => mysql_timeout_hint(sql, timeout_ms),
+        MyFlavor::MariaDb => format!(
+            "SET STATEMENT max_statement_time={} FOR {sql}",
+            timeout_ms as f64 / 1000.0
+        ),
     }
 }
 
@@ -363,6 +386,7 @@ pub async fn config_query_rows(
 ) -> Result<Vec<Map<String, Value>>, sqlx::Error> {
     match pool {
         DbPool::Pg(pg) => {
+            let sql = sql.trim().trim_end_matches(';');
             let wrapped = format!("SELECT row_to_json(sub.*) AS r FROM ({sql}) sub LIMIT {cap}");
             let mut tx = pg.begin().await?;
             sqlx::query("SET TRANSACTION READ ONLY")
@@ -384,27 +408,32 @@ pub async fn config_query_rows(
                 .collect())
         }
         DbPool::MySql(my, flavor) => {
-            let wrapped = format!("SELECT sub.* FROM ({sql}) sub LIMIT {cap}");
-            let mut conn = my.acquire().await?;
-            sqlx::Executor::execute(&mut *conn, "START TRANSACTION READ ONLY").await?;
-            let timed = match flavor {
-                MyFlavor::MySql => mysql_timeout_hint(&wrapped, timeout_ms),
-                MyFlavor::MariaDb => format!(
-                    "SET STATEMENT max_statement_time={} FOR {wrapped}",
-                    timeout_ms as f64 / 1000.0
-                ),
-            };
-            let mut q = sqlx::query(&timed);
-            for b in binds {
-                q = match b {
-                    crate::interp::BoundVal::Text(s) => q.bind(s.as_str()),
-                    crate::interp::BoundVal::Int(n) => q.bind(*n),
-                    crate::interp::BoundVal::Float(f) => q.bind(*f),
-                };
-            }
-            let res = q.fetch_all(&mut *conn).await;
-            let _ = sqlx::Executor::execute(&mut *conn, "ROLLBACK").await;
-            res?.iter().map(my_row_to_json).collect()
+            // No derived-table wrap: MariaDB drops a subquery's ORDER BY, so
+            // the SQL runs as written and the row cap applies after the fetch
+            // (the read-only tx + statement timeout still fence it).
+            let timed = my_timeout_sql(*flavor, sql.trim().trim_end_matches(';'), timeout_ms);
+            let my = my.clone();
+            let binds = binds.to_vec();
+            let mut rows = shielded(async move {
+                let mut conn = my.acquire().await?;
+                sqlx::Executor::execute(&mut *conn, "START TRANSACTION READ ONLY").await?;
+                let mut q = sqlx::query(&timed);
+                for b in &binds {
+                    q = match b {
+                        crate::interp::BoundVal::Text(s) => q.bind(s.clone()),
+                        crate::interp::BoundVal::Int(n) => q.bind(*n),
+                        crate::interp::BoundVal::Float(f) => q.bind(*f),
+                    };
+                }
+                let res = q.fetch_all(&mut *conn).await;
+                let _ = sqlx::Executor::execute(&mut *conn, "ROLLBACK").await;
+                res?.iter()
+                    .map(my_row_to_json)
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .await?;
+            rows.truncate(cap.max(0) as usize);
+            Ok(rows)
         }
     }
 }
@@ -526,6 +555,22 @@ fn json_numeric(d: BigDecimal) -> Value {
         .unwrap_or(Value::Null)
 }
 
+/// MySQL TIME is a signed duration up to ±838:59:59 — chrono can't hold it.
+/// (`MySqlTime::is_negative` is broken in sqlx 0.8.6 — read the sign enum.)
+fn fmt_mysql_time(t: &sqlx::mysql::types::MySqlTime) -> String {
+    let sign = match t.sign() {
+        sqlx::mysql::types::MySqlTimeSign::Negative => "-",
+        sqlx::mysql::types::MySqlTimeSign::Positive => "",
+    };
+    format!(
+        "{sign}{:02}:{:02}:{:02}{}",
+        t.hours(),
+        t.minutes(),
+        t.seconds(),
+        fmt_frac(t.microseconds())
+    )
+}
+
 fn fmt_frac(micros: u32) -> String {
     if micros == 0 {
         return String::new();
@@ -585,6 +630,62 @@ mod tests {
         assert_eq!(json_float(f64::INFINITY), Value::Null);
         assert_eq!(json_float(2.0), serde_json::json!(2));
         assert_eq!(json_float(2.5), serde_json::json!(2.5));
+    }
+
+    /// Legacy-type decode pins from the read-side adversarial review: TIME and
+    /// YEAR must not 500 the table, DECIMAL survives past 28 digits, *_bin text
+    /// stays text, MariaDB-style json-in-BLOB still parses, and config SQL
+    /// keeps its ORDER BY. Needs CARTAPEL_TEST_MYSQL; skipped otherwise.
+    #[tokio::test]
+    async fn mysql_decoder_covers_legacy_types() {
+        let Ok(url) = std::env::var("CARTAPEL_TEST_MYSQL") else {
+            eprintln!("CARTAPEL_TEST_MYSQL not set — mysql decode test skipped");
+            return;
+        };
+        let my = sqlx::MySqlPool::connect(&url).await.unwrap();
+        for stmt in [
+            "DROP TABLE IF EXISTS decode_kinds",
+            "CREATE TABLE decode_kinds (
+                id int auto_increment primary key,
+                t time, y year, d40 decimal(40,10),
+                bt varchar(30) COLLATE utf8mb4_bin, js json)",
+            r#"INSERT INTO decode_kinds (t, y, d40, bt, js) VALUES
+               ('-10:30:05', 2024, 123456789012345678901234567890.5,
+                'hello', '{"a": [1, 2]}'),
+               (NULL, NULL, NULL, NULL, NULL)"#,
+        ] {
+            sqlx::query(stmt).execute(&my).await.unwrap();
+        }
+        let pool = DbPool::MySql(my, MyFlavor::MySql);
+        let binds = crate::sqlval::Binds::for_dialect(Dialect::MySql);
+        let rows = fetch_json_rows(&pool, "SELECT * FROM decode_kinds ORDER BY id", &binds)
+            .await
+            .unwrap();
+        let r = &rows[0];
+        assert_eq!(r.get("t"), Some(&Value::String("-10:30:05".into())));
+        assert_eq!(r.get("y"), Some(&serde_json::json!(2024)));
+        assert_eq!(
+            r.get("d40").and_then(Value::as_f64).map(|f| f.round()),
+            Some(123456789012345678901234567890.5f64.round())
+        );
+        assert_eq!(r.get("bt"), Some(&Value::String("hello".into())));
+        assert_eq!(r.get("js"), Some(&serde_json::json!({"a": [1, 2]})));
+        assert!(rows[1].values().skip(1).all(Value::is_null));
+
+        let ordered = config_query_rows(
+            &pool,
+            "SELECT id FROM decode_kinds ORDER BY id DESC;",
+            &[],
+            10,
+            4000,
+        )
+        .await
+        .unwrap();
+        let ids: Vec<i64> = ordered
+            .iter()
+            .filter_map(|m| m.get("id").and_then(Value::as_i64))
+            .collect();
+        assert_eq!(ids, vec![2, 1], "config SQL must keep its ORDER BY");
     }
 
     /// The Phase-1 gate: for a fixture spanning every Kind (plus enum, interval,

@@ -36,6 +36,10 @@ pub struct DbTable {
     pub source: String,
     pub is_view: bool,
     pub pk: Option<String>,
+    /// The table has a unique key beyond the primary key. MySQL's upsert fires
+    /// on ANY unique key — an import row could silently rewrite an unrelated
+    /// row — so upserts are refused there when this is set.
+    pub extra_unique: bool,
     pub columns: Vec<DbColumn>,
 }
 
@@ -210,6 +214,7 @@ pub async fn introspect(pool: &PgPool, schemas: &[String]) -> Result<Schema, sql
             schema: sch.clone(),
             source: String::new(),
             is_view,
+            extra_unique: false,
             pk: single_pk
                 .get(&(sch.clone(), table.clone()))
                 .cloned()
@@ -234,15 +239,8 @@ pub async fn introspect(pool: &PgPool, schemas: &[String]) -> Result<Schema, sql
 pub fn kind_of_mysql(data_type: &str, column_type: &str) -> Kind {
     match data_type {
         "tinyint" if column_type.starts_with("tinyint(1)") => Kind::Bool,
-        "tinyint" | "smallint" | "mediumint" | "int" | "bigint" | "year" => Kind::Int,
+        "tinyint" | "smallint" | "mediumint" | "int" | "bigint" | "year" | "bit" => Kind::Int,
         "decimal" | "float" | "double" => Kind::Float,
-        "bit" => {
-            if column_type == "bit(1)" {
-                Kind::Bool
-            } else {
-                Kind::Int
-            }
-        }
         "date" => Kind::Date,
         "datetime" | "timestamp" => Kind::Datetime,
         "json" => Kind::Json,
@@ -286,13 +284,41 @@ pub async fn introspect_mysql(pool: &sqlx::MySqlPool) -> Result<Schema, sqlx::Er
         .fetch_one(pool)
         .await?;
 
+    let extra_uniques: std::collections::BTreeSet<String> = sqlx::query(
+        r#"SELECT DISTINCT CAST(TABLE_NAME AS CHAR) AS table_name
+           FROM information_schema.STATISTICS
+           WHERE TABLE_SCHEMA = DATABASE() AND NON_UNIQUE = 0 AND INDEX_NAME <> 'PRIMARY'"#,
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|r| r.get("table_name"))
+    .collect();
+
+    for r in sqlx::query(
+        r#"SELECT CAST(TABLE_NAME AS CHAR) AS t, CAST(ENGINE AS CHAR) AS e
+           FROM information_schema.TABLES
+           WHERE TABLE_SCHEMA = DATABASE() AND ENGINE IS NOT NULL AND ENGINE <> 'InnoDB'"#,
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default()
+    {
+        tracing::warn!(
+            "table {} uses engine {} — no transactions, edits lose their atomicity guard",
+            r.get::<String, _>("t"),
+            r.get::<String, _>("e")
+        );
+    }
+
     // MariaDB stores `json` as longtext + an auto-named CHECK (json_valid(col));
     // the constraint name is the column name. Empty on MySQL (native json type).
     let json_checks: std::collections::BTreeSet<(String, String)> = sqlx::query(
         r#"SELECT CAST(TABLE_NAME AS CHAR) AS table_name,
                   CAST(CONSTRAINT_NAME AS CHAR) AS column_name
            FROM information_schema.CHECK_CONSTRAINTS
-           WHERE CONSTRAINT_SCHEMA = DATABASE() AND CHECK_CLAUSE LIKE '%json_valid%'"#,
+           WHERE CONSTRAINT_SCHEMA = DATABASE() AND LEVEL = 'Column'
+             AND CHECK_CLAUSE LIKE '%json_valid%'"#,
     )
     .fetch_all(pool)
     .await
@@ -330,6 +356,7 @@ pub async fn introspect_mysql(pool: &sqlx::MySqlPool) -> Result<Schema, sqlx::Er
             source: String::new(),
             is_view,
             pk: None,
+            extra_unique: extra_uniques.contains(&table),
             columns: Vec::new(),
         });
         if is_pk && pk_count.get(&table) == Some(&1) {
@@ -366,6 +393,7 @@ mod tests {
             source: String::new(),
             is_view: false,
             pk: None,
+            extra_unique: false,
             columns: vec![],
         }
     }
@@ -376,7 +404,7 @@ mod tests {
         assert_eq!(kind_of_mysql("tinyint", "tinyint(4)"), Kind::Int);
         assert_eq!(kind_of_mysql("bigint", "bigint(20) unsigned"), Kind::Int);
         assert_eq!(kind_of_mysql("decimal", "decimal(10,2)"), Kind::Float);
-        assert_eq!(kind_of_mysql("bit", "bit(1)"), Kind::Bool);
+        assert_eq!(kind_of_mysql("bit", "bit(1)"), Kind::Int);
         assert_eq!(kind_of_mysql("bit", "bit(8)"), Kind::Int);
         assert_eq!(kind_of_mysql("datetime", "datetime"), Kind::Datetime);
         assert_eq!(kind_of_mysql("json", "json"), Kind::Json);

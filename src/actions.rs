@@ -177,7 +177,7 @@ async fn run_bulk(
     }
     let mut where_sql = format!(
         "{} IN ({})",
-        crate::sqlval::text_cast(binds.dialect(), &ident(pk_name)),
+        crate::sqlval::pk_in_lhs(binds.dialect(), &ident(pk_name)),
         placeholders.join(", ")
     );
     if let Some(rf) = state.row_filter(user, table) {

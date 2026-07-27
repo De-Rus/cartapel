@@ -106,17 +106,12 @@ pub async fn named_query(
     };
 
     let env = crate::vars::resolve(&state, &user, &params).await?;
+    let pool = state.pool_for(source.as_deref());
     let (sql, binds) =
-        crate::interp::interpolate(&sql, &env.types, &env.values).map_err(AppError::bad)?;
+        crate::interp::interpolate_for(&sql, &env.types, &env.values, pool.dialect())
+            .map_err(AppError::bad)?;
 
-    let rows = crate::db::config_query_rows(
-        state.pool_for(source.as_deref()),
-        &sql,
-        &binds,
-        QUERY_CAP,
-        8000,
-    )
-    .await?;
+    let rows = crate::db::config_query_rows(pool, &sql, &binds, QUERY_CAP, 8000).await?;
     let rows: Vec<Value> = rows.into_iter().map(Value::Object).collect();
     Ok(Json(json!({ "rows": rows })))
 }

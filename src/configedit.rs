@@ -1088,6 +1088,7 @@ pub(crate) mod test_support {
                     schema: "public".into(),
                     source: String::new(),
                     is_view: false,
+                    extra_unique: false,
                     pk: Some("id".into()),
                     columns: vec![DbColumn {
                         name: "id".into(),

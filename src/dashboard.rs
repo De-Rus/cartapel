@@ -15,7 +15,8 @@ async fn read_only_rows(
     cap: i64,
     env: &crate::vars::Resolved,
 ) -> Result<Vec<Value>, String> {
-    let (sql, binds) = crate::interp::interpolate(sql, &env.types, &env.values)?;
+    let (sql, binds) =
+        crate::interp::interpolate_for(sql, &env.types, &env.values, state.pg.dialect())?;
     let rows = crate::db::config_query_rows(&state.pg, &sql, &binds, cap, 5000)
         .await
         .map_err(|e| e.to_string())?;
