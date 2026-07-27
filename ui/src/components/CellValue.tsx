@@ -55,11 +55,41 @@ function Empty() {
   return <span className="text-muted">—</span>
 }
 
-export function Badge({ value, colors }: { value: string; colors: Record<string, string> }) {
-  const c = BADGE_VARS[colors[value] ?? 'gray'] ?? BADGE_VARS.gray
+/// `show` picks what rides next to the bar: the raw value (a count against a
+/// ceiling reads as "3", not "0%"), the percentage, both, or nothing.
+function progressLabel(
+  n: number,
+  max: number,
+  pct: number,
+  params: Record<string, unknown>,
+): string {
+  switch (params.show) {
+    case 'none':
+      return ''
+    case 'value':
+      return fmtNumber(n)
+    case 'ratio':
+      return `${fmtNumber(n)} / ${fmtNumber(max)}`
+    default:
+      return `${Math.round(pct)}%`
+  }
+}
+
+export function Badge({
+  value,
+  colors,
+  labels,
+  fallback,
+}: {
+  value: string
+  colors: Record<string, string>
+  labels?: Record<string, string>
+  fallback?: string
+}) {
+  const c = BADGE_VARS[colors[value] ?? fallback ?? 'gray'] ?? BADGE_VARS.gray
   return (
     <span className="badge" style={{ '--badge-c': c } as React.CSSProperties}>
-      {value}
+      {labels?.[value] ?? value}
     </span>
   )
 }
@@ -199,7 +229,14 @@ export function CellValue({
         )
       case 'badge':
       case 'pill':
-        return <Badge value={String(value)} colors={params.colors ?? {}} />
+        return (
+          <Badge
+            value={String(value)}
+            colors={params.colors ?? {}}
+            labels={params.labels as Record<string, string> | undefined}
+            fallback={params.fallback as string | undefined}
+          />
+        )
       case 'tags': {
         const items = Array.isArray(value)
           ? value
@@ -278,7 +315,7 @@ export function CellValue({
                 style={{ width: `${Math.round(pct)}%`, background: bar }}
               />
             </span>
-            <span className="tabular-nums text-xxs text-muted">{Math.round(pct)}%</span>
+            <span className="tabular-nums text-xxs text-muted">{progressLabel(n, max, pct, params)}</span>
           </span>
         )
       }

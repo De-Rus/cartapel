@@ -222,7 +222,7 @@ Set `widget = "<name>"`. Widgets that take parameters read them from the field's
 | `percent` | Percentage (negatives tinted in lists). | — |
 | `duration` | Human duration from a seconds value. | — |
 | `bytes` | Human byte size. | — |
-| `progress` | A horizontal progress bar + percent. | `max` (default 100), `warn_at`, `color` |
+| `progress` | A horizontal bar with the number beside it. | `max` (default 100), `warn_at`, `color`, `show` (`percent` default, `value`, `ratio`, `none`) |
 | `rating` | A row of icons (e.g. stars). | `max` (default 5), `icon` (default `★`) |
 | `trend` | Signed value with ▲/▼ arrow, colored by sign. | — |
 | `heatcell` | A cell tinted by magnitude within a range. | `min` (default 0), `max` (default 100) |
@@ -232,8 +232,8 @@ Set `widget = "<name>"`. Widgets that take parameters read them from the field's
 | Widget | Renders | Notable `params` |
 | --- | --- | --- |
 | `toggle` | A check / dash for truthy / falsy. | — |
-| `badge` | A colored badge from a value → color map. | `colors` |
-| `pill` | Same as `badge` (pill styling). | `colors` |
+| `badge` | A colored badge from a value → color map. | `colors`, `labels` (value → printed text), `fallback` (color when no key matches) |
+| `pill` | Same as `badge` (pill styling). | `colors`, `labels`, `fallback` |
 | `tags` | Splits a list/CSV value into multiple badges. | `colors` |
 
 The `colors` param maps values to one of `blue`, `green`, `orange`, `red`,

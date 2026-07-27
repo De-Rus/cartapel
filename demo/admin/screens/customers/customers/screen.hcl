@@ -17,12 +17,18 @@ field "mrr" {
 }
 
 field "plan" {
-  widget = "custom:statuspill"
+  widget = "badge"
   params = {
-    map = {
+    colors = {
       free       = "gray"
       pro        = "blue"
       enterprise = "green"
     }
+    labels = {
+      free       = "Free"
+      pro        = "Pro"
+      enterprise = "Enterprise"
+    }
+    fallback = "gray"
   }
 }
