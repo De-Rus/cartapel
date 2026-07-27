@@ -1,23 +1,25 @@
 ---
-description: "An honest comparison of Postgres admin panels: cartapel vs Django admin, Retool, Metabase, NocoDB, Baserow, Directus and pgAdmin — who each tool is actually for, and where cartapel is not the right choice."
+description: "An honest comparison of database admin panels: cartapel vs Django admin, Retool, Metabase, NocoDB, Baserow, Directus and pgAdmin — who each tool is actually for, and where cartapel is not the right choice."
 ---
 
 # cartapel vs the alternatives
 
-There are many good ways to put an admin UI in front of a Postgres database.
-This page tries to be the comparison a fair-minded engineer would trust: what
-cartapel does well, what each alternative does *better*, and when you should
-pick them instead.
+There are many good ways to put an admin UI in front of a database. This page
+tries to be the comparison a fair-minded engineer would trust: what cartapel
+does well, what each alternative does *better*, and when you should pick them
+instead.
 
 cartapel's shape, in one line: a single self-hosted Rust binary that
-introspects an existing Postgres database and serves a CRUD panel — roles with
-inheritance, an audit log with revert, SQL dashboards, custom pages — all
-configured as HCL files you review in pull requests. MIT licensed, free.
+introspects an existing Postgres, MySQL or MariaDB database and serves a CRUD
+panel — roles with inheritance, an audit log with revert, SQL dashboards,
+custom pages — all configured as HCL files you review in pull requests. MIT
+licensed, free.
 
 ## At a glance
 
 | | cartapel | Django admin | Retool | Metabase | NocoDB / Baserow | Directus | pgAdmin |
 |---|---|---|---|---|---|---|---|
+| Databases | ✅ Postgres, MySQL, MariaDB (+ ClickHouse read-only) | ⚠️ whatever Django supports, via models | ✅ many sources | ✅ many sources | ⚠️ Postgres/MySQL + its own tables | ✅ several SQL databases | ❌ Postgres only |
 | Self-hosted single binary | ✅ one Rust binary | ❌ part of a Python app | ❌ multi-container self-host, or SaaS | ❌ JVM app | ❌ Node/Python services | ❌ Node app | ❌ Python app |
 | Works on an *existing* db without owning the schema | ✅ introspects live schema | ⚠️ via ORM models you must generate and keep in sync | ✅ queries any source | ✅ (read-oriented) | ⚠️ NocoDB yes; Baserow prefers its own tables | ✅ introspects | ✅ raw access |
 | Config as code, reviewable in PRs | ✅ HCL in git | ✅ Python in git | ⚠️ GUI-first; git sync on paid tiers | ⚠️ GUI-first; serialization is a paid feature | ❌ GUI-configured | ⚠️ config lives in the db; snapshot export | ❌ n/a |
@@ -127,8 +129,9 @@ everyone else uses the other.
 To keep this page honest, the reverse list:
 
 - **You are already on Django with real models** — use Django admin.
-- **You need apps over many data sources, not a panel over one database** — use
-  Retool (or Appsmith/Budibase in open source).
+- **You need apps over many data sources, not a panel over your databases** —
+  use Retool (or Appsmith/Budibase in open source). cartapel mixes several SQL
+  databases in one panel, but it is not an app builder over APIs and SaaS.
 - **The job is analytics and self-serve exploration** — use Metabase.
 - **Non-technical users should own the data in a spreadsheet-like UI** — use
   NocoDB or Baserow.
@@ -136,8 +139,8 @@ To keep this page honest, the reverse list:
   use Directus.
 - **You are administering the database server itself** — use pgAdmin.
 
-What cartapel is for: a team with an existing production Postgres that wants a
-safe, audited, role-scoped operations panel — deployed as one binary, with the
+What cartapel is for: a team with an existing production database — Postgres,
+MySQL or MariaDB — that wants a safe, audited, role-scoped operations panel — deployed as one binary, with the
 whole configuration reviewable in a pull request. If that is the shape of your
 problem, [get started](/getting-started) or click around the
 [live demo](https://demo.cartapel.com).

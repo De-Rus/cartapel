@@ -45,7 +45,7 @@ const faq = [
     <link rel="canonical" href="https://cartapel.com/" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="cartapel — an admin panel for your existing database" />
-    <meta property="og:description" content="One Rust binary, config as code. Introspected CRUD, roles, audit log and SQL dashboards for Postgres, MySQL and MariaDB." />
+    <meta property="og:description" content="One Rust binary, config as code. Introspected CRUD, roles, audit log and SQL dashboards for Postgres, MySQL and MariaDB — plus read-only ClickHouse." />
     <meta property="og:url" content="https://cartapel.com/" />
     <meta property="og:image" content="https://cartapel.com/og.png" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -96,7 +96,7 @@ const faq = [
       <p class="sub">
         One Rust binary. No framework, no ORM, no Node runtime. Point cartapel at your Postgres,
         MySQL or MariaDB and get a Django-admin-quality panel — every customization is HCL you
-        version like code.
+        version like code. ClickHouse comes along read-only, for browsing.
       </p>
       <div class="cta">
         <a class="btn primary" href={DEMO}>Try the live demo</a>
@@ -157,6 +157,10 @@ action "refund" {
       <div class="card">
         <h3>Zero-config relations</h3>
         <p>Introspected foreign keys become links and inline child tables on every detail page. No configuration required at all.</p>
+      </div>
+      <div class="card">
+        <h3>One panel, several databases</h3>
+        <p>Postgres, MySQL and MariaDB are fully editable; ClickHouse joins read-only for browsing and SQL. Declare each as a <code>source</code> and mix their tables in the same sidebar.</p>
       </div>
       <div class="card">
         <h3>Custom pages</h3>

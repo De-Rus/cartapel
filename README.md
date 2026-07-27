@@ -3,7 +3,7 @@
 
   # cartapel
 
-  **An admin panel for your existing database — Postgres, MySQL or MariaDB.**
+  **An admin panel for your existing database — Postgres, MySQL or MariaDB (and ClickHouse, read-only).**
   One Rust binary · config as code · no framework, no ORM, no Node runtime.
 
   [![CI](https://github.com/De-Rus/cartapel/actions/workflows/ci.yml/badge.svg)](https://github.com/De-Rus/cartapel/actions/workflows/ci.yml)
@@ -81,6 +81,7 @@ commit.
 | **SQL dashboards** | Stat tiles, charts and tables straight from SQL, with template variables (`{{window}}`), all in read-only transactions with timeouts. |
 | **Custom pages** | Drop a `.tsx` module next to your config — transpiled in the browser with the `sx` SDK in scope. No build step, no npm. Typed via `{base}/sx.d.ts`. |
 | **Theming & i18n** | Presets (including a faithful Django look), your accent, per-mode design tokens, per-locale labels — one hot-reloaded HCL block. |
+| **Several databases at once** | Postgres, MySQL and MariaDB are fully editable — the connection URL's scheme picks the engine. ClickHouse joins as a read-only source for browsing and SQL. Extra databases are `source` blocks; their tables share one sidebar. |
 | **Ops-friendly** | Single static binary or Docker image. Config hot-reloads from disk (a broken edit keeps the last good config). `cartapel check` validates the bundle in CI. Optional `public_role` for kiosk/demo access. |
 
 ## Security model, in short

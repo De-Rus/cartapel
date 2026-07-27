@@ -39,11 +39,12 @@ features:
 
 ## What is cartapel?
 
-cartapel is an open-source, single-binary admin panel for an existing PostgreSQL, MySQL or MariaDB
-database — a Django-admin / Forest / Retool alternative you run yourself. Point
-the Rust binary at your database, register the tables you want to expose, and
-you get a polished CRUD panel: paginated lists, search, filters, detail pages,
-inline child rows, bulk actions, dashboards, roles and an audit log.
+cartapel is an open-source, single-binary admin panel for an existing PostgreSQL,
+MySQL or MariaDB database — a Django-admin / Forest / Retool alternative you run
+yourself. Point the Rust binary at your database, register the tables you want to
+expose, and you get a polished CRUD panel: paginated lists, search, filters,
+detail pages, inline child rows, bulk actions, dashboards, roles and an audit log.
+A ClickHouse database can be attached too, read-only, for browsing and SQL.
 
 ::: tip Try it without installing
 A hosted demo runs the bundled Acme dataset at

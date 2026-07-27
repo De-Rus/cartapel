@@ -50,7 +50,7 @@ cartapel serve \
   --data ./cartapel-data
 ```
 
-- `--db` — the database connection URL (`postgres://…` or `mysql://…` — the scheme picks the engine). Also settable via `CARTAPEL_DB`, or as
+- `--db` — the database connection URL (`postgres://…` or `mysql://…` — the scheme picks the engine; ClickHouse attaches as a secondary read-only [source](/configuration/overview#source)). Also settable via `CARTAPEL_DB`, or as
   the URL of the primary `source` in config (see below).
 - `--schema` — the Postgres schema to introspect (a MySQL source is scoped to the database in its URL). Defaults to `public`; set the
   source's `schemas` list for more than one.
