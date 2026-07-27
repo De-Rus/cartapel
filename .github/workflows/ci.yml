@@ -11,6 +11,37 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - "55432:5432"
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 3s --health-retries 20
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci
+          MYSQL_DATABASE: ci
+        ports:
+          - "53306:3306"
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pci" --health-interval 5s
+          --health-timeout 3s --health-retries 30
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: ci
+          MARIADB_DATABASE: ci
+        ports:
+          - "53307:3306"
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s --health-timeout 3s --health-retries 30
     steps:
       - uses: actions/checkout@v4
 
@@ -35,4 +66,21 @@ jobs:
 
       - run: cargo fmt --check
       - run: cargo clippy --all-targets --locked -- -D warnings
-      - run: cargo test --locked
+      - name: Seed the MySQL-port fixtures
+        run: |
+          for port in 53306 53307; do
+            docker run --rm --network host mysql:8.4 mysql -h127.0.0.1 -P$port -uroot -pci ci -e "
+              CREATE TABLE IF NOT EXISTS wp_posts (
+                ID bigint unsigned auto_increment primary key,
+                post_title varchar(200), post_status enum('publish','draft'),
+                post_date datetime, ping_status tinyint(1), meta json);"
+          done
+      - name: cargo test (live golden + mysql suites)
+        env:
+          CARTAPEL_TEST_DB: postgres://postgres:ci@127.0.0.1:55432/ci
+          CARTAPEL_TEST_MYSQL: mysql://root:ci@127.0.0.1:53306/ci
+        run: cargo test --locked
+      - name: mysql introspection on MariaDB
+        env:
+          CARTAPEL_TEST_MYSQL: mysql://root:ci@127.0.0.1:53307/ci
+        run: cargo test --locked mysql_introspects
