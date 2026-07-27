@@ -48,6 +48,9 @@ cartapel serve \
   --schema public \
   --config ./admin \
   --data ./cartapel-data
+
+# MySQL or MariaDB: same command, different scheme
+cartapel serve --db mysql://user:pass@host:3306/mydb --config ./admin
 ```
 
 - `--db` — the database connection URL (`postgres://…` or `mysql://…` — the scheme picks the engine; ClickHouse attaches as a secondary read-only [source](/configuration/overview#source)). Also settable via `CARTAPEL_DB`, or as

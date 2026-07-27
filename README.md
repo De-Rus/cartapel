@@ -59,12 +59,15 @@ keys rendered as links carrying the related record's *name*, not a bare id.
 git clone https://github.com/De-Rus/cartapel && cd cartapel
 docker compose up            # → http://localhost:8686/admin
 
-# Or against YOUR database, in one command (postgres:// or mysql://):
+# Or against YOUR database, in one command:
 docker run -p 8686:8686 \
   -e CARTAPEL_DB=postgres://user:pass@host/db \
   -e CARTAPEL_SECRET_KEY=$(openssl rand -hex 32) \
   -e CARTAPEL_ADMIN_EMAIL=you@example.com -e CARTAPEL_ADMIN_PASSWORD=change-me \
   ghcr.io/de-rus/cartapel serve
+
+# The URL names the engine — nothing else to configure:
+#   CARTAPEL_DB=mysql://user:pass@host/db     → MySQL or MariaDB
 ```
 
 First boot with an empty config drops you into a **setup wizard** that

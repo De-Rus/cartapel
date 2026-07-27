@@ -190,6 +190,10 @@ action "refund" {
   -e CARTAPEL_ADMIN_EMAIL=you@example.com -e CARTAPEL_ADMIN_PASSWORD=change-me \\
   ghcr.io/de-rus/cartapel serve --config /data/admin`}</code></pre>
       <p>
+        The URL is the only thing that names your engine: swap it for
+        <code>mysql://user:pass@host/db</code> to run against MySQL or MariaDB. Nothing else changes.
+      </p>
+      <p>
         Or skip the terminal: <a href={RENDER}>one-click deploy to Render</a> — it asks for your
         database URL and drops you into the setup wizard.
       </p>
