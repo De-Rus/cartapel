@@ -204,7 +204,10 @@ pub async fn render_panel(
             if w.sql.is_none() && w.query.is_none() && w.source.is_none() {
                 return None;
             }
-            match panel_rows(state, user, w, TABLE_CAP, env).await {
+            // A listing can be thousands of rows; `pp` lets a panel ask for
+            // more than the dashboard default without it being the default.
+            let cap = w.pp.map(|n| n as i64).unwrap_or(TABLE_CAP).clamp(1, 2000);
+            match panel_rows(state, user, w, cap, env).await {
                 Ok(rows) => {
                     let columns: Vec<String> = rows
                         .first()

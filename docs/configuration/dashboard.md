@@ -157,6 +157,10 @@ save you from repeating yourself or reach data that is not in the database.
 | `source` | An `http` source alias: cartapel fetches it server-side (the secret never reaches the browser) and renders the JSON array it returns. Pair with `path` for a sub-path and `rows_at` for a dotted path to the array inside the payload. |
 | `table` | A configured table slug: the panel renders **that screen's own list** — its columns, widgets, formats and permissions — instead of raw query rows. `sort` and `pp` tune it. |
 
+`pp` also raises the row cap on a `sql`, `query` or `source` table panel (50 by
+default, 2000 at most) — useful when a listing source has more rows than a
+dashboard tile would normally show.
+
 ```hcl
 panel {
   type  = "table"
