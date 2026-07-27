@@ -19,6 +19,7 @@ import { VarBar, useVarQuery } from '../components/VarBar'
 import { Badge, CellValue, NUMERIC_WIDGETS } from '../components/CellValue'
 import { Chart, Sparkline } from '../components/Chart'
 import { EmptyState } from '../components/EmptyState'
+import { applyFilters, filterOptions } from '../lib/panelFilter'
 import { Skeleton } from '../components/Skeleton'
 import { IconAlert, IconArrowDown, IconArrowUp, IconDashboard, IconInbox, IconWarn } from '../components/Icons'
 
@@ -212,7 +213,7 @@ function DeclaredCell({ col, value, frac }: { col: TableColumn; value: unknown; 
 function DeclaredTable({ w }: { w: QueryTableWidget }) {
   const t = useT()
   const cols = w.cols ?? []
-  const paged = useSearchAndPage(w.rows, w.pp, w.search ?? undefined)
+  const paged = useSearchAndPage(w.rows, w.pp, w.search ?? undefined, w.filter_by)
 
   const scales = useMemo(() => {
     const m: Record<string, { min: number; max: number }> = {}
@@ -235,7 +236,7 @@ function DeclaredTable({ w }: { w: QueryTableWidget }) {
 
   return (
     <div className="-mx-1 overflow-x-auto">
-      {w.search && <SearchBox value={paged.q} onChange={paged.setQ} />}
+      <PanelControls paged={paged} search={w.search ?? false} />
       <table className="w-full text-[13px]">
         <thead>
           <tr className="text-left text-xxs font-medium uppercase tracking-wide text-muted">
@@ -374,17 +375,27 @@ function WidgetTable({ w }: { w: TableWidget }) {
 /// Panel tables can carry thousands of rows (a listing does), so they search
 /// and page in place rather than scrolling forever. `pp` sets the page size;
 /// `search = true` adds the box. Both work on the rows the panel already has.
-function useSearchAndPage(rows: Row[], pp?: number | null, searchable?: boolean) {
+function useSearchAndPage(
+  rows: Row[],
+  pp?: number | null,
+  searchable?: boolean,
+  filterBy?: string[] | null,
+) {
   const [q, setQ] = useState('')
   const [page, setPage] = useState(0)
+  const [picked, setPicked] = useState<Record<string, string>>({})
   const size = Math.max(1, pp ?? 50)
   const needle = q.trim().toLowerCase()
+
+  const options = useMemo(() => filterOptions(rows, filterBy), [rows, filterBy])
+  const kept = useMemo(() => applyFilters(rows, picked), [rows, picked])
+
   const matched = useMemo(() => {
-    if (!searchable || !needle) return rows
-    return rows.filter((r) =>
+    if (!searchable || !needle) return kept
+    return kept.filter((r) =>
       Object.values(r).some((v) => v != null && String(v).toLowerCase().includes(needle)),
     )
-  }, [rows, needle, searchable])
+  }, [kept, needle, searchable])
   const pages = Math.max(1, Math.ceil(matched.length / size))
   const current = Math.min(page, pages - 1)
   return {
@@ -398,13 +409,57 @@ function useSearchAndPage(rows: Row[], pp?: number | null, searchable?: boolean)
       setQ(v)
       setPage(0)
     },
+    options,
+    picked,
+    pick: (key: string, v: string) => {
+      setPicked((p) => ({ ...p, [key]: v }))
+      setPage(0)
+    },
   }
+}
+
+/// A panel's own controls: the dropdowns `filter_by` asked for, then the search
+/// box. Both narrow this panel alone — a page-wide control is a `variable`.
+export function PanelControls({
+  paged,
+  search,
+}: {
+  paged: ReturnType<typeof useSearchAndPage>
+  search: boolean
+}) {
+  const t = useT()
+  const keys = Object.keys(paged.options)
+  if (!keys.length && !search) return null
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 px-2 pb-1.5">
+      {keys.map((key) => (
+        <select
+          key={key}
+          value={paged.picked[key] ?? ''}
+          onChange={(e) => paged.pick(key, e.target.value)}
+          className="rounded border border-line bg-surface px-1.5 py-1 text-xs text-ink focus:border-accent focus:outline-none"
+        >
+          <option value="">{t('filter_all', { label: key.replace(/_/g, ' ') })}</option>
+          {paged.options[key].map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </select>
+      ))}
+      {search && (
+        <div className="min-w-[8rem] flex-1">
+          <SearchBox value={paged.q} onChange={paged.setQ} />
+        </div>
+      )}
+    </div>
+  )
 }
 
 function SearchBox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const t = useT()
   return (
-    <div className="px-2 pb-1.5">
+    <div>
       <input
         type="search"
         value={value}

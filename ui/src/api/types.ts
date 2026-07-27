@@ -385,6 +385,8 @@ export interface QueryTableWidget extends WidgetSpan {
   pp?: number | null
   /** Show a search box that filters the rows the panel carries. */
   search?: boolean | null
+  /** Columns offered as dropdowns; the choices come from the rows themselves. */
+  filter_by?: string[] | null
   /** Set when the panel shows only part of a larger result. */
   total?: number | null
   table?: undefined

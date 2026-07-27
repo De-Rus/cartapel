@@ -162,6 +162,31 @@ On a table panel, `max` is how many rows travel to the browser (50 by default,
 rest in place, and `search = true` adds a box that filters them. A listing with thousands of rows wants both: `max` high enough to
 carry them, `pp` small enough to read.
 
+`filter_by` adds a dropdown per column, above the rows:
+
+```hcl
+panel {
+  type      = "table"
+  label     = "Cached series"
+  source    = "cache_fs"
+  filter_by = ["source", "tf"]
+  max       = 8000
+  pp        = 25
+  search    = true
+}
+```
+
+The choices are the values the rows actually contain, so there is no list to
+keep in sync and a filter can never offer something that matches nothing; a
+column whose values are all the same is left out, since it could not narrow
+anything. Filters apply before the search box and the pager, so searching within
+a selection works as you would expect.
+
+Use `filter_by` when the control belongs to one panel. Use a
+[template variable](pages-and-queries.md#template-variables) when one control
+should narrow the whole page — a variable travels into the SQL, so it can also
+cut work at the database instead of in the browser.
+
 ```hcl
 panel {
   type  = "table"
@@ -208,23 +233,32 @@ panel {
 }
 
 panel {
-  type   = "table"
-  label  = "Series"
-  source = "cache"
-  filter = { source = "{{feed}}" }   # empty variable → no filtering
-  pp     = 400
+  type      = "table"
+  label     = "Series"
+  source    = "cache"
+  filter_by = ["source"]   # a dropdown on this panel, options from the rows
+  max       = 8000
+  pp        = 25
 }
 ```
 
-The control that drives that filter is an ordinary
-[template variable](/configuration/dashboard#template-variables) whose options
-come from the listing itself:
+`filter_by` is the short way: the control sits on the panel and needs nothing
+declared. When one control should drive *several* panels at once, promote it to
+a [template variable](/configuration/dashboard#template-variables) whose options
+come from the listing, and filter against it explicitly:
 
 ```hcl
 variable "feed" {
   label  = "Feed"
   source = "cache"
   field  = "source"     # distinct values of this column become the options
+}
+
+panel {
+  type   = "table"
+  label  = "Series"
+  source = "cache"
+  filter = { source = "{{feed}}" }   # empty variable → no filtering
 }
 ```
 
@@ -244,6 +278,7 @@ files and declare it as a database source instead.
 | `roles` | all | Restrict the panel to these roles. Omit → visible to all who can see the dashboard. |
 | `max` / `pp` | table | Rows carried, and rows per page inside the panel. |
 | `search` | table | Adds a search box that filters the rows the panel carries. |
+| `filter_by` | table | Columns offered as dropdowns on the panel; the options come from the rows themselves. |
 | `link` | table | Target table for row links. |
 | `url` | iframe | The embedded URL. |
 

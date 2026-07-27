@@ -1230,6 +1230,12 @@ pub struct PanelConfig {
     /// Show a search box over the rows the panel carries.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub search: bool,
+    /// Columns the panel offers as dropdown filters, e.g. `filter_by = ["source"]`.
+    /// The choices are the values actually present in the rows, so no list is
+    /// configured and none can go stale. Unlike a `variable`, the control belongs
+    /// to the panel and narrows nothing else on the page.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub filter_by: Vec<String>,
     /// How many rows the panel keeps at all — the payload it carries. Paging
     /// happens within these, so raising it is what shows more of a big listing.
     #[serde(default, skip_serializing_if = "Option::is_none")]

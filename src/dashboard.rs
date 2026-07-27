@@ -296,6 +296,7 @@ pub async fn render_panel(
                         "id": id, "type": "table", "label": w.label,
                         "link": w.link, "columns": columns, "cols": cols, "rows": rows, "pk": pk,
                         "pp": w.pp, "search": w.search,
+                        "filter_by": (!w.filter_by.is_empty()).then(|| w.filter_by.clone()),
                         "total": truncated.then_some(total),
                     })
                 }
