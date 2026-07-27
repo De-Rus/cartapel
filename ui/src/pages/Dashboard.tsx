@@ -3,7 +3,15 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { api } from '../api/client'
-import type { Row, StatWidget, TableColumn, TableWidget, Widget } from '../api/types'
+import type {
+  QueryTableWidget,
+  Row,
+  ScreenTableWidget,
+  StatWidget,
+  TableColumn,
+  TableWidget,
+  Widget,
+} from '../api/types'
 import { applyFormat, fmtByFormat, fmtDateTime, fmtPercent } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useMeta } from '../lib/meta'
@@ -129,7 +137,7 @@ function Stat({ w }: { w: StatWidget }) {
   )
 }
 
-function rowHref(w: TableWidget, row: Row): string | null {
+function rowHref(w: QueryTableWidget, row: Row): string | null {
   if (!w.link || !w.pk || row[w.pk] == null) return null
   return `/${w.link}/${encodeURIComponent(String(row[w.pk]))}`
 }
@@ -193,7 +201,7 @@ function DeclaredCell({ col, value, frac }: { col: TableColumn; value: unknown; 
   return <>{text}</>
 }
 
-function DeclaredTable({ w }: { w: TableWidget }) {
+function DeclaredTable({ w }: { w: QueryTableWidget }) {
   const t = useT()
   const cols = w.cols ?? []
 
@@ -280,7 +288,58 @@ function fmtLoose(v: unknown): string {
   return String(v)
 }
 
+/// `panel { table = "<slug>" }` — the panel shows the configured screen's own
+/// list, so its columns, widgets, formats and permissions are the ones the
+/// table already declares rather than a guess from result-row keys.
+function ScreenTable({ w }: { w: ScreenTableWidget }) {
+  const meta = useMeta()
+  const t = useT()
+  const slug = w.table
+  const table = meta.tables.find((tb) => tb.name === slug)
+  const pp = w.pp ?? 10
+  const qs = new URLSearchParams({ pp: String(pp) })
+  if (w.sort) qs.set('sort', w.sort)
+  const { data, isPending, error } = useQuery({
+    queryKey: ['panel-table', slug, qs.toString()],
+    queryFn: () => api.list(slug, qs.toString()),
+  })
+  if (!table) return <div className="p-3 text-xs text-muted">{t('unknown_table')}</div>
+  if (error) return <div className="p-3 text-xs text-critical">{String(error)}</div>
+  if (isPending) return <div className="p-3 text-xs text-muted">…</div>
+  const cols = table.columns.filter((c) => table.list.columns.includes(c.name))
+  return (
+    <div className="-mx-1 overflow-x-auto">
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="text-left text-xxs font-medium uppercase tracking-wide text-muted">
+            {cols.map((c) => (
+              <th key={c.name} className="px-2 py-1.5 font-medium">
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {(data?.rows ?? []).map((row, i) => (
+            <tr key={i} className="border-t border-line/60">
+              {cols.map((c) => (
+                <td key={c.name} className="px-2 py-1.5">
+                  <CellValue col={c} row={row} value={row[c.name]} mode="list" />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function WidgetTable({ w }: { w: TableWidget }) {
+  return w.table !== undefined ? <ScreenTable w={w} /> : <QueryTable w={w} />
+}
+
+function QueryTable({ w }: { w: QueryTableWidget }) {
   const meta = useMeta()
   const t = useT()
   if (w.cols && w.cols.length > 0) return <DeclaredTable w={w} />

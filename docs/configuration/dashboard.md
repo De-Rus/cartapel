@@ -145,6 +145,39 @@ panel {
 
 `iframe` panels require a `url` instead of `sql`.
 
+## Where a panel reads from
+
+Every panel reads from exactly one origin. `sql` is the common case; the others
+save you from repeating yourself or reach data that is not in the database.
+
+| Key | Description |
+| --- | --- |
+| `sql` | Inline read-only SQL. |
+| `query` | The name of a `query { }` block — it carries its own `source`, so one query can feed several panels. |
+| `source` | An `http` source alias: cartapel fetches it server-side (the secret never reaches the browser) and renders the JSON array it returns. Pair with `path` for a sub-path and `rows_at` for a dotted path to the array inside the payload. |
+| `table` | A configured table slug: the panel renders **that screen's own list** — its columns, widgets, formats and permissions — instead of raw query rows. `sort` and `pp` tune it. |
+
+```hcl
+panel {
+  type  = "table"
+  label = "Latest orders"
+  table = "orders"          # the configured screen, not a hand-written SELECT
+  sort  = "-placed_at"
+  pp    = 8
+  link  = "orders"
+}
+
+panel {
+  type    = "table"
+  label   = "Cache coverage"
+  source  = "cache_coverage"
+  rows_at = "items"         # omit when the payload is the array itself
+}
+```
+
+A `sql` panel may also carry `source` to run against a secondary database
+rather than the primary one.
+
 ## Common panel keys
 
 | Key | Applies to | Description |

@@ -107,6 +107,16 @@ async function loadTsxModule(url: string, pageSlug?: string): Promise<void> {
   let mod: Record<string, unknown>
   try {
     mod = (await import(/* @vite-ignore */ blobUrl)) as Record<string, unknown>
+  } catch (e) {
+    // Every sx export is injected as a top-level const, so a module declaring
+    // its own `Page`/`Chart`/`Table` collides — with an error that never says why.
+    const m = /Identifier '(\w+)' has already been declared/.exec(String(e))
+    if (m) {
+      throw new Error(
+        `\`${m[1]}\` is already provided by the sx SDK — rename yours (every sx export is in scope without importing).`,
+      )
+    }
+    throw e
   } finally {
     URL.revokeObjectURL(blobUrl)
   }

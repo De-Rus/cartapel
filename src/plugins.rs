@@ -134,12 +134,19 @@ pub async fn named_source(
     proxy_source(&state, &user, &name, &rest).await
 }
 
-async fn proxy_source(
-    state: &Arc<AppState>,
+/// A source's response is held in memory whole; a runaway upstream must not be
+/// able to exhaust the panel process.
+const SOURCE_CAP_BYTES: usize = 8 * 1024 * 1024;
+
+/// Fetch a configured `http` source (optionally a sub-path), with the secret
+/// attached server-side. The single place a source is read — the proxy route
+/// and panels both come through here.
+pub async fn fetch_source(
+    state: &AppState,
     user: &CurrentUser,
     name: &str,
     rest: &str,
-) -> Result<Response, AppError> {
+) -> Result<(StatusCode, Vec<u8>), AppError> {
     let cfg = state.cfg();
     let src = cfg
         .sources
@@ -149,43 +156,97 @@ async fn proxy_source(
     if !user.may(&src.roles, crate::state::Access::AdminOnly) {
         return Err(AppError::forbidden("source not allowed for your role"));
     }
-    match src.kind.as_str() {
-        "http" => {
-            if rest.contains("..") {
-                return Err(AppError::bad("bad source path"));
-            }
-            let base = src.url.trim_end_matches('/');
-            let url = if rest.is_empty() {
-                base.to_string()
-            } else {
-                format!("{base}/{}", rest.trim_start_matches('/'))
-            };
-            let mut req = state
-                .http
-                .get(&url)
-                .timeout(std::time::Duration::from_secs(15));
-            if let Some(env_name) = &src.token_env {
-                if let Ok(tok) = std::env::var(env_name) {
-                    let hdr = src.header.as_deref().unwrap_or("x-admin-token");
-                    req = req.header(hdr, tok);
-                }
-            }
-            let resp = req
-                .send()
-                .await
-                .map_err(|e| AppError::internal(format!("source {name} failed: {e}")))?;
-            let status =
-                StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
-            let body = resp
-                .bytes()
-                .await
-                .map_err(|e| AppError::internal(e.to_string()))?;
-            Ok((status, [(header::CONTENT_TYPE, "application/json")], body).into_response())
+    if src.kind != "http" {
+        return Err(AppError::bad(format!(
+            "source \"{name}\" is a {} source — only http sources are readable this way",
+            src.kind
+        )));
+    }
+    if rest.contains("..") {
+        return Err(AppError::bad("bad source path"));
+    }
+    let base = src.url.trim_end_matches('/');
+    let url = if rest.is_empty() {
+        base.to_string()
+    } else {
+        format!("{base}/{}", rest.trim_start_matches('/'))
+    };
+    let mut req = state
+        .http
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(15));
+    if let Some(env_name) = &src.token_env {
+        if let Ok(tok) = std::env::var(env_name) {
+            let hdr = src.header.as_deref().unwrap_or("x-admin-token");
+            req = req.header(hdr, tok);
         }
-        other => Err(AppError::bad(format!(
-            "unsupported source type \"{other}\""
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| AppError::internal(format!("source {name} failed: {e}")))?;
+    let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    if let Some(len) = resp.content_length() {
+        if len as usize > SOURCE_CAP_BYTES {
+            return Err(AppError::bad(format!(
+                "source \"{name}\" returned {len} bytes, over the {SOURCE_CAP_BYTES} cap"
+            )));
+        }
+    }
+    let body = resp
+        .bytes()
+        .await
+        .map_err(|e| AppError::internal(e.to_string()))?
+        .to_vec();
+    if body.len() > SOURCE_CAP_BYTES {
+        return Err(AppError::bad(format!(
+            "source \"{name}\" returned over the {SOURCE_CAP_BYTES} byte cap"
+        )));
+    }
+    Ok((status, body))
+}
+
+/// A source's payload as rows: the JSON array itself, or the array at
+/// `rows_at` (a dotted path into the response object).
+pub async fn source_rows(
+    state: &AppState,
+    user: &CurrentUser,
+    name: &str,
+    path: &str,
+    rows_at: Option<&str>,
+) -> Result<Vec<Value>, AppError> {
+    let (status, body) = fetch_source(state, user, name, path).await?;
+    if !status.is_success() {
+        return Err(AppError::bad(format!(
+            "source \"{name}\" answered {status}"
+        )));
+    }
+    let parsed: Value = serde_json::from_slice(&body)
+        .map_err(|e| AppError::bad(format!("source \"{name}\" is not json: {e}")))?;
+    let at = match rows_at {
+        Some(p) => p
+            .split('.')
+            .try_fold(&parsed, |acc, k| acc.get(k))
+            .ok_or_else(|| AppError::bad(format!("source \"{name}\" has nothing at \"{p}\"")))?,
+        None => &parsed,
+    };
+    match at {
+        Value::Array(rows) => Ok(rows.clone()),
+        _ => Err(AppError::bad(format!(
+            "source \"{name}\"{} is not a json array",
+            rows_at.map(|p| format!(" at \"{p}\"")).unwrap_or_default()
         ))),
     }
+}
+
+async fn proxy_source(
+    state: &Arc<AppState>,
+    user: &CurrentUser,
+    name: &str,
+    rest: &str,
+) -> Result<Response, AppError> {
+    let (status, body) = fetch_source(state, user, name, rest).await?;
+    Ok((status, [(header::CONTENT_TYPE, "application/json")], body).into_response())
 }
 
 #[cfg(test)]

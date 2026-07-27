@@ -9,18 +9,58 @@ const CHART_CAP: i64 = 500;
 const TABLE_CAP: i64 = 50;
 const SPARK_CAP: i64 = 100;
 
-async fn read_only_rows(
+async fn read_only_rows_on(
     state: &AppState,
+    source: Option<&str>,
     sql: &str,
     cap: i64,
     env: &crate::vars::Resolved,
 ) -> Result<Vec<Value>, String> {
+    let pool = state.pool_for(source);
     let (sql, binds) =
-        crate::interp::interpolate_for(sql, &env.types, &env.values, state.pg.dialect())?;
-    let rows = crate::db::config_query_rows(&state.pg, &sql, &binds, cap, 5000)
+        crate::interp::interpolate_for(sql, &env.types, &env.values, pool.dialect())?;
+    let rows = crate::db::config_query_rows(pool, &sql, &binds, cap, 5000)
         .await
         .map_err(|e| e.to_string())?;
     Ok(rows.into_iter().map(Value::Object).collect())
+}
+
+/// A panel's rows, from whichever origin it declares: inline `sql`, a named
+/// `query` (which carries its own source), or an http `source`. `table` panels
+/// never reach here — the browser fetches the configured list itself.
+async fn panel_rows(
+    state: &AppState,
+    user: &CurrentUser,
+    w: &crate::config::PanelConfig,
+    cap: i64,
+    env: &crate::vars::Resolved,
+) -> Result<Vec<Value>, String> {
+    if let Some(name) = &w.query {
+        let cfg = state.cfg();
+        let q = cfg
+            .queries
+            .get(name)
+            .ok_or_else(|| format!("unknown query \"{name}\""))?;
+        if !user.may(&q.roles, crate::state::Access::AdminOnly) {
+            return Err(format!("query \"{name}\" not allowed for your role"));
+        }
+        let (sql, source) = (q.sql.clone(), q.source.clone());
+        return read_only_rows_on(state, source.as_deref(), &sql, cap, env).await;
+    }
+    if let Some(alias) = &w.source {
+        let rows = crate::plugins::source_rows(
+            state,
+            user,
+            alias,
+            w.path.as_deref().unwrap_or(""),
+            w.rows_at.as_deref(),
+        )
+        .await
+        .map_err(|e| e.1)?;
+        return Ok(rows.into_iter().take(cap.max(0) as usize).collect());
+    }
+    let sql = w.sql.as_ref().ok_or("panel has no sql, query or source")?;
+    read_only_rows_on(state, w.source.as_deref(), sql, cap, env).await
 }
 
 fn first_number(row: &Value) -> Option<f64> {
@@ -65,6 +105,7 @@ fn alert_of(v: f64, above: Option<f64>, below: Option<f64>) -> Value {
 /// requirement instead. Shared by the live dashboard and the editor preview.
 pub async fn render_panel(
     state: &AppState,
+    user: &CurrentUser,
     w: &crate::config::PanelConfig,
     id: &str,
     env: &crate::vars::Resolved,
@@ -74,12 +115,14 @@ pub async fn render_panel(
             "id": id, "type": "iframe", "label": w.label, "url": w.url,
         }),
         PanelKind::Stat => {
-            let sql = w.sql.as_ref()?;
-            match read_only_rows(state, sql, 1, env).await {
+            if w.sql.is_none() && w.query.is_none() && w.source.is_none() {
+                return None;
+            }
+            match panel_rows(state, user, w, 1, env).await {
                 Ok(rows) => {
                     let value = scalar(&rows);
                     let compare = match &w.compare_sql {
-                        Some(cs) => match read_only_rows(state, cs, 1, env).await {
+                        Some(cs) => match read_only_rows_on(state, w.source.as_deref(), cs, 1, env).await {
                             Ok(crows) => scalar(&crows).map(|v| {
                                 json!({ "value": v, "label": w.compare_label.clone().unwrap_or_else(|| "prev".into()) })
                             }),
@@ -88,13 +131,17 @@ pub async fn render_panel(
                         None => None,
                     };
                     let spark = match &w.spark {
-                        Some(sq) => match read_only_rows(state, sq, SPARK_CAP, env).await {
-                            Ok(srows) => {
-                                let s = spark_series(&srows);
-                                (s.len() > 1).then_some(s)
+                        Some(sq) => {
+                            match read_only_rows_on(state, w.source.as_deref(), sq, SPARK_CAP, env)
+                                .await
+                            {
+                                Ok(srows) => {
+                                    let s = spark_series(&srows);
+                                    (s.len() > 1).then_some(s)
+                                }
+                                Err(_) => None,
                             }
-                            Err(_) => None,
-                        },
+                        }
                         None => None,
                     };
                     json!({
@@ -113,8 +160,10 @@ pub async fn render_panel(
             }
         }
         PanelKind::Chart => {
-            let sql = w.sql.as_ref()?;
-            match read_only_rows(state, sql, CHART_CAP, env).await {
+            if w.sql.is_none() && w.query.is_none() && w.source.is_none() {
+                return None;
+            }
+            match panel_rows(state, user, w, CHART_CAP, env).await {
                 Ok(rows) => {
                     let points: Vec<Value> = rows
                         .iter()
@@ -143,9 +192,19 @@ pub async fn render_panel(
                 }
             }
         }
+        PanelKind::Table if w.table.is_some() => {
+            let slug = w.table.clone().unwrap();
+            state.readable_table(user, &slug).ok()?;
+            json!({
+                "id": id, "type": "table", "label": w.label,
+                "table": slug, "sort": w.sort, "pp": w.pp,
+            })
+        }
         PanelKind::Table => {
-            let sql = w.sql.as_ref()?;
-            match read_only_rows(state, sql, TABLE_CAP, env).await {
+            if w.sql.is_none() && w.query.is_none() && w.source.is_none() {
+                return None;
+            }
+            match panel_rows(state, user, w, TABLE_CAP, env).await {
                 Ok(rows) => {
                     let columns: Vec<String> = rows
                         .first()
@@ -207,7 +266,7 @@ async fn render_panels(
         if !user.may(&w.roles, crate::state::Access::Everyone) {
             continue;
         }
-        if let Some(widget) = render_panel(state, w, &format!("w{i}"), env).await {
+        if let Some(widget) = render_panel(state, user, w, &format!("w{i}"), env).await {
             widgets.push(widget);
         }
     }
@@ -248,7 +307,7 @@ pub async fn page_widgets_handler(
         if !user.may(&w.roles, crate::state::Access::Everyone) {
             continue;
         }
-        if let Some(widget) = render_panel(&state, w, &format!("w{i}"), &env).await {
+        if let Some(widget) = render_panel(&state, &user, w, &format!("w{i}"), &env).await {
             widgets.push(widget);
         }
     }
@@ -262,6 +321,13 @@ mod tests {
     use super::*;
     use crate::configedit::test_support::{state_with_tables, tmp_dir};
 
+    fn admin() -> CurrentUser {
+        CurrentUser {
+            email: "a@b.c".into(),
+            role: "admin".into(),
+        }
+    }
+
     #[tokio::test]
     async fn render_panel_emits_grid_span_and_category() {
         let state = state_with_tables(Some(tmp_dir()), &["bots"]);
@@ -269,7 +335,7 @@ mod tests {
             "type = \"iframe\"\nlabel = \"Docs\"\nurl = \"https://x.io\"\nw = 2\nh = 2\ncategory = \"Links\"\n",
         )
         .unwrap();
-        let rendered = render_panel(&state, &w, "w0", &Default::default())
+        let rendered = render_panel(&state, &admin(), &w, "w0", &Default::default())
             .await
             .unwrap();
         assert_eq!(rendered["type"], json!("iframe"));
@@ -279,7 +345,7 @@ mod tests {
 
         let bare: crate::config::PanelConfig =
             hcl::from_str("type = \"iframe\"\nlabel = \"Docs\"\nurl = \"https://x.io\"\n").unwrap();
-        let rendered = render_panel(&state, &bare, "w0", &Default::default())
+        let rendered = render_panel(&state, &admin(), &bare, "w0", &Default::default())
             .await
             .unwrap();
         assert!(rendered.get("w").is_none(), "absent span not emitted");

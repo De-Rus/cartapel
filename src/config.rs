@@ -1131,6 +1131,26 @@ pub struct PanelConfig {
     pub id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sql: Option<String>,
+    /// A panel reads from exactly one origin: inline `sql`, a named `query`,
+    /// an http `source`, or a configured `table`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    /// Sub-path appended to the source's url, and where its rows live in the
+    /// response (a dotted path; omit when the payload is the array itself).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rows_at: Option<String>,
+    /// A configured table slug: the panel renders that screen's list — its
+    /// columns, widgets and permissions — instead of raw query rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub table: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pp: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub compare_sql: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

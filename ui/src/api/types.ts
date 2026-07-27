@@ -372,7 +372,9 @@ export interface TableColumn {
   tone?: 'accent' | 'green' | 'red' | 'orange' | 'blue' | 'violet' | null
 }
 
-export interface TableWidget extends WidgetSpan {
+/** A table panel is either query-backed (it carries its rows) or screen-backed
+ *  (it names a configured table and the browser fetches that list). */
+export interface QueryTableWidget extends WidgetSpan {
   id: string
   type: 'table'
   label: string
@@ -381,7 +383,20 @@ export interface TableWidget extends WidgetSpan {
   cols?: TableColumn[] | null
   rows: Row[]
   pk?: string | null
+  table?: undefined
 }
+
+export interface ScreenTableWidget extends WidgetSpan {
+  id: string
+  type: 'table'
+  label: string
+  table: string
+  link?: string | null
+  sort?: string | null
+  pp?: number | null
+}
+
+export type TableWidget = QueryTableWidget | ScreenTableWidget
 
 export interface IframeWidget extends WidgetSpan {
   id: string
