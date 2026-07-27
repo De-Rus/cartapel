@@ -7,9 +7,9 @@ export default defineConfig({
   // when deploying to a custom domain (root).
   base: process.env.DOCS_BASE || '/cartapel/',
   title: 'cartapel',
-  titleTemplate: ':title · cartapel — Postgres admin panel',
+  titleTemplate: ':title · cartapel — database admin panel',
   description:
-    'Open-source, single-binary admin panel for your existing Postgres. A Django-admin alternative in one Rust binary: introspected CRUD, roles, audit and dashboards, configured with HCL you version like code.',
+    'Open-source, single-binary admin panel for your existing Postgres, MySQL or MariaDB. A Django-admin alternative in one Rust binary: introspected CRUD, roles, audit and dashboards, configured with HCL you version like code.',
   lang: 'en-US',
   cleanUrls: true,
   ignoreDeadLinks: [/^https?:\/\/localhost/],
@@ -46,7 +46,7 @@ export default defineConfig({
         applicationCategory: 'DeveloperApplication',
         operatingSystem: 'Linux, macOS, Docker',
         description:
-          'Open-source, single-binary admin panel for PostgreSQL — introspected CRUD, roles, audit log and SQL dashboards, configured as code.',
+          'Open-source, single-binary admin panel for PostgreSQL, MySQL and MariaDB — introspected CRUD, roles, audit log and SQL dashboards, configured as code.',
         license: 'https://opensource.org/licenses/MIT',
         url: SITE,
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
@@ -66,7 +66,7 @@ export default defineConfig({
   transformPageData(pageData) {
     const path = pageData.relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')
     const canonical = SITE + path
-    const title = pageData.frontmatter.layout === 'home' ? 'cartapel — Postgres admin panel' : `${pageData.title} · cartapel`
+    const title = pageData.frontmatter.layout === 'home' ? 'cartapel — database admin panel' : `${pageData.title} · cartapel`
     pageData.frontmatter.head ??= []
     pageData.frontmatter.head.push(
       ['link', { rel: 'canonical', href: canonical }],
