@@ -295,7 +295,11 @@ async fn listing_source_rows(
         let creds = crate::s3::Creds {
             access_key: env_of(&src.access_key_env),
             secret_key: env_of(&src.secret_key_env),
-            region: src.region.clone().unwrap_or_else(|| "auto".into()),
+            region: src
+                .region
+                .as_deref()
+                .and_then(crate::config::resolve_env)
+                .unwrap_or_else(|| "auto".into()),
         };
         if creds.access_key.is_empty() || creds.secret_key.is_empty() {
             return Err(AppError::bad(format!(
@@ -308,10 +312,15 @@ async fn listing_source_rows(
             .and_then(crate::config::resolve_env)
             .ok_or_else(|| AppError::bad(format!("source \"{name}\": missing endpoint")))?;
         let pattern = crate::files::parse_pattern(&pattern_src).map_err(bad)?;
+        let bucket = src
+            .bucket
+            .as_deref()
+            .and_then(crate::config::resolve_env)
+            .ok_or_else(|| AppError::bad(format!("source \"{name}\": missing bucket")))?;
         crate::s3::list(
             &state.http,
             &endpoint,
-            src.bucket.as_deref().unwrap_or_default(),
+            &bucket,
             src.prefix.as_deref().unwrap_or_default(),
             &creds,
             &pattern,
