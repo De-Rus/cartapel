@@ -383,6 +383,8 @@ export interface QueryTableWidget extends WidgetSpan {
   cols?: TableColumn[] | null
   rows: Row[]
   pk?: string | null
+  /** Set when the panel shows only part of a larger result. */
+  total?: number | null
   table?: undefined
 }
 

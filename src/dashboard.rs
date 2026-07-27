@@ -57,7 +57,7 @@ async fn panel_rows(
         )
         .await
         .map_err(|e| e.1)?;
-        return Ok(rows.into_iter().take(cap.max(0) as usize).collect());
+        return Ok(rows);
     }
     let sql = w.sql.as_ref().ok_or("panel has no sql, query or source")?;
     read_only_rows_on(state, w.source.as_deref(), sql, cap, env).await
@@ -208,7 +208,12 @@ pub async fn render_panel(
             // more than the dashboard default without it being the default.
             let cap = w.pp.map(|n| n as i64).unwrap_or(TABLE_CAP).clamp(1, 2000);
             match panel_rows(state, user, w, cap, env).await {
-                Ok(rows) => {
+                Ok(mut rows) => {
+                    // Showing part of a listing must never read as the whole of
+                    // it: carry the real total so the panel can say so.
+                    let total = rows.len();
+                    rows.truncate(cap as usize);
+                    let truncated = total > rows.len();
                     let columns: Vec<String> = rows
                         .first()
                         .and_then(|r| r.as_object())
@@ -235,6 +240,7 @@ pub async fn render_panel(
                     json!({
                         "id": id, "type": "table", "label": w.label,
                         "link": w.link, "columns": columns, "cols": cols, "rows": rows, "pk": pk,
+                        "total": truncated.then_some(total),
                     })
                 }
                 Err(e) => {

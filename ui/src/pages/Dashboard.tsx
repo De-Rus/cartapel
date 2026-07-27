@@ -339,10 +339,26 @@ function WidgetTable({ w }: { w: TableWidget }) {
   return w.table !== undefined ? <ScreenTable w={w} /> : <QueryTable w={w} />
 }
 
+function TruncatedNote({ w }: { w: QueryTableWidget }) {
+  const t = useT()
+  if (!w.total) return null
+  return (
+    <div className="px-2 pt-1.5 text-xxs text-muted">
+      {t('showing_of', { shown: String(w.rows.length), total: String(w.total) })}
+    </div>
+  )
+}
+
 function QueryTable({ w }: { w: QueryTableWidget }) {
   const meta = useMeta()
   const t = useT()
-  if (w.cols && w.cols.length > 0) return <DeclaredTable w={w} />
+  if (w.cols && w.cols.length > 0)
+    return (
+      <>
+        <DeclaredTable w={w} />
+        <TruncatedNote w={w} />
+      </>
+    )
   const table = meta.tables.find((tb) => tb.name === w.link)
   return (
     <div className="-mx-1 overflow-x-auto">
