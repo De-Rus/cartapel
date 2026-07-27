@@ -58,6 +58,9 @@ pub fn interpolate_for(
             out.push_str(&n.to_string());
         }
         crate::db::Dialect::MySql => out.push('?'),
+        crate::db::Dialect::ClickHouse => {
+            out.push_str(&format!("{{p{n}:String}}"));
+        }
     };
     let mut out = String::with_capacity(sql.len());
     let mut binds: Vec<BoundVal> = Vec::new();

@@ -401,6 +401,10 @@ impl NamedSource {
     pub fn is_mysql(&self) -> bool {
         self.kind == "mysql" || self.kind == "mariadb"
     }
+
+    pub fn is_clickhouse(&self) -> bool {
+        self.kind == "clickhouse"
+    }
 }
 
 impl NamedSource {
@@ -1678,10 +1682,10 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                         "table \"{table}\": from.source \"{alias}\" is not a defined source"
                     ))
                 }
-                Some(s) if !s.is_postgres() && !s.is_mysql() => {
+                Some(s) if !s.is_postgres() && !s.is_mysql() && !s.is_clickhouse() => {
                     return Err(format!(
-                    "table \"{table}\": from.source \"{alias}\" is not a postgres or mysql source"
-                ))
+                        "table \"{table}\": from.source \"{alias}\" is not a database source"
+                    ))
                 }
                 _ => {}
             }
@@ -1695,9 +1699,9 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                         "query \"{name}\": source \"{alias}\" is not a defined source"
                     ))
                 }
-                Some(s) if !s.is_postgres() && !s.is_mysql() => {
+                Some(s) if !s.is_postgres() && !s.is_mysql() && !s.is_clickhouse() => {
                     return Err(format!(
-                        "query \"{name}\": source \"{alias}\" is not a postgres or mysql source"
+                        "query \"{name}\": source \"{alias}\" is not a database source"
                     ))
                 }
                 _ => {}
@@ -1712,9 +1716,9 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                         "variable \"{name}\": source \"{alias}\" is not a defined source"
                     ))
                 }
-                Some(s) if !s.is_postgres() && !s.is_mysql() => {
+                Some(s) if !s.is_postgres() && !s.is_mysql() && !s.is_clickhouse() => {
                     return Err(format!(
-                        "variable \"{name}\": source \"{alias}\" is not a postgres or mysql source"
+                        "variable \"{name}\": source \"{alias}\" is not a database source"
                     ))
                 }
                 _ => {}
@@ -2673,7 +2677,7 @@ panel {
         let http = base("from-http");
         std::fs::write(http.join("bots.hcl"), "from { source = \"metrics\" }\n").unwrap();
         let err = load(Some(&http)).expect_err("http source errors");
-        assert!(err.contains("not a postgres or mysql source"), "{err}");
+        assert!(err.contains("not a database source"), "{err}");
         let _ = std::fs::remove_dir_all(&http);
 
         let ok = base("from-ok");

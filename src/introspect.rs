@@ -236,6 +236,116 @@ pub async fn introspect(pool: &PgPool, schemas: &[String]) -> Result<Schema, sql
     Ok(schema_out)
 }
 
+/// ClickHouse types → Kind, unwrapping `Nullable(…)` / `LowCardinality(…)`.
+pub fn kind_of_clickhouse(ty: &str) -> Kind {
+    let mut t = ty.trim();
+    while let Some(inner) = t
+        .strip_prefix("Nullable(")
+        .or_else(|| t.strip_prefix("LowCardinality("))
+    {
+        t = inner.strip_suffix(')').unwrap_or(inner);
+    }
+    if t.starts_with("Array(") {
+        return Kind::Array;
+    }
+    if t.starts_with("Map(") || t.starts_with("Tuple(") || t == "JSON" || t == "Object('json')" {
+        return Kind::Json;
+    }
+    if t.starts_with("Enum") || t.starts_with("FixedString") {
+        return Kind::Text;
+    }
+    if t.starts_with("Decimal") || t.starts_with("Float") {
+        return Kind::Float;
+    }
+    if t.starts_with("DateTime") {
+        return Kind::Datetime;
+    }
+    match t {
+        "UInt8" | "UInt16" | "UInt32" | "UInt64" | "Int8" | "Int16" | "Int32" | "Int64"
+        | "UInt128" | "Int128" | "UInt256" | "Int256" => Kind::Int,
+        "Bool" => Kind::Bool,
+        "Date" | "Date32" => Kind::Date,
+        "UUID" => Kind::Uuid,
+        _ => Kind::Text,
+    }
+}
+
+pub async fn introspect_clickhouse(ch: &crate::db::ChPool) -> Result<Schema, sqlx::Error> {
+    let cols = ch
+        .query_json(
+            "SELECT table, name, type, is_in_primary_key
+             FROM system.columns WHERE database = currentDatabase()
+             ORDER BY table, position",
+            &[],
+            100_000,
+            8_000,
+        )
+        .await?;
+    let views: std::collections::BTreeSet<String> = ch
+        .query_json(
+            "SELECT name FROM system.tables
+             WHERE database = currentDatabase() AND engine = 'View'",
+            &[],
+            100_000,
+            8_000,
+        )
+        .await?
+        .into_iter()
+        .filter_map(|m| m.get("name")?.as_str().map(String::from))
+        .collect();
+    let db_name: String = ch
+        .query_json("SELECT currentDatabase() AS db", &[], 1, 4_000)
+        .await?
+        .first()
+        .and_then(|m| m.get("db")?.as_str().map(String::from))
+        .unwrap_or_default();
+
+    let mut pk_count: BTreeMap<String, u32> = BTreeMap::new();
+    for m in &cols {
+        let in_pk = m.get("is_in_primary_key").and_then(|v| v.as_i64()) == Some(1);
+        if in_pk {
+            if let Some(t) = m.get("table").and_then(|v| v.as_str()) {
+                *pk_count.entry(t.to_string()).or_default() += 1;
+            }
+        }
+    }
+
+    let mut out = Schema::default();
+    for m in &cols {
+        let (Some(table), Some(name), Some(ty)) = (
+            m.get("table").and_then(|v| v.as_str()).map(String::from),
+            m.get("name").and_then(|v| v.as_str()).map(String::from),
+            m.get("type").and_then(|v| v.as_str()).map(String::from),
+        ) else {
+            continue;
+        };
+        let in_pk = m.get("is_in_primary_key").and_then(|v| v.as_i64()) == Some(1);
+        let entry = out.tables.entry(table.clone()).or_insert_with(|| DbTable {
+            name: table.clone(),
+            schema: db_name.clone(),
+            source: String::new(),
+            is_view: views.contains(&table),
+            pk: None,
+            extra_unique: false,
+            columns: Vec::new(),
+        });
+        // MergeTree "primary keys" aren't unique; still useful for detail links.
+        if in_pk && pk_count.get(&table) == Some(&1) {
+            entry.pk = Some(name.clone());
+        }
+        entry.columns.push(DbColumn {
+            fk: None,
+            kind: kind_of_clickhouse(&ty),
+            nullable: ty.starts_with("Nullable("),
+            udt: ty,
+            elem_udt: None,
+            has_default: true,
+            name,
+        });
+    }
+    Ok(out)
+}
+
 pub fn kind_of_mysql(data_type: &str, column_type: &str) -> Kind {
     match data_type {
         "tinyint" if column_type.starts_with("tinyint(1)") => Kind::Bool,

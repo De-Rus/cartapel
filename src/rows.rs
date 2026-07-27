@@ -197,7 +197,7 @@ fn bare_filter_clause(
         Kind::Bool => {
             let val = match dialect {
                 crate::db::Dialect::Pg => raw.to_string(),
-                crate::db::Dialect::MySql => match raw {
+                crate::db::Dialect::MySql | crate::db::Dialect::ClickHouse => match raw {
                     "true" | "1" => "1".into(),
                     "false" | "0" => "0".into(),
                     other => return Err(AppError::bad(format!("bad boolean filter {other}"))),
@@ -214,6 +214,9 @@ fn bare_filter_clause(
                 }),
                 crate::db::Dialect::MySql => ("CAST(CURDATE() AS DATETIME)", |d| {
                     format!("NOW() - INTERVAL {d} DAY")
+                }),
+                crate::db::Dialect::ClickHouse => ("toStartOfDay(now())", |d| {
+                    format!("now() - INTERVAL {d} DAY")
                 }),
             };
             match raw {
@@ -1005,6 +1008,9 @@ pub async fn create_handler(
     }
     let items = crate::meta::select_items_for(dbt, &Default::default(), dialect).join(", ");
     let after_raw = match dialect {
+        crate::db::Dialect::ClickHouse => {
+            return Err(AppError::bad("ClickHouse sources are read-only"));
+        }
         crate::db::Dialect::Pg => {
             let sql = format!(
                 "INSERT INTO {} AS t ({}) VALUES ({}) RETURNING {items}",
@@ -1269,6 +1275,7 @@ fn build_import_row(
         }
     }
     match dialect {
+        crate::db::Dialect::ClickHouse => Err("ClickHouse sources are read-only".into()),
         crate::db::Dialect::Pg => {
             let mut sql = format!(
                 "INSERT INTO {} AS t ({}) VALUES ({})",

@@ -183,10 +183,12 @@ async fn connect_pg(url: &str) -> sqlx::PgPool {
     }
 }
 
-/// The URL's scheme picks the engine — one `CARTAPEL_DB` works for both.
+/// The URL's scheme picks the engine — one `CARTAPEL_DB` works for all.
 async fn connect_any(alias: &str, url: &str) -> crate::db::DbPool {
     if url.starts_with("mysql://") || url.starts_with("mariadb://") {
         connect_mysql(alias, url).await
+    } else if url.starts_with("clickhouse://") || url.starts_with("chttp://") {
+        connect_clickhouse(alias, url).await
     } else if url.starts_with("postgres://") || url.starts_with("postgresql://") {
         crate::db::DbPool::Pg(connect_pg(url).await)
     } else {
@@ -194,6 +196,53 @@ async fn connect_any(alias: &str, url: &str) -> crate::db::DbPool {
             "source \"{alias}\": unrecognized database url — use postgres:// or mysql://"
         ))
     }
+}
+
+/// `clickhouse://user:pass@host:8123/db` → HTTP interface with basic auth;
+/// the path picks the database. Read-only by construction.
+async fn connect_clickhouse(alias: &str, url: &str) -> crate::db::DbPool {
+    let http = url
+        .replacen("clickhouse://", "http://", 1)
+        .replacen("chttp://", "http://", 1);
+    let parsed = reqwest::Url::parse(&http)
+        .unwrap_or_else(|e| die(&format!("source \"{alias}\": bad clickhouse url: {e}")));
+    let user = if parsed.username().is_empty() {
+        "default".to_string()
+    } else {
+        parsed.username().to_string()
+    };
+    let password = parsed.password().unwrap_or("").to_string();
+    let database = parsed.path().trim_matches('/').to_string();
+    let mut base = parsed.clone();
+    let _ = base.set_username("");
+    let _ = base.set_password(None);
+    base.set_path("/");
+    let mut endpoint = base.to_string();
+    if !database.is_empty() {
+        endpoint = format!("{endpoint}?database={database}");
+    }
+    let pool = crate::db::ChPool {
+        client: reqwest::Client::new(),
+        url: endpoint,
+        user,
+        password,
+    };
+    match pool
+        .query_json("SELECT version() AS v", &[], 1, 5_000)
+        .await
+    {
+        Ok(rows) => {
+            let v = rows
+                .first()
+                .and_then(|m| m.get("v"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("?")
+                .to_string();
+            tracing::info!("source {alias}: connected (ClickHouse {v}, read-only)");
+        }
+        Err(e) => die(&format!("source \"{alias}\": cannot reach clickhouse: {e}")),
+    }
+    crate::db::DbPool::ClickHouse(pool)
 }
 
 async fn connect_mysql(alias: &str, url: &str) -> crate::db::DbPool {
@@ -492,7 +541,7 @@ async fn serve(
         if alias == &primary_alias {
             continue;
         }
-        if !src.is_postgres() && !src.is_mysql() {
+        if !src.is_postgres() && !src.is_mysql() && !src.is_clickhouse() {
             continue;
         }
         let url = config::resolve_env(&src.url)
@@ -536,6 +585,9 @@ async fn serve(
             tracing::info!("introspected {} tables ({flavor:?})", s.tables.len());
             s
         }
+        crate::db::DbPool::ClickHouse(_) => {
+            die("clickhouse cannot be the primary source — it is read-only; declare it as a secondary `source` and keep a postgres or mysql primary")
+        }
     };
     for t in db_schema.tables.values_mut() {
         t.source = primary_alias.clone();
@@ -575,6 +627,16 @@ async fn serve(
                     .expect("introspect mysql source");
                 tracing::info!(
                     "source {alias}: introspected {} tables ({flavor:?})",
+                    s.tables.len()
+                );
+                s
+            }
+            Some(crate::db::DbPool::ClickHouse(ch)) => {
+                let s = introspect::introspect_clickhouse(ch)
+                    .await
+                    .expect("introspect clickhouse source");
+                tracing::info!(
+                    "source {alias}: introspected {} tables (ClickHouse, read-only)",
                     s.tables.len()
                 );
                 s

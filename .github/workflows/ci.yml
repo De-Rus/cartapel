@@ -42,6 +42,15 @@ jobs:
         options: >-
           --health-cmd "healthcheck.sh --connect --innodb_initialized"
           --health-interval 5s --health-timeout 3s --health-retries 30
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8
+        env:
+          CLICKHOUSE_PASSWORD: ci
+        ports:
+          - "58123:8123"
+        options: >-
+          --health-cmd "wget -qO- http://localhost:8123/ping || exit 1"
+          --health-interval 5s --health-timeout 3s --health-retries 30
     steps:
       - uses: actions/checkout@v4
 
@@ -79,6 +88,7 @@ jobs:
         env:
           CARTAPEL_TEST_DB: postgres://postgres:ci@127.0.0.1:55432/ci
           CARTAPEL_TEST_MYSQL: mysql://root:ci@127.0.0.1:53306/ci
+          CARTAPEL_TEST_CLICKHOUSE: clickhouse://default:ci@127.0.0.1:58123/default
         run: cargo test --locked
       - name: mysql introspection on MariaDB
         env:

@@ -17,3 +17,9 @@ services:
       MARIADB_DATABASE: p0
     ports:
       - "33062:3306"
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    environment:
+      CLICKHOUSE_PASSWORD: p0
+    ports:
+      - "33064:8123"

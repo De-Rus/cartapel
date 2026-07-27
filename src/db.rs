@@ -44,6 +44,7 @@ pub fn pg_row_to_json(row: &PgRow) -> Result<Map<String, Value>, sqlx::Error> {
 pub enum Dialect {
     Pg,
     MySql,
+    ClickHouse,
 }
 
 /// MySQL-protocol servers diverge where it matters (statement timeouts, auth,
@@ -57,10 +58,22 @@ pub enum MyFlavor {
 /// One handle per configured source. There is deliberately no accessor to the
 /// raw inner pool: every statement flows through the dispatched verbs below,
 /// which is what keeps the rest of the codebase dialect-free.
+/// A ClickHouse source: plain HTTP, queried with `FORMAT JSON`, every request
+/// pinned `readonly=1` server-side. There is no connection pool to manage —
+/// reqwest keeps its own.
+#[derive(Clone)]
+pub struct ChPool {
+    pub client: reqwest::Client,
+    pub url: String,
+    pub user: String,
+    pub password: String,
+}
+
 #[derive(Clone)]
 pub enum DbPool {
     Pg(sqlx::PgPool),
     MySql(sqlx::MySqlPool, MyFlavor),
+    ClickHouse(ChPool),
 }
 
 impl DbPool {
@@ -68,8 +81,81 @@ impl DbPool {
         match self {
             DbPool::Pg(_) => Dialect::Pg,
             DbPool::MySql(..) => Dialect::MySql,
+            DbPool::ClickHouse(_) => Dialect::ClickHouse,
         }
     }
+}
+
+fn ch_readonly() -> sqlx::Error {
+    sqlx::Error::Protocol("ClickHouse sources are read-only".into())
+}
+
+impl ChPool {
+    /// Run `sql` with the given bound values as `{pN:String}` params, always
+    /// read-only, time-boxed and row-capped server-side, decoded from
+    /// `FORMAT JSON`'s `data` array.
+    pub async fn query_json(
+        &self,
+        sql: &str,
+        params: &[(String, String)],
+        cap: i64,
+        timeout_ms: u32,
+    ) -> Result<Vec<Map<String, Value>>, sqlx::Error> {
+        let sql = format!("{} FORMAT JSON", sql.trim().trim_end_matches(';'));
+        let mut req = self
+            .client
+            .post(&self.url)
+            .basic_auth(&self.user, Some(&self.password))
+            .query(&[
+                ("readonly", "1"),
+                ("output_format_json_quote_64bit_integers", "0"),
+                ("result_overflow_mode", "break"),
+            ])
+            .query(&[
+                (
+                    "max_execution_time",
+                    ((timeout_ms / 1000).max(1)).to_string(),
+                ),
+                ("max_result_rows", cap.max(1).to_string()),
+            ]);
+        for (name, value) in params {
+            req = req.query(&[(format!("param_{name}"), value)]);
+        }
+        let resp = req
+            .body(sql)
+            .send()
+            .await
+            .map_err(|e| sqlx::Error::Protocol(format!("clickhouse: {e}")))?;
+        let status = resp.status();
+        let body = resp
+            .text()
+            .await
+            .map_err(|e| sqlx::Error::Protocol(format!("clickhouse: {e}")))?;
+        if !status.is_success() {
+            return Err(sqlx::Error::Protocol(format!(
+                "clickhouse: {}",
+                body.lines().next().unwrap_or("query failed")
+            )));
+        }
+        let parsed: Value = serde_json::from_str(&body)
+            .map_err(|e| sqlx::Error::Protocol(format!("clickhouse response: {e}")))?;
+        Ok(parsed
+            .get("data")
+            .and_then(Value::as_array)
+            .map(|rows| rows.iter().filter_map(|r| r.as_object().cloned()).collect())
+            .unwrap_or_default())
+    }
+}
+
+/// The `{pN:String}` params for a Binds' values (NULLs travel as empty — the
+/// callers never bind NULL on read paths).
+pub fn ch_params(binds: &crate::sqlval::Binds) -> Vec<(String, String)> {
+    binds
+        .values
+        .iter()
+        .enumerate()
+        .map(|(i, v)| (format!("p{}", i + 1), v.clone().unwrap_or_default()))
+        .collect()
 }
 
 /// MySQL rows decode natively — the closed type surface the Phase-0 rig proved:
@@ -155,6 +241,7 @@ pub async fn fetch_json_rows(
             let rows = q.fetch_all(my).await?;
             rows.iter().map(my_row_to_json).collect()
         }
+        DbPool::ClickHouse(ch) => ch.query_json(sql, &ch_params(binds), 100_000, 15_000).await,
     }
 }
 
@@ -175,6 +262,7 @@ impl DbPool {
         match self {
             DbPool::Pg(p) => Ok(DbTx::Pg(p.begin().await?)),
             DbPool::MySql(p, _) => Ok(DbTx::My(p.begin().await?)),
+            DbPool::ClickHouse(_) => Err(ch_readonly()),
         }
     }
 }
@@ -270,6 +358,7 @@ pub async fn execute(
                 last_insert_id: Some(r.last_insert_id()),
             })
         }
+        DbPool::ClickHouse(_) => Err(ch_readonly()),
     }
 }
 
@@ -295,6 +384,10 @@ pub async fn read_only_json_rows(
             let rows = binds.query(sql).fetch_all(&mut *tx).await?;
             let _ = tx.rollback().await;
             rows.iter().map(pg_row_to_json).collect()
+        }
+        DbPool::ClickHouse(ch) => {
+            ch.query_json(sql, &ch_params(binds), 100_000, timeout_ms)
+                .await
         }
         DbPool::MySql(my, flavor) => {
             let timed = my_timeout_sql(*flavor, sql, timeout_ms);
@@ -369,6 +462,30 @@ pub async fn estimate_all_rows(
                 .map(|(sch, t, r)| (format!("{sch}.{t}"), r))
                 .collect())
         }
+        DbPool::ClickHouse(ch) => {
+            let rows = ch
+                .query_json(
+                    "SELECT database, name, COALESCE(total_rows, 0) AS n
+                     FROM system.tables WHERE database = currentDatabase()",
+                    &[],
+                    10_000,
+                    4_000,
+                )
+                .await?;
+            Ok(rows
+                .into_iter()
+                .filter_map(|m| {
+                    Some((
+                        format!(
+                            "{}.{}",
+                            m.get("database")?.as_str()?,
+                            m.get("name")?.as_str()?
+                        ),
+                        m.get("n").and_then(Value::as_i64).unwrap_or(0),
+                    ))
+                })
+                .collect())
+        }
     }
 }
 
@@ -435,6 +552,21 @@ pub async fn config_query_rows(
             rows.truncate(cap.max(0) as usize);
             Ok(rows)
         }
+        DbPool::ClickHouse(ch) => {
+            let params: Vec<(String, String)> = binds
+                .iter()
+                .enumerate()
+                .map(|(i, b)| {
+                    let v = match b {
+                        crate::interp::BoundVal::Text(s) => s.clone(),
+                        crate::interp::BoundVal::Int(n) => n.to_string(),
+                        crate::interp::BoundVal::Float(f) => f.to_string(),
+                    };
+                    (format!("p{}", i + 1), v)
+                })
+                .collect();
+            ch.query_json(sql, &params, cap, timeout_ms).await
+        }
     }
 }
 
@@ -469,6 +601,22 @@ pub async fn estimate_rows(
             .map(|r| r.get::<i64, _>("n"))
             .unwrap_or(0);
             Ok(est)
+        }
+        DbPool::ClickHouse(ch) => {
+            let rows = ch
+                .query_json(
+                    "SELECT COALESCE(total_rows, 0) AS n FROM system.tables
+                     WHERE database = currentDatabase() AND name = {p1:String}",
+                    &[("p1".into(), dbt.name.clone())],
+                    1,
+                    4_000,
+                )
+                .await?;
+            Ok(rows
+                .first()
+                .and_then(|m| m.get("n"))
+                .and_then(Value::as_i64)
+                .unwrap_or(0))
         }
     }
 }
@@ -630,6 +778,88 @@ mod tests {
         assert_eq!(json_float(f64::INFINITY), Value::Null);
         assert_eq!(json_float(2.0), serde_json::json!(2));
         assert_eq!(json_float(2.5), serde_json::json!(2.5));
+    }
+
+    /// ClickHouse end-to-end against a live server (CARTAPEL_TEST_CLICKHOUSE):
+    /// introspection kinds, browse decode (64-bit exactness, arrays, nullables),
+    /// typed-param filtering, and the read-only wall.
+    #[tokio::test]
+    async fn clickhouse_browse_and_readonly() {
+        let Ok(url) = std::env::var("CARTAPEL_TEST_CLICKHOUSE") else {
+            eprintln!("CARTAPEL_TEST_CLICKHOUSE not set — clickhouse test skipped");
+            return;
+        };
+        let parsed = reqwest::Url::parse(&url.replacen("clickhouse://", "http://", 1)).unwrap();
+        let mut base = parsed.clone();
+        let _ = base.set_username("");
+        let _ = base.set_password(None);
+        base.set_path("/");
+        let ch = ChPool {
+            client: reqwest::Client::new(),
+            url: base.to_string(),
+            user: if parsed.username().is_empty() {
+                "default".into()
+            } else {
+                parsed.username().into()
+            },
+            password: parsed.password().unwrap_or("").into(),
+        };
+        let pool = DbPool::ClickHouse(ch.clone());
+        for stmt in [
+            "DROP TABLE IF EXISTS ch_kinds",
+            "CREATE TABLE ch_kinds (id UInt64, s String, sc Nullable(Float64),
+             tags Array(String), d DateTime) ENGINE = MergeTree ORDER BY id",
+            "INSERT INTO ch_kinds VALUES
+             (9007199254740993, 'wörld', NULL, ['a','b'], '2026-03-05 07:08:09'),
+             (2, 'two', 0.5, [], '2026-01-01 00:00:00')",
+        ] {
+            let mut req = ch
+                .client
+                .post(&ch.url)
+                .basic_auth(&ch.user, Some(&ch.password));
+            req = req.body(stmt.to_string());
+            assert!(req.send().await.unwrap().status().is_success(), "{stmt}");
+        }
+
+        let schema = crate::introspect::introspect_clickhouse(&ch).await.unwrap();
+        let t = schema.tables.get("ch_kinds").expect("fixture table");
+        assert_eq!(t.pk.as_deref(), Some("id"));
+        assert_eq!(t.column("s").unwrap().kind, crate::introspect::Kind::Text);
+        assert_eq!(t.column("sc").unwrap().kind, crate::introspect::Kind::Float);
+        assert!(t.column("sc").unwrap().nullable);
+        assert_eq!(
+            t.column("tags").unwrap().kind,
+            crate::introspect::Kind::Array
+        );
+
+        let mut binds = crate::sqlval::Binds::for_dialect(Dialect::ClickHouse);
+        let p = binds.ph(Some("2".into()));
+        let rows = fetch_json_rows(
+            &pool,
+            &format!(r#"SELECT * FROM ch_kinds WHERE "id" > {p} ORDER BY id"#),
+            &binds,
+        )
+        .await
+        .unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            rows[0].get("id"),
+            Some(&serde_json::json!(9007199254740993u64))
+        );
+        assert_eq!(rows[0].get("s"), Some(&Value::String("wörld".into())));
+        assert_eq!(rows[0].get("sc"), Some(&Value::Null));
+        assert_eq!(rows[0].get("tags"), Some(&serde_json::json!(["a", "b"])));
+
+        let binds = crate::sqlval::Binds::for_dialect(Dialect::ClickHouse);
+        let err = fetch_json_rows(
+            &pool,
+            "INSERT INTO ch_kinds VALUES (3,'x',0,[],now())",
+            &binds,
+        )
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("readonly") || err.to_string().contains("READONLY"));
+        assert!(pool.begin_tx().await.is_err());
     }
 
     /// Legacy-type decode pins from the read-side adversarial review: TIME and

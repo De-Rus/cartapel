@@ -140,7 +140,7 @@ import/export and audit all work the same way.
 
 | Key | Description |
 | --- | --- |
-| `type` | `"postgres"`, `"mysql"` (also accepts `"mariadb"`), or `"http"` for a read-only JSON source a custom page can call. |
+| `type` | `"postgres"`, `"mysql"` (also accepts `"mariadb"`), `"clickhouse"` (read-only), or `"http"` for a read-only JSON source a custom page can call. |
 | `url` | Connection URL (`postgres://…`, `mysql://…`) or endpoint (http). Supports `env:NAME` / `${NAME}`. |
 | `schemas` | List of schemas to introspect (postgres). Defaults to `["public"]`. A MySQL source is scoped to the database in its URL. |
 | `primary` | Marks the source cartapel introspects and serves by default. With a single database source it is implied; declare it explicitly when you define several. |
@@ -149,6 +149,14 @@ import/export and audit all work the same way.
 
 `--db postgres://…` / `CARTAPEL_DB` overrides the `primary` source's URL, so the
 same bundle can run against dev, staging or prod by swapping one env var.
+
+::: info ClickHouse (read-only)
+A `clickhouse` source (`url = "clickhouse://user:pass@host:8123/db"`) exposes
+its tables for browsing, filtering, search, export and SQL queries — writes are
+off by design, and the panel simply doesn't offer them. Every request runs with
+ClickHouse's own `readonly=1`, a statement timeout and a row cap. MergeTree
+primary keys aren't unique, so detail pages show the first matching row.
+:::
 
 ::: info MySQL & MariaDB
 MySQL 8.0+ and MariaDB 10.6+ are supported everywhere a database goes: as the

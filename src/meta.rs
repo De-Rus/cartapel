@@ -179,13 +179,15 @@ pub fn select_items_for(
 ) -> Vec<String> {
     let item = match dialect {
         crate::db::Dialect::Pg => column_item,
-        crate::db::Dialect::MySql => column_item_mysql,
+        crate::db::Dialect::MySql | crate::db::Dialect::ClickHouse => column_item_mysql,
     };
     let mut out: Vec<String> = dbt.columns.iter().map(item).collect();
     for (name, sql) in computed_columns(dbt, cfg) {
         match dialect {
             crate::db::Dialect::Pg => out.push(format!("to_jsonb(({sql})) AS {}", ident(name))),
-            crate::db::Dialect::MySql => out.push(format!("({sql}) AS {}", ident(name))),
+            crate::db::Dialect::MySql | crate::db::Dialect::ClickHouse => {
+                out.push(format!("({sql}) AS {}", ident(name)))
+            }
         }
     }
     out

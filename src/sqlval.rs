@@ -21,6 +21,7 @@ impl Binds {
         match self.dialect {
             crate::db::Dialect::Pg => format!("${}", self.values.len()),
             crate::db::Dialect::MySql => "?".into(),
+            crate::db::Dialect::ClickHouse => format!("{{p{}:String}}", self.values.len()),
         }
     }
 
@@ -30,7 +31,7 @@ impl Binds {
         let p = self.ph(v);
         match self.dialect {
             crate::db::Dialect::Pg => format!("{p}::{udt}"),
-            crate::db::Dialect::MySql => p,
+            crate::db::Dialect::MySql | crate::db::Dialect::ClickHouse => p,
         }
     }
 
@@ -57,6 +58,7 @@ pub fn pk_in_lhs(dialect: crate::db::Dialect, pk_ident: &str) -> String {
     match dialect {
         crate::db::Dialect::Pg => format!("{pk_ident}::text"),
         crate::db::Dialect::MySql => pk_ident.to_string(),
+        crate::db::Dialect::ClickHouse => format!("toString({pk_ident})"),
     }
 }
 
@@ -65,6 +67,7 @@ pub fn text_cast(dialect: crate::db::Dialect, expr: &str) -> String {
     match dialect {
         crate::db::Dialect::Pg => format!("{expr}::text"),
         crate::db::Dialect::MySql => format!("CAST({expr} AS CHAR)"),
+        crate::db::Dialect::ClickHouse => format!("toString({expr})"),
     }
 }
 
@@ -74,13 +77,16 @@ pub fn ilike_clause(dialect: crate::db::Dialect, expr: &str, ph: &str) -> String
     match dialect {
         crate::db::Dialect::Pg => format!("{expr}::text ILIKE {ph}"),
         crate::db::Dialect::MySql => format!("LOWER(CAST({expr} AS CHAR)) LIKE LOWER({ph})"),
+        crate::db::Dialect::ClickHouse => format!("toString({expr}) ILIKE {ph}"),
     }
 }
 
 /// One ORDER BY term with NULLS LAST semantics in both dialects.
 pub fn order_term(dialect: crate::db::Dialect, expr: &str, dir: &str) -> String {
     match dialect {
-        crate::db::Dialect::Pg => format!("{expr} {dir} NULLS LAST"),
+        crate::db::Dialect::Pg | crate::db::Dialect::ClickHouse => {
+            format!("{expr} {dir} NULLS LAST")
+        }
         crate::db::Dialect::MySql => format!("({expr} IS NULL), {expr} {dir}"),
     }
 }

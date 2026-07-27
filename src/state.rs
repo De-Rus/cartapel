@@ -372,7 +372,11 @@ impl AppState {
             .resolve_table(table)
             .map(|t| t.is_view || t.pk.is_none())
             .unwrap_or(true);
-        let writable = caps.write && !read_only_table;
+        let read_only_source = self
+            .resolve_table(table)
+            .map(|t| matches!(self.pool_of(t).dialect(), crate::db::Dialect::ClickHouse))
+            .unwrap_or(false);
+        let writable = caps.write && !read_only_table && !read_only_source;
         TablePerms {
             view,
             create: create && writable && caps.create,
