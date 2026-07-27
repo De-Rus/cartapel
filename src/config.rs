@@ -185,11 +185,6 @@ pub struct TableSource {
 #[serde(deny_unknown_fields)]
 pub struct PageConfig {
     pub label: String,
-    /// Scripted page: the module file, resolved relative to the page's folder.
-    /// When neither `module` nor `panel {}` is given it defaults to
-    /// `<page-slug>.js`. Mutually exclusive with `panel {}`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub module: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -214,18 +209,10 @@ pub struct LoadedPage {
     pub slug: String,
     pub group: Option<String>,
     pub label: String,
-    /// `Some` for a scripted page (module path), `None` for a declarative one.
-    pub module: Option<String>,
     pub columns: Option<u8>,
     pub widgets: Vec<PanelConfig>,
     pub icon: Option<String>,
     pub roles: Vec<String>,
-}
-
-impl LoadedPage {
-    pub fn is_declarative(&self) -> bool {
-        self.module.is_none()
-    }
 }
 
 impl LoadedPage {
@@ -1435,6 +1422,23 @@ pub(crate) fn validate_panel_fields(widgets: &[PanelConfig]) -> Result<(), Strin
 /// `dashboard.hcl`) and shared `widgets/` assets — never a screen/group.
 pub const RESERVED_DIR: &str = "config";
 
+/// `module` used to point a page at a JS bundle. Pages are declarative now, so
+/// a bundle carrying it must fail naming its replacement — serde's "unknown
+/// field" would be technically true and useless.
+fn reject_page_module(raw: &str, path: &Path) -> Result<(), String> {
+    let has_module = raw
+        .lines()
+        .map(str::trim_start)
+        .any(|l| l.starts_with("module") && l.contains('='));
+    if !has_module {
+        return Ok(());
+    }
+    Err(format!(
+        "{}: `module` is gone — a page is a grid of `panel {{}}` blocks now, and a panel reads inline `sql`, a named `query`, a configured `table` or a `source`",
+        path.display()
+    ))
+}
+
 pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
     let mut cfg = ConfigDir::default();
     let Some(dir) = dir else { return Ok(cfg) };
@@ -1571,24 +1575,16 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                     .parent()
                     .filter(|gp| gp.join("_group.hcl").exists())
                     .and_then(|gp| gp.file_name().map(|n| n.to_string_lossy().to_string()));
+                reject_page_module(&raw, &path)?;
                 let p: PageConfig = hcl::from_str(&raw).map_err(ctx)?;
-                let declarative = !p.widgets.is_empty();
-                if declarative && p.module.is_some() {
+                if p.widgets.is_empty() {
                     return Err(format!(
-                        "{}: a page sets both `module` and `panel {{}}` — a page is scripted OR declarative, not both",
+                        "{}: a page needs at least one `panel {{}}` block — pages are declarative (a panel can read `sql`, a named `query`, a configured `table` or a `source`)",
                         path.display()
                     ));
                 }
                 validate_panel_fields(&p.widgets)
                     .map_err(|e| format!("{}: {e}", path.display()))?;
-                let module = (!declarative).then(|| {
-                    let module_file = p.module.clone().unwrap_or_else(|| format!("{slug}.js"));
-                    let folder_rel = parent.strip_prefix(dir).unwrap_or(parent);
-                    folder_rel
-                        .join(&module_file)
-                        .to_string_lossy()
-                        .replace('\\', "/")
-                });
                 if let Some(prev) = page_slugs.get(&slug) {
                     return Err(format!(
                         "duplicate page slug \"{slug}\": {} and {}",
@@ -1601,7 +1597,6 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                     slug,
                     group,
                     label: p.label,
-                    module,
                     columns: p.columns,
                     widgets: p.widgets,
                     icon: p.icon,
@@ -1633,27 +1628,15 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                     panels: Vec<PanelConfig>,
                 }
                 let peek: Peek = hcl::from_str(&raw).map_err(ctx)?;
-                let is_page = peek.module.is_some() || !peek.panels.is_empty();
+                if peek.module.is_some() {
+                    reject_page_module(&raw, &path)?;
+                }
+                let is_page = !peek.panels.is_empty();
 
                 if is_page {
                     let p: PageConfig = hcl::from_str(&raw).map_err(ctx)?;
-                    let declarative = !p.widgets.is_empty();
-                    if declarative && p.module.is_some() {
-                        return Err(format!(
-                            "{}: a screen sets both `module` and `panel {{}}` — a screen is scripted OR declarative, not both",
-                            path.display()
-                        ));
-                    }
                     validate_panel_fields(&p.widgets)
                         .map_err(|e| format!("{}: {e}", path.display()))?;
-                    let module = (!declarative).then(|| {
-                        let module_file = p.module.clone().unwrap_or_else(|| format!("{slug}.js"));
-                        let folder_rel = parent.strip_prefix(dir).unwrap_or(parent);
-                        folder_rel
-                            .join(&module_file)
-                            .to_string_lossy()
-                            .replace('\\', "/")
-                    });
                     if let Some(prev) = page_slugs.get(&slug) {
                         return Err(format!(
                             "duplicate screen slug \"{slug}\": {} and {}",
@@ -1666,7 +1649,6 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                         slug,
                         group,
                         label: p.label,
-                        module,
                         columns: p.columns,
                         widgets: p.widgets,
                         icon: p.icon,
@@ -2240,14 +2222,12 @@ source "main" {
         let p: PageConfig = hcl::from_str(
             r#"
 label  = "Operations"
-module = "ops.js"
 icon   = "satellite"
 roles  = ["ops"]
 "#,
         )
         .expect("parse page");
         assert_eq!(p.label, "Operations");
-        assert_eq!(p.module.as_deref(), Some("ops.js"));
         assert_eq!(p.icon.as_deref(), Some("satellite"));
         assert_eq!(p.roles, vec!["ops"]);
         let out = hcl::to_string(&p).unwrap();
@@ -2259,17 +2239,15 @@ roles  = ["ops"]
         );
 
         assert!(
-            hcl::from_str::<PageConfig>("label = \"X\"\nmodule = \"x.js\"\ngroup = \"Ops\"\n")
-                .is_err(),
+            hcl::from_str::<PageConfig>("label = \"X\"\ngroup = \"Ops\"\n").is_err(),
             "a stray folder-derived `group` is rejected",
         );
         assert!(
-            hcl::from_str::<PageConfig>("label = \"X\"\nmodule = \"x.js\"\nslug = \"x\"\n")
-                .is_err(),
+            hcl::from_str::<PageConfig>("label = \"X\"\nslug = \"x\"\n").is_err(),
             "a stray folder-derived `slug` is rejected",
         );
         assert!(
-            hcl::from_str::<PageConfig>("label = \"X\"\nmodule = \"x.js\"\nid = \"x\"\n").is_err(),
+            hcl::from_str::<PageConfig>("label = \"X\"\nid = \"x\"\n").is_err(),
             "a stray folder-derived `id` is rejected",
         );
     }
@@ -2406,7 +2384,6 @@ panel {
         .expect("parse declarative page");
         assert_eq!(p.label, "Ops");
         assert_eq!(p.roles, vec!["ops"]);
-        assert!(p.module.is_none(), "declarative page has no module");
         let w = &p.widgets[0];
         assert_eq!(w.columns.len(), 3);
         assert_eq!(w.columns[0].label.as_deref(), Some("Bot"));
@@ -2587,7 +2564,7 @@ panel {
         std::fs::create_dir_all(&ops).unwrap();
         std::fs::write(
             ops.join("screen.hcl"),
-            "label = \"Ops\"\nmodule = \"ops.tsx\"\n",
+            "label = \"Ops\"\npanel {\n  type = \"stat\"\n  label = \"X\"\n  sql = \"SELECT 1 AS v\"\n}\n",
         )
         .unwrap();
 
@@ -2622,13 +2599,13 @@ panel {
         .unwrap();
         std::fs::write(
             grouped.join("bar").join("page.hcl"),
-            "label = \"Bar\"\nmodule = \"bar.js\"\n",
+            "label = \"Bar\"\npanel {\n  type = \"stat\"\n  label = \"X\"\n  sql = \"SELECT 1 AS v\"\n}\n",
         )
         .unwrap();
         std::fs::create_dir_all(root.join("baz")).unwrap();
         std::fs::write(
             root.join("baz").join("page.hcl"),
-            "label = \"Baz\"\nmodule = \"baz.js\"\n",
+            "label = \"Baz\"\npanel {\n  type = \"stat\"\n  label = \"X\"\n  sql = \"SELECT 1 AS v\"\n}\n",
         )
         .unwrap();
 
@@ -2679,7 +2656,7 @@ panel {
         .unwrap();
         std::fs::write(
             grouped.join("cache").join("page.hcl"),
-            "label = \"Cache\"\nmodule = \"cache.tsx\"\n",
+            "label = \"Cache\"\npanel {\n  type = \"stat\"\n  label = \"X\"\n  sql = \"SELECT 1 AS v\"\n}\n",
         )
         .unwrap();
 
@@ -2696,8 +2673,7 @@ panel {
         assert_eq!(fleet.id(), "overview/fleet");
         assert_eq!(fleet.group.as_deref(), Some("overview"));
         assert_eq!(fleet.roles, vec!["ops"]);
-        assert!(fleet.is_declarative(), "widgets => declarative, no module");
-        assert!(fleet.module.is_none());
+        assert!(!fleet.widgets.is_empty(), "a page is its panels");
         assert_eq!(fleet.columns, Some(4));
         assert_eq!(fleet.widgets.len(), 1);
         let cache = cfg
@@ -2705,12 +2681,11 @@ panel {
             .iter()
             .find(|p| p.slug == "cache")
             .expect("cache page");
-        assert!(!cache.is_declarative(), "module => scripted");
-        assert_eq!(cache.module.as_deref(), Some("overview/cache/cache.tsx"));
+        assert!(!cache.widgets.is_empty());
 
         std::fs::write(
             grouped.join("fleet").join("page.hcl"),
-            "label = \"Both\"\nmodule = \"x.tsx\"\npanel {\n  type = \"stat\"\n  label = \"X\"\n  sql = \"SELECT 1 AS v\"\n}\n",
+            "label = \"Both\"\nmodule = \"x.tsx\"\n",
         )
         .unwrap();
         assert!(
@@ -2903,7 +2878,7 @@ panel {
         std::fs::write(a.join("_group.hcl"), "label = \"Grp A\"\n").unwrap();
         std::fs::write(
             a.join("ops").join("page.hcl"),
-            "label = \"A\"\nmodule = \"a.js\"\n",
+            "label = \"A\"\npanel {\n  type = \"stat\"\n  label = \"X\"\n  sql = \"SELECT 1 AS v\"\n}\n",
         )
         .unwrap();
 
@@ -2912,7 +2887,7 @@ panel {
         std::fs::write(b.join("_group.hcl"), "label = \"Grp B\"\n").unwrap();
         std::fs::write(
             b.join("ops").join("page.hcl"),
-            "label = \"B\"\nmodule = \"b.js\"\n",
+            "label = \"B\"\npanel {\n  type = \"stat\"\n  label = \"X\"\n  sql = \"SELECT 1 AS v\"\n}\n",
         )
         .unwrap();
 
@@ -2934,7 +2909,7 @@ panel {
         std::fs::write(a.join("_group.hcl"), "label = \"Overview\"\n").unwrap();
         std::fs::write(
             a.join("ops").join("page.hcl"),
-            "label = \"A\"\nmodule = \"a.js\"\n",
+            "label = \"A\"\npanel {\n  type = \"stat\"\n  label = \"X\"\n  sql = \"SELECT 1 AS v\"\n}\n",
         )
         .unwrap();
 
@@ -2943,7 +2918,7 @@ panel {
         std::fs::write(b.join("_group.hcl"), "label = \"Other\"\n").unwrap();
         std::fs::write(
             b.join("ops").join("page.hcl"),
-            "label = \"B\"\nmodule = \"b.js\"\n",
+            "label = \"B\"\npanel {\n  type = \"stat\"\n  label = \"X\"\n  sql = \"SELECT 1 AS v\"\n}\n",
         )
         .unwrap();
 
@@ -3035,12 +3010,36 @@ panel {
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// The emitted page `module` is the admin-relative path to the module file:
-    /// the convention default `<folder>/<slug>.js` when omitted, and the explicit
-    /// filename resolved against the page's own folder when present.
+    /// `module` is gone: a page is its panels. A bundle carrying the old key
+    /// must fail loudly, naming what replaces it, rather than rendering blank.
     #[test]
-    fn page_module_emits_admin_relative_path() {
-        let root = fresh_root("page-module");
+    fn a_page_with_module_is_a_loud_load_error() {
+        let root = fresh_root("page-module-gone");
+        let ops = root.join("overview").join("ops");
+        std::fs::create_dir_all(&ops).unwrap();
+        std::fs::write(
+            root.join("overview").join("_group.hcl"),
+            "label = \"Overview\"\n",
+        )
+        .unwrap();
+        std::fs::write(
+            ops.join("screen.hcl"),
+            "label = \"Operations\"\nmodule = \"ops.tsx\"\n",
+        )
+        .unwrap();
+        let err = load(Some(&root)).expect_err("module must be refused");
+        assert!(err.contains("`module` is gone"), "{err}");
+        assert!(
+            err.contains("panel"),
+            "the error names the replacement: {err}"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A page with neither panels nor module is not a blank scripted page.
+    #[test]
+    fn a_page_needs_panels() {
+        let root = fresh_root("page-empty");
         let ops = root.join("overview").join("ops");
         std::fs::create_dir_all(&ops).unwrap();
         std::fs::write(
@@ -3049,44 +3048,9 @@ panel {
         )
         .unwrap();
         std::fs::write(ops.join("page.hcl"), "label = \"Operations\"\n").unwrap();
-        let cfg = load(Some(&root)).expect("load");
-        let page = cfg
-            .pages
-            .iter()
-            .find(|p| p.slug == "ops")
-            .expect("ops page");
-        assert_eq!(
-            page.module.as_deref(),
-            Some("overview/ops/ops.js"),
-            "convention default"
-        );
+        let err = load(Some(&root)).expect_err("an empty page must be refused");
+        assert!(err.contains("at least one"), "{err}");
         let _ = std::fs::remove_dir_all(&root);
-
-        let root2 = fresh_root("page-module-explicit");
-        let ops2 = root2.join("overview").join("ops");
-        std::fs::create_dir_all(&ops2).unwrap();
-        std::fs::write(
-            root2.join("overview").join("_group.hcl"),
-            "label = \"Overview\"\n",
-        )
-        .unwrap();
-        std::fs::write(
-            ops2.join("page.hcl"),
-            "label = \"Operations\"\nmodule = \"ops.js\"\n",
-        )
-        .unwrap();
-        let cfg2 = load(Some(&root2)).expect("load");
-        let page2 = cfg2
-            .pages
-            .iter()
-            .find(|p| p.slug == "ops")
-            .expect("ops page");
-        assert_eq!(
-            page2.module.as_deref(),
-            Some("overview/ops/ops.js"),
-            "explicit module, admin-relative"
-        );
-        let _ = std::fs::remove_dir_all(&root2);
     }
 
     // ---- one-shot TOML -> HCL converter (run explicitly) --------------------

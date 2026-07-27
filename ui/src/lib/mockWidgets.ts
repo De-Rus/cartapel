@@ -1,4 +1,4 @@
-import { pageElementName, widgetElementName } from './widgets'
+import { widgetElementName } from './widgets'
 
 const registered = new Set<string>()
 
@@ -60,22 +60,6 @@ function defineSparkline() {
   customElements.define(widgetElementName('sparkline'), SxSparkline)
 }
 
-function definePage(elementName: string) {
-  if (customElements.get(elementName)) return
-  class SxMockPage extends HTMLElement {
-    set api(_v: unknown) {}
-    set params(_v: unknown) {}
-    connectedCallback() {
-      this.innerHTML =
-        `<div style="padding:2rem;color:var(--sec)">` +
-        `<h2 style="font-size:18px;color:var(--ink);font-weight:600;margin-bottom:.5rem">Custom page (mock)</h2>` +
-        `<p>This full-screen module is served from <code>/admin/static/</code> in production. ` +
-        `It mounts <code>&lt;${elementName}&gt;</code> with the <code>api</code> prop.</p></div>`
-    }
-  }
-  customElements.define(elementName, SxMockPage)
-}
-
 function defineWidget(elementName: string, name: string) {
   if (customElements.get(elementName)) return
   class SxMockWidget extends HTMLElement {
@@ -92,34 +76,23 @@ function defineWidget(elementName: string, name: string) {
 
 const WIDGET_MODULE = /(?:^|\/)config\/widgets\/([^/]+)\.js$/
 
-function stem(moduleFile: string): string {
-  return (moduleFile.split('/').pop() ?? moduleFile).replace(/\.js$/, '')
-}
-
 export interface MockElement {
-  kind: 'widget' | 'page'
   name: string
   tag: string
 }
 
-export function mockElement(moduleFile: string): MockElement {
+export function mockElement(moduleFile: string): MockElement | null {
   const widget = WIDGET_MODULE.exec(moduleFile)
-  if (widget) {
-    const name = widget[1]
-    return { kind: 'widget', name, tag: widgetElementName(name) }
-  }
-  const slug = stem(moduleFile)
-  return { kind: 'page', name: slug, tag: pageElementName(slug) }
+  if (!widget) return null
+  const name = widget[1]
+  return { name, tag: widgetElementName(name) }
 }
 
 export function registerMockModule(moduleFile: string): void {
   if (registered.has(moduleFile)) return
   registered.add(moduleFile)
   const el = mockElement(moduleFile)
-  if (el.kind === 'widget') {
-    if (el.name === 'sparkline') defineSparkline()
-    else defineWidget(el.tag, el.name)
-  } else {
-    definePage(el.tag)
-  }
+  if (!el) return
+  if (el.name === 'sparkline') defineSparkline()
+  else defineWidget(el.tag, el.name)
 }

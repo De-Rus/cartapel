@@ -613,7 +613,7 @@ export function PageDashboard() {
   const { '*': id = '' } = useParams()
   const meta = useMeta()
   const vq = useVarQuery()
-  const known = meta.pages?.some((p) => p.id === id && p.declarative)
+  const known = meta.pages?.some((p) => p.id === id)
   const { data, isLoading } = useQuery({
     queryKey: ['page-widgets', id, vq],
     queryFn: () => api.pageWidgets(id, vq),

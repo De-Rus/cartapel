@@ -21,7 +21,7 @@ export default defineConfig({
     ['meta', { name: 'theme-color', content: '#f59e0b' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: 'cartapel' }],
-    ['meta', { property: 'og:title', content: 'cartapel — an admin panel for your existing Postgres' }],
+    ['meta', { property: 'og:title', content: 'cartapel — an admin panel for your existing database' }],
     [
       'meta',
       {
@@ -119,7 +119,7 @@ export default defineConfig({
         collapsed: false,
         items: [
           { text: 'Fields & widgets', link: '/configuration/fields-and-widgets' },
-          { text: 'Custom pages & queries', link: '/configuration/pages-and-queries' },
+          { text: 'Pages & queries', link: '/configuration/pages-and-queries' },
           { text: 'Theming', link: '/theming' },
           { text: 'Localization', link: '/localization' },
           { text: 'Roles & permissions', link: '/roles-and-permissions' },
@@ -148,7 +148,7 @@ export default defineConfig({
 
     footer: {
       message: 'Released under the MIT License.',
-      copyright: 'cartapel — an admin panel for your existing Postgres.',
+      copyright: 'cartapel — an admin panel for your existing database.',
     },
   },
 })

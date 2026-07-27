@@ -789,8 +789,7 @@ pub(crate) fn pages_meta(cfg: &crate::config::ConfigDir, user: &CurrentUser) -> 
         .map(|p| {
             let group = p.group.as_deref().and_then(|slug| cfg.group_label(slug));
             json!({
-                "id": p.id(), "slug": p.slug, "label": p.label, "module": p.module,
-                "declarative": p.is_declarative(),
+                "id": p.id(), "slug": p.slug, "label": p.label,
                 "group": group, "icon": p.icon, "roles": p.roles,
             })
         })
@@ -847,7 +846,7 @@ mod nav_tests {
     /// `declarative = true`; a role-gated one is hidden from the wrong role but
     /// shown to an admin.
     #[test]
-    fn pages_meta_marks_declarative_and_role_gates() {
+    fn pages_meta_is_group_qualified_and_role_gated() {
         use crate::config::{ConfigDir, LoadedGroup, LoadedPage};
         let mut cfg = ConfigDir::default();
         cfg.groups.push(LoadedGroup {
@@ -863,7 +862,6 @@ mod nav_tests {
             slug: "fleet".into(),
             group: Some("overview".into()),
             label: "Fleet".into(),
-            module: None,
             columns: Some(4),
             widgets: vec![],
             icon: Some("satellite".into()),
@@ -883,12 +881,6 @@ mod nav_tests {
         assert_eq!(
             seen[0]["group"], "Overview",
             "group is the LABEL, not the slug"
-        );
-        assert_eq!(seen[0]["declarative"], true);
-        assert_eq!(
-            seen[0]["module"],
-            serde_json::Value::Null,
-            "declarative page has no module"
         );
 
         let viewer = CurrentUser {

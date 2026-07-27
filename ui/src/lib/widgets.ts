@@ -51,7 +51,7 @@ export function widgetModuleUrl(moduleFile: string): string {
   return `${BASE}/static/${moduleFile}?v=${CACHE_BUST}`
 }
 
-export function loadWidgetModule(moduleFile: string, pageSlug?: string): Promise<void> {
+export function loadWidgetModule(moduleFile: string): Promise<void> {
   const existing = moduleCache.get(moduleFile)
   if (existing) return existing
   const url = widgetModuleUrl(moduleFile)
@@ -63,10 +63,6 @@ export function loadWidgetModule(moduleFile: string, pageSlug?: string): Promise
           resolve()
         })
         .catch(reject)
-      return
-    }
-    if (/\.tsx?$/.test(moduleFile)) {
-      loadTsxModule(url, pageSlug).then(resolve).catch(reject)
       return
     }
     const script = document.createElement('script')
@@ -86,52 +82,6 @@ export function loadWidgetModule(moduleFile: string, pageSlug?: string): Promise
   return moduleCache.get(moduleFile) as Promise<void>
 }
 
-/** TSX/TS page modules: fetched as source, transpiled in the browser (sucrase,
- *  lazy chunk), executed with every `sx` export in scope — pages write plain
- *  typed JSX with zero imports and `export default` their component. */
-async function loadTsxModule(url: string, pageSlug?: string): Promise<void> {
-  const res = await fetch(url, { credentials: 'include' })
-  if (!res.ok) throw new Error(`failed to load ${url}`)
-  const source = await res.text()
-  const { transform } = await import('sucrase')
-  const sx = (window as unknown as { sx: Record<string, unknown> }).sx
-  const prelude = `const {${Object.keys(sx).join(',')}} = window.sx;\n`
-  const { code } = transform(source, {
-    transforms: ['typescript', 'jsx'],
-    jsxPragma: 'h',
-    jsxFragmentPragma: 'Fragment',
-    production: true,
-  })
-  const sourced = `${prelude}${code}\n//# sourceURL=${url}\n`
-  const blobUrl = URL.createObjectURL(new Blob([sourced], { type: 'text/javascript' }))
-  let mod: Record<string, unknown>
-  try {
-    mod = (await import(/* @vite-ignore */ blobUrl)) as Record<string, unknown>
-  } catch (e) {
-    // Every sx export is injected as a top-level const, so a module declaring
-    // its own `Page`/`Chart`/`Table` collides — with an error that never says why.
-    const m = /Identifier '(\w+)' has already been declared/.exec(String(e))
-    if (m) {
-      throw new Error(
-        `\`${m[1]}\` is already provided by the sx SDK — rename yours (every sx export is in scope without importing).`,
-      )
-    }
-    throw e
-  } finally {
-    URL.revokeObjectURL(blobUrl)
-  }
-  if (!pageSlug) return
-  if (typeof mod.default === 'function') {
-    ;(sx.definePage as (slug: string, c: unknown) => void)(pageSlug, mod.default)
-    return
-  }
-  if (customElements.get(pageElementName(pageSlug))) return
-  const found = Object.keys(mod).filter((k) => k !== 'default')
-  throw new Error(
-    `loaded but exported no page. Add \`export default\` (or call sx.definePage('${pageSlug}', C)).` +
-      (found.length ? ` Found exports: ${found.join(', ')}.` : ''),
-  )
-}
 
 export function widgetElementName(name: string): string {
   return `sx-widget-${name}`

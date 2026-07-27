@@ -14,13 +14,10 @@
     "@tanstack/react-query": "^5.51.1",
     "@tanstack/react-virtual": "^3.14.6",
     "clsx": "^2.1.1",
-    "htm": "^3.1.1",
     "lucide-react": "^1.25.0",
-    "preact": "^10.24.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.0",
-    "sucrase": "^3.35.1"
+    "react-router-dom": "^6.26.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

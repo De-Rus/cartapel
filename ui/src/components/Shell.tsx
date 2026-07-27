@@ -86,7 +86,7 @@ function SidebarGroups({
           to: `/p/${p.id}`,
           label: p.label,
           group: p.group,
-          icon: p.icon ?? (p.declarative ? 'layout-dashboard' : undefined),
+          icon: p.icon ?? 'layout-dashboard',
         }),
       ),
     ]

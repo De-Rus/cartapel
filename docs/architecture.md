@@ -116,7 +116,6 @@ becomes a read-only viewer that hands you the HCL to commit yourself.
 Browser ──▶ {base}/api/*        JSON API (auth, meta, rows, config, dashboard, queries)
         ──▶ {base}/static/*     path-confined bundle assets (widget/page JS, logos)
         ──▶ {base}/assets/*     the hashed SPA bundle (immutable, cached for a year)
-        ──▶ {base}/sx.d.ts      type declarations for the `sx` page/widget SDK
         ──▶ {base}/*            the embedded SPA (client-side routing)
         ──▶ /                   redirects to {base}/
 ```

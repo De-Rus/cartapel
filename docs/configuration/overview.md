@@ -35,10 +35,9 @@ admin/
     │       └── screen.hcl
     └── overview/
         ├── _group.hcl
-        └── summary/            # a scripted page instead of a table
-            ├── screen.hcl     #   module = "summary.tsx"
-            ├── summary.tsx     #   the page module (co-located)
-            └── queries.hcl     #   named read-only queries the page calls
+        └── summary/            # a page of panels instead of a table
+            ├── screen.hcl     #   panel { } blocks
+            └── queries.hcl     #   named read-only queries its panels call
 ```
 
 Config files are discovered recursively; load order is deterministic (files
@@ -49,10 +48,9 @@ sorted by path). The rules the diagram doesn't show:
 - A **`_group.hcl`** makes its folder a sidebar group and sets its label, icon
   and order. Tables in a folder without one land in a trailing "Ungrouped"
   group. See [Groups & navigation](/configuration/groups-and-nav).
-- A **page** is the same shape — a folder whose `screen.hcl` sets
-  `module = "<name>.tsx"` (scripted) or holds `panel { }` blocks (declarative),
-  never both. `page.hcl` is an accepted synonym for such a file. See
-  [Pages & queries](/configuration/pages-and-queries).
+- A **page** is the same shape — a folder whose `screen.hcl` holds `panel { }`
+  blocks instead of table config. `page.hcl` is an accepted synonym for such a
+  file. See [Pages & queries](/configuration/pages-and-queries).
 - A **`queries.hcl`** in any folder contributes named read-only queries;
   **`variables.hcl`** and **`sources.hcl`** work the same way for template
   variables and extra data sources. Names must be unique across the bundle.

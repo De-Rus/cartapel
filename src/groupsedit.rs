@@ -1205,7 +1205,11 @@ mod tests {
         .unwrap();
         let page_dir = dir.join("trading").join("ops");
         std::fs::create_dir_all(&page_dir).unwrap();
-        std::fs::write(page_dir.join("page.hcl"), "label = \"Ops\"\n").unwrap();
+        std::fs::write(
+            page_dir.join("page.hcl"),
+            "label = \"Ops\"\npanel {\n  type = \"stat\"\n  label = \"X\"\n  sql = \"SELECT 1 AS v\"\n}\n",
+        )
+        .unwrap();
         let state = state_with_tables(Some(dir.clone()), &["bots"]);
         assert!(state.cfg().queries.contains_key("trading_fleet"));
         assert!(state.cfg().pages.iter().any(|p| p.id() == "trading/ops"));

@@ -306,7 +306,7 @@ pub async fn page_widgets_handler(
     let page = cfg
         .pages
         .iter()
-        .find(|p| p.id() == id && p.is_declarative())
+        .find(|p| p.id() == id)
         .ok_or_else(|| AppError::not_found("unknown declarative page"))?;
     if !user.may(&page.roles, crate::state::Access::Everyone) {
         return Err(AppError::forbidden("no access to this page"));

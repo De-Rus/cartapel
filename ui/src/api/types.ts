@@ -141,8 +141,6 @@ export interface PageMeta {
   id: string
   slug: string
   label: string
-  module: string | null
-  declarative?: boolean
   group: string | null
   icon?: string | null
   roles?: string[] | null

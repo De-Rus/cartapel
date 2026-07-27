@@ -82,7 +82,7 @@ commit.
 | **Roles & permissions** | Per-table / per-column / row-level, in versioned config. Role inheritance (`extends`), multi-role union, a per-role `customize` grant, and a read-only **view-as** mode to verify what a role sees. |
 | **Audit & revert** | Every write logged with before/after diffs. Field edits revert in one click — and the revert is itself audited. |
 | **SQL dashboards** | Stat tiles, charts and tables straight from SQL, with template variables (`{{window}}`), all in read-only transactions with timeouts. |
-| **Custom pages** | Drop a `.tsx` module next to your config — transpiled in the browser with the `sx` SDK in scope. No build step, no npm. Typed via `{base}/sx.d.ts`. |
+| **Pages & dashboards** | Grids of panels defined in HCL — each reads inline SQL, a named query, a configured table, or a source (an HTTP endpoint, a directory, a bucket). No JavaScript anywhere. |
 | **Theming & i18n** | Presets (including a faithful Django look), your accent, per-mode design tokens, per-locale labels — one hot-reloaded HCL block. |
 | **Several databases at once** | Postgres, MySQL and MariaDB are fully editable — the connection URL's scheme picks the engine. ClickHouse joins as a read-only source for browsing and SQL. Extra databases are `source` blocks; their tables share one sidebar. |
 | **Ops-friendly** | Single static binary or Docker image. Config hot-reloads from disk (a broken edit keeps the last good config). `cartapel check` validates the bundle in CI. Optional `public_role` for kiosk/demo access. |

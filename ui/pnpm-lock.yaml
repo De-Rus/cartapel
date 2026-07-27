@@ -17,15 +17,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
-      htm:
-        specifier: ^3.1.1
-        version: 3.1.1
       lucide-react:
         specifier: ^1.25.0
         version: 1.25.0(react@18.3.1)
-      preact:
-        specifier: ^10.24.0
-        version: 10.29.7
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -35,9 +29,6 @@ importers:
       react-router-dom:
         specifier: ^6.26.0
         version: 6.30.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      sucrase:
-        specifier: ^3.35.1
-        version: 3.35.1
     devDependencies:
       '@types/react':
         specifier: ^18.3.3
@@ -718,9 +709,6 @@ packages:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
 
-  htm@3.1.1:
-    resolution: {integrity: sha512-983Vyg8NwUE7JkZ6NmOqpCZ+sh1bKv2iYTlUkzlWmA5JD2acKoxd4KVxbMmxX/85mtfdnDmTFoNKcg5DGAvxNQ==}
-
   is-binary-path@2.1.0:
     resolution: {integrity: sha512-ZMERYes6pDydyuGidse7OsHxtbI7WVeUEozgR/g7rd0xUimYNlvZRE/K2MgZTjWy725IfelLeVcEM97mmtRGXw==}
     engines: {node: '>=8'}
@@ -893,14 +881,6 @@ packages:
   postcss@8.5.19:
     resolution: {integrity: sha512-Mz8SaolMd8nB+G13WkORcxQKHZ/NE4xXevtkJHVuG+guo9/wYKlIMTKAqGdEmYOXR2ijPjTYNHssizdaVSUNdQ==}
     engines: {node: ^10 || ^12 || >=14}
-
-  preact@10.29.7:
-    resolution: {integrity: sha512-DCHYrK/B10yUD3ZjLfhZ3WIE/9Vf9VFUODcRE2dRomTYDpJk6z6L9wecSfhfE6M9ZTHUdyQkoC46arIDhEV84Q==}
-    peerDependencies:
-      preact-render-to-string: '>=5'
-    peerDependenciesMeta:
-      preact-render-to-string:
-        optional: true
 
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
@@ -1669,8 +1649,6 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
-  htm@3.1.1: {}
-
   is-binary-path@2.1.0:
     dependencies:
       binary-extensions: 2.3.0
@@ -1794,8 +1772,6 @@ snapshots:
       nanoid: 3.3.16
       picocolors: 1.1.1
       source-map-js: 1.2.1
-
-  preact@10.29.7: {}
 
   queue-microtask@1.2.3: {}
 

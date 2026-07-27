@@ -585,7 +585,7 @@ const META: Meta = {
   user: CURRENT_USER,
   has_dashboard: true,
   pages: [
-    { id: 'ops/reconcile', slug: 'reconcile', label: 'Reconciliation', module: 'reconcile.js', group: 'Ops', icon: 'scale' },
+    { id: 'ops/reconcile', slug: 'reconcile', label: 'Reconciliation', group: 'Ops', icon: 'scale' },
   ],
   locale: 'es',
   strings: null,
