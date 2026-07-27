@@ -15,3 +15,14 @@ display {
 field "mrr" {
   format = "currency"
 }
+
+field "plan" {
+  widget = "custom:statuspill"
+  params = {
+    map = {
+      free       = "gray"
+      pro        = "blue"
+      enterprise = "green"
+    }
+  }
+}

@@ -267,6 +267,25 @@ field "equity" {
 }
 ```
 
+### Bundled widgets
+
+The demo bundle ships three drop-in widgets under `config/widgets/` — copy the
+files into your own bundle and reference them as `custom:<name>`:
+
+- **`statuspill`** — a colored pill from a value → tone mapping.
+  `params`: `field` (column to read, defaults to the cell value), `map`
+  (`{ "<value>": "<tone>" | { label, tone } }` with tone ∈
+  `green|red|blue|gray|orange|violet|yellow`), `fallback` (tone when no key
+  matches, default `gray`), `labels` (optional value → label overrides).
+  Booleans and numbers match by their string form (`"true"`, `"3"`).
+- **`minibar`** — a tiny horizontal magnitude bar + number.
+  `params`: `field`, `max` (full scale, default 100), `width` (px), `color`,
+  `suffix`, plus `warn_at` / `warn_color` to recolor once `value ≥ warn_at`.
+- **`sparkline`** — inline SVG trend line. `params = { field, color, width,
+  height }`; `field` names a column holding a JSON array of numbers.
+
+All three read the panel's CSS variables, so they track the active theme.
+
 ### Authoring one
 
 Define a custom element named `sx-widget-<name>`. cartapel sets three properties
