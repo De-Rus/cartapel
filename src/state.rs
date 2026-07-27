@@ -39,6 +39,9 @@ pub struct AppState {
     pub secret_key: [u8; 32],
     pub webhook_secret: Option<String>,
     pub options_cache: Mutex<HashMap<OptionsCacheKey, (Instant, serde_json::Value)>>,
+    /// Listings for `files` sources: walking a deep tree costs real time, so a
+    /// scan is reused for the source's ttl.
+    pub files_cache: Mutex<HashMap<String, (Instant, Vec<serde_json::Value>)>>,
     pub login_limiter: Mutex<HashMap<String, (u32, Instant)>>,
     /// Serializes the read-modify-write of the on-disk config files so two
     /// concurrent admin writes can't clobber each other (last rename wins =

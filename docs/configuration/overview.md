@@ -140,7 +140,7 @@ import/export and audit all work the same way.
 
 | Key | Description |
 | --- | --- |
-| `type` | `"postgres"`, `"mysql"` (also accepts `"mariadb"`), `"clickhouse"` (read-only), or `"http"` for a read-only JSON source a custom page can call. |
+| `type` | `"postgres"`, `"mysql"` (also accepts `"mariadb"`), `"clickhouse"` (read-only), `"http"` (a JSON endpoint cartapel proxies server-side), or `"files"` (a directory listing). |
 | `url` | Connection URL (`postgres://…`, `mysql://…`) or endpoint (http). Supports `env:NAME` / `${NAME}`. |
 | `schemas` | List of schemas to introspect (postgres). Defaults to `["public"]`. A MySQL source is scoped to the database in its URL. |
 | `primary` | Marks the source cartapel introspects and serves by default. With a single database source it is implied; declare it explicitly when you define several. |
@@ -149,6 +149,49 @@ import/export and audit all work the same way.
 
 `--db postgres://…` / `CARTAPEL_DB` overrides the `primary` source's URL, so the
 same bundle can run against dev, staging or prod by swapping one env var.
+
+### `files` — a directory as rows
+
+A `files` source turns a directory tree into a table. The `pattern` says both
+what to walk and what the path *means*: every `{name}` captures a segment as a
+column, so a cache laid out as `<source>/<symbol>/<timeframe>.parquet` reads as
+rows without anyone writing a scanner.
+
+```hcl
+source "cache" {
+  type    = "files"
+  root    = "env:CACHE_DIR"
+  pattern = "{source}/{symbol}/{tf}.parquet"
+  ttl_secs    = 60      # a listing is reused this long (default 60)
+  max_entries = 5000    # hard cap on rows (default 5000)
+}
+```
+
+Each row carries the captured columns plus `path`, `bytes` and `modified_ms`,
+so a panel renders it directly:
+
+```hcl
+panel {
+  type   = "table"
+  label  = "Coverage"
+  source = "cache"
+
+  field {
+    key     = "bytes"
+    format  = "bytes"
+    align   = "r"
+    display = "bar"
+  }
+}
+```
+
+**Metadata only.** cartapel reports names, sizes and mtimes and never reads a
+file's contents — a listing must not become a way to read arbitrary files.
+Walking is confined to `root`, symlinks are skipped rather than followed, and
+the entry cap bounds a runaway tree. For anything *inside* the files — a
+parquet footer, a header, a checksum — write a small HTTP endpoint and declare
+it as an `http` source; that is the extension point, and it can be in any
+language.
 
 ::: info ClickHouse (read-only)
 A `clickhouse` source (`url = "clickhouse://user:pass@host:8123/db"`) exposes

@@ -1155,6 +1155,7 @@ mod relation_tests {
             secret_key: [7u8; 32],
             webhook_secret: None,
             options_cache: Default::default(),
+            files_cache: Default::default(),
             login_limiter: Default::default(),
             config_write_lock: Default::default(),
         })

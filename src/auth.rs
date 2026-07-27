@@ -232,6 +232,7 @@ mod tests {
             secret_key,
             webhook_secret: None,
             options_cache: Default::default(),
+            files_cache: Default::default(),
             login_limiter: Default::default(),
             config_write_lock: Default::default(),
         })

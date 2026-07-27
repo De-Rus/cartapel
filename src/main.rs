@@ -6,6 +6,7 @@ mod config;
 mod configedit;
 mod dashboard;
 mod db;
+mod files;
 mod globaledit;
 mod groupsedit;
 mod images;
@@ -699,6 +700,7 @@ async fn serve(
             .ok()
             .filter(|s| !s.is_empty()),
         options_cache: Default::default(),
+        files_cache: Default::default(),
         login_limiter: Default::default(),
         config_write_lock: Default::default(),
     });

@@ -371,16 +371,35 @@ pub struct VariablesFile {
     pub variables: BTreeMap<String, Variable>,
 }
 
-/// A named external data source. Today only `type = "http"`: cartapel proxies a
-/// server-side GET to `url` (optionally `url/<rest>`), attaching a secret read
-/// from `token_env` under `header` (default `x-admin-token`), and streams the
-/// JSON body back to the page. The secret never reaches the browser.
+/// A named external data source.
+///
+/// `type = "http"`: cartapel proxies a server-side GET to `url` (optionally
+/// `url/<rest>`), attaching a secret read from `token_env` under `header`
+/// (default `x-admin-token`). The secret never reaches the browser.
+///
+/// `type = "files"`: a directory listing under `root`, shaped by `pattern` —
+/// each `{name}` in the pattern captures a path segment as a column, so
+/// `{source}/{symbol}/{tf}.parquet` turns a cache tree into rows. Metadata
+/// only: names, sizes and mtimes, never file contents.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct NamedSource {
     #[serde(rename = "type")]
     pub kind: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub url: String,
+    /// `files`: the directory the listing is confined to. Supports `env:NAME`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root: Option<String>,
+    /// `files`: path template whose `{name}` segments become columns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<String>,
+    /// `files`: how long a listing is reused before rescanning (default 60s) —
+    /// walking a deep tree is expensive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ttl_secs: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_entries: Option<usize>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub schemas: Vec<String>,
     #[serde(default)]
@@ -405,6 +424,10 @@ impl NamedSource {
     pub fn is_clickhouse(&self) -> bool {
         self.kind == "clickhouse"
     }
+
+    pub fn is_files(&self) -> bool {
+        self.kind == "files"
+    }
 }
 
 impl NamedSource {
@@ -419,6 +442,10 @@ impl NamedSource {
         Self {
             kind: kind.into(),
             url: url.into(),
+            root: None,
+            pattern: None,
+            ttl_secs: None,
+            max_entries: None,
             schemas: Vec::new(),
             primary: true,
             token_env: None,
@@ -1743,6 +1770,20 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                 }
                 _ => {}
             }
+        }
+    }
+    for (name, s) in &cfg.sources {
+        if s.is_files() {
+            if s.root.is_none() {
+                return Err(format!("source \"{name}\": a files source needs a root"));
+            }
+            if s.pattern.is_none() {
+                return Err(format!(
+                    "source \"{name}\": a files source needs a pattern, e.g. \"{{dir}}/{{file}}.csv\""
+                ));
+            }
+        } else if s.url.is_empty() {
+            return Err(format!("source \"{name}\": missing url"));
         }
     }
     validate_role_inheritance(&cfg.auth.roles)?;

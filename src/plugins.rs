@@ -215,6 +215,9 @@ pub async fn source_rows(
     path: &str,
     rows_at: Option<&str>,
 ) -> Result<Vec<Value>, AppError> {
+    if let Some(rows) = files_source_rows(state, user, name).await? {
+        return Ok(rows);
+    }
     let (status, body) = fetch_source(state, user, name, path).await?;
     if !status.is_success() {
         return Err(AppError::bad(format!(
@@ -239,12 +242,67 @@ pub async fn source_rows(
     }
 }
 
+/// A `files` source's listing, reused within its ttl. `None` when the source
+/// is not a files source, so callers fall through to the http path.
+async fn files_source_rows(
+    state: &AppState,
+    user: &CurrentUser,
+    name: &str,
+) -> Result<Option<Vec<Value>>, AppError> {
+    let (root, pattern, ttl, max_entries) = {
+        let cfg = state.cfg();
+        let Some(src) = cfg.sources.get(name) else {
+            return Ok(None);
+        };
+        if !src.is_files() {
+            return Ok(None);
+        }
+        if !user.may(&src.roles, crate::state::Access::AdminOnly) {
+            return Err(AppError::forbidden("source not allowed for your role"));
+        }
+        let root = src
+            .root
+            .as_deref()
+            .and_then(crate::config::resolve_env)
+            .ok_or_else(|| AppError::bad(format!("source \"{name}\": missing root")))?;
+        let pattern = src
+            .pattern
+            .clone()
+            .ok_or_else(|| AppError::bad(format!("source \"{name}\": missing pattern")))?;
+        (
+            root,
+            pattern,
+            crate::files::cache_ttl(src.ttl_secs),
+            src.max_entries.unwrap_or(crate::files::DEFAULT_MAX_ENTRIES),
+        )
+    };
+    if let Some((at, rows)) = state.files_cache.lock().unwrap().get(name) {
+        if at.elapsed() < ttl {
+            return Ok(Some(rows.clone()));
+        }
+    }
+    let scanned = tokio::task::spawn_blocking(move || {
+        crate::files::scan(std::path::Path::new(&root), &pattern, max_entries)
+    })
+    .await
+    .map_err(|e| AppError::internal(format!("listing failed: {e}")))?
+    .map_err(|e| AppError::bad(format!("source \"{name}\": {e}")))?;
+    state.files_cache.lock().unwrap().insert(
+        name.to_string(),
+        (std::time::Instant::now(), scanned.clone()),
+    );
+    Ok(Some(scanned))
+}
+
 async fn proxy_source(
     state: &Arc<AppState>,
     user: &CurrentUser,
     name: &str,
     rest: &str,
 ) -> Result<Response, AppError> {
+    if let Some(rows) = files_source_rows(state, user, name).await? {
+        return Ok(Json(Value::Array(rows)).into_response());
+    }
     let (status, body) = fetch_source(state, user, name, rest).await?;
     Ok((status, [(header::CONTENT_TYPE, "application/json")], body).into_response())
 }
@@ -280,6 +338,7 @@ mod tests {
             secret_key: [7u8; 32],
             webhook_secret: None,
             options_cache: Default::default(),
+            files_cache: Default::default(),
             login_limiter: Default::default(),
             config_write_lock: Default::default(),
         })
@@ -391,6 +450,7 @@ mod tests {
             secret_key: [7u8; 32],
             webhook_secret: None,
             options_cache: Default::default(),
+            files_cache: Default::default(),
             login_limiter: Default::default(),
             config_write_lock: Default::default(),
         });
