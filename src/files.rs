@@ -104,10 +104,6 @@ pub fn parse_pattern(pattern: &str) -> Result<Pattern, String> {
 }
 
 impl Pattern {
-    pub fn depth(&self) -> usize {
-        self.0.len()
-    }
-
     /// Bind captures for a whole key, e.g. `binance/BTCUSDT/1h.parquet`.
     pub fn match_key(&self, key: &str) -> Option<Map<String, Value>> {
         let parts: Vec<&str> = key.trim_matches('/').split('/').collect();
