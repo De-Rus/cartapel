@@ -42,19 +42,25 @@ async fn resolve_path(
         .and_then(|p| dbt.column(p))
         .ok_or_else(|| AppError::bad("table has no primary key"))?;
 
-    let mut binds = crate::sqlval::Binds::new();
+    let pool = state.pool_of(dbt);
+    let mut binds = crate::sqlval::Binds::for_dialect(pool.dialect());
     let mut where_sql = crate::sqlval::pk_predicate(pk_col, pk, &mut binds);
     if let Some(rf) = state.row_filter(user, table) {
         where_sql = format!("{where_sql} AND ({rf})");
     }
     let sql = format!(
-        "SELECT {}::text AS n FROM {} WHERE {where_sql}",
-        crate::sqlval::ident(&name_col.name),
+        "SELECT {} AS n FROM {} WHERE {where_sql}",
+        crate::sqlval::text_cast(pool.dialect(), &crate::sqlval::ident(&name_col.name)),
         state.qualified_of(dbt)
     );
-    let row = binds.query(&sql).fetch_one(state.pool_of(dbt)).await?;
-    let name: Option<String> = sqlx::Row::get(&row, "n");
-    let name = name.ok_or_else(|| AppError::not_found("no image for this row"))?;
+    let name = crate::db::fetch_json_rows(pool, &sql, &binds)
+        .await?
+        .into_iter()
+        .next()
+        .ok_or(sqlx::Error::RowNotFound)?
+        .get("n")
+        .and_then(|v| v.as_str().map(String::from))
+        .ok_or_else(|| AppError::not_found("no image for this row"))?;
 
     if name.is_empty() || name.contains('/') || name.contains("..") || name.contains('\\') {
         return Err(AppError::bad("unsafe image filename"));

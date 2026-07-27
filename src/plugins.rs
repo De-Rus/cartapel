@@ -4,7 +4,6 @@ use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::{json, Value};
-use sqlx::Row;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -110,21 +109,15 @@ pub async fn named_query(
     let (sql, binds) =
         crate::interp::interpolate(&sql, &env.types, &env.values).map_err(AppError::bad)?;
 
-    let mut tx = state.pool_for(source.as_deref()).begin().await?;
-    sqlx::query("SET TRANSACTION READ ONLY")
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("SET LOCAL statement_timeout = '8000ms'")
-        .execute(&mut *tx)
-        .await?;
-    let wrapped = format!(
-        "SELECT coalesce(json_agg(row_to_json(sub.*)), '[]'::json) AS r FROM ({sql}) sub LIMIT {QUERY_CAP}"
-    );
-    let row = crate::interp::bind_all(sqlx::query(&wrapped), &binds)
-        .fetch_one(&mut *tx)
-        .await?;
-    let _ = tx.rollback().await;
-    let rows: Value = row.get("r");
+    let rows = crate::db::config_query_rows(
+        state.pool_for(source.as_deref()),
+        &sql,
+        &binds,
+        QUERY_CAP,
+        8000,
+    )
+    .await?;
+    let rows: Vec<Value> = rows.into_iter().map(Value::Object).collect();
     Ok(Json(json!({ "rows": rows })))
 }
 
@@ -213,7 +206,7 @@ mod tests {
         Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
-            pg,
+            pg: crate::db::DbPool::Pg(pg),
             schema: "public".into(),
             db: crate::introspect::Schema::default(),
             cfg: arc_swap::ArcSwap::from_pointee(crate::config::ConfigDir::default()),
@@ -323,7 +316,7 @@ mod tests {
         let state = Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
-            pg,
+            pg: crate::db::DbPool::Pg(pg),
             schema: "public".into(),
             db: crate::introspect::Schema::default(),
             cfg: arc_swap::ArcSwap::from_pointee(crate::config::ConfigDir::default()),

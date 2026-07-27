@@ -220,7 +220,7 @@ mod tests {
         Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
-            pg,
+            pg: crate::db::DbPool::Pg(pg),
             schema: "public".into(),
             db: crate::introspect::Schema::default(),
             cfg: arc_swap::ArcSwap::from_pointee(crate::config::ConfigDir::default()),

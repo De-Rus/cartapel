@@ -8,7 +8,6 @@ use axum::http::header;
 use axum::response::Response;
 use axum::Json;
 use serde_json::{json, Map, Value};
-use sqlx::Row;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -69,7 +68,7 @@ fn build_list_query(
     let cfg = table_config(state, key);
     let masked = state.masked_columns(user, key);
     let mut clauses: Vec<String> = Vec::new();
-    let mut binds = Binds::new();
+    let mut binds = Binds::for_dialect(state.pool_of(dbt).dialect());
 
     if let Some(q) = params.get("q").filter(|q| !q.is_empty()) {
         let cols: Vec<String> = search_columns(dbt, &cfg)
@@ -77,10 +76,12 @@ fn build_list_query(
             .filter(|c| !masked.contains(c))
             .collect();
         if !cols.is_empty() {
-            let n = binds.push(Some(format!("%{q}%")));
             let ors: Vec<String> = cols
                 .iter()
-                .map(|c| format!("{}::text ILIKE ${n}", ident(c)))
+                .map(|c| {
+                    let n = binds.ph(Some(format!("%{q}%")));
+                    crate::sqlval::ilike_clause(binds.dialect(), &ident(c), &n)
+                })
                 .collect();
             clauses.push(format!("({})", ors.join(" OR ")));
         }
@@ -149,7 +150,7 @@ fn build_list_query(
             None => computed_sort_expr(dbt, &cfg, &masked, col)
                 .ok_or_else(|| AppError::bad(format!("unknown sort column {col}")))?,
         };
-        terms.push(format!("{expr} {dir} NULLS LAST"));
+        terms.push(crate::sqlval::order_term(binds.dialect(), &expr, dir));
     }
     let order_sql = if terms.is_empty() {
         String::new()
@@ -191,36 +192,54 @@ fn bare_filter_clause(
         clauses.push(format!("{} IS NULL", ident(name)));
         return Ok(());
     }
+    let dialect = binds.dialect();
     match col.kind {
         Kind::Bool => {
-            let n = binds.push(Some(raw.to_string()));
-            clauses.push(format!("{} = ${n}::boolean", ident(name)));
+            let val = match dialect {
+                crate::db::Dialect::Pg => raw.to_string(),
+                crate::db::Dialect::MySql => match raw {
+                    "true" | "1" => "1".into(),
+                    "false" | "0" => "0".into(),
+                    other => return Err(AppError::bad(format!("bad boolean filter {other}"))),
+                },
+            };
+            let p = binds.typed(Some(val), "boolean");
+            clauses.push(format!("{} = {p}", ident(name)));
         }
         Kind::Datetime | Kind::Date => {
             let expr = ident(name);
+            let (today, ago): (&str, fn(u32) -> String) = match dialect {
+                crate::db::Dialect::Pg => ("date_trunc('day', now())", |d| {
+                    format!("now() - interval '{d} days'")
+                }),
+                crate::db::Dialect::MySql => ("CAST(CURDATE() AS DATETIME)", |d| {
+                    format!("NOW() - INTERVAL {d} DAY")
+                }),
+            };
             match raw {
-                "today" => clauses.push(format!("{expr} >= date_trunc('day', now())")),
-                "7d" => clauses.push(format!("{expr} >= now() - interval '7 days'")),
-                "30d" => clauses.push(format!("{expr} >= now() - interval '30 days'")),
-                "90d" => clauses.push(format!("{expr} >= now() - interval '90 days'")),
+                "today" => clauses.push(format!("{expr} >= {today}")),
+                "7d" => clauses.push(format!("{expr} >= {}", ago(7))),
+                "30d" => clauses.push(format!("{expr} >= {}", ago(30))),
+                "90d" => clauses.push(format!("{expr} >= {}", ago(90))),
                 other => {
                     let (from, to) = other
                         .split_once("..")
                         .ok_or_else(|| AppError::bad(format!("bad date filter {other}")))?;
                     if !from.is_empty() {
-                        let n = binds.push(Some(from.to_string()));
-                        clauses.push(format!("{expr} >= ${n}::timestamptz"));
+                        let p = binds.typed(Some(from.to_string()), "timestamptz");
+                        clauses.push(format!("{expr} >= {p}"));
                     }
                     if !to.is_empty() {
-                        let n = binds.push(Some(to.to_string()));
-                        clauses.push(format!("{expr} < ${n}::timestamptz"));
+                        let p = binds.typed(Some(to.to_string()), "timestamptz");
+                        clauses.push(format!("{expr} < {p}"));
                     }
                 }
             }
         }
         _ => {
-            let n = binds.push(Some(raw.to_string()));
-            clauses.push(format!("{}::text = ${n}", ident(name)));
+            let n = binds.ph(Some(raw.to_string()));
+            let lhs = crate::sqlval::text_cast(dialect, &ident(name));
+            clauses.push(format!("{lhs} = {n}"));
         }
     }
     Ok(())
@@ -242,8 +261,9 @@ fn operator_clause(
             other => return Err(AppError::bad(format!("isnull expects 0 or 1, got {other}"))),
         },
         "contains" => {
-            let n = binds.push(Some(format!("%{raw}%")));
-            clauses.push(format!("{}::text ILIKE ${n}", ident(name)));
+            let n = binds.ph(Some(format!("%{raw}%")));
+            let clause = crate::sqlval::ilike_clause(binds.dialect(), &ident(name), &n);
+            clauses.push(clause);
         }
         "in" => {
             let parts: Vec<&str> = raw
@@ -258,10 +278,7 @@ fn operator_clause(
             }
             let placeholders: Vec<String> = parts
                 .iter()
-                .map(|p| {
-                    let n = binds.push(Some(p.to_string()));
-                    format!("${n}::{cast}")
-                })
+                .map(|p| binds.typed(Some(p.to_string()), &cast))
                 .collect();
             clauses.push(format!("{} IN ({})", ident(name), placeholders.join(", ")));
         }
@@ -272,12 +289,9 @@ fn operator_clause(
             if a.is_empty() || b.is_empty() {
                 return Err(AppError::bad(format!("{name}__between needs both bounds")));
             }
-            let na = binds.push(Some(a.to_string()));
-            let nb = binds.push(Some(b.to_string()));
-            clauses.push(format!(
-                "{} BETWEEN ${na}::{cast} AND ${nb}::{cast}",
-                ident(name)
-            ));
+            let pa = binds.typed(Some(a.to_string()), &cast);
+            let pb = binds.typed(Some(b.to_string()), &cast);
+            clauses.push(format!("{} BETWEEN {pa} AND {pb}", ident(name)));
         }
         cmp => {
             let sqlop = match cmp {
@@ -288,8 +302,8 @@ fn operator_clause(
                 "ne" => "<>",
                 _ => return Err(AppError::bad(format!("unknown operator {cmp}"))),
             };
-            let n = binds.push(Some(raw.to_string()));
-            clauses.push(format!("{} {sqlop} ${n}::{cast}", ident(name)));
+            let p = binds.typed(Some(raw.to_string()), &cast);
+            clauses.push(format!("{} {sqlop} {p}", ident(name)));
         }
     }
     Ok(())
@@ -318,8 +332,11 @@ fn fk_label_pairs(state: &AppState, user: &CurrentUser, key: &str, dbt: &DbTable
             continue;
         }
         let mut sub = format!(
-            "SELECT f.{}::text FROM {} f WHERE f.{} = t.{}",
-            ident(&label),
+            "SELECT {} FROM {} f WHERE f.{} = t.{}",
+            crate::sqlval::text_cast(
+                state.pool_of(dbt).dialect(),
+                &format!("f.{}", ident(&label))
+            ),
             state.qualified_of(child),
             ident(fc),
             ident(&c.name)
@@ -328,8 +345,8 @@ fn fk_label_pairs(state: &AppState, user: &CurrentUser, key: &str, dbt: &DbTable
             sub = format!("{sub} AND ({rf})");
         }
         out.push(format!(
-            "{}, ({sub} LIMIT 1)",
-            crate::sqlval::sql_literal(&format!("{}__label", c.name))
+            "({sub} LIMIT 1) AS {}",
+            ident(&format!("{}__label", c.name))
         ));
     }
     out
@@ -344,28 +361,26 @@ async fn fetch_rows(
     limit: i64,
     offset: i64,
 ) -> Result<Vec<Value>, AppError> {
-    let mut sel = crate::meta::row_select(dbt, &table_config(state, key));
-    let pairs = fk_label_pairs(state, user, key, dbt);
-    if !pairs.is_empty() {
-        sel = format!("({sel}) || jsonb_build_object({})", pairs.join(", "));
-    }
+    let mut items =
+        crate::meta::select_items_for(dbt, &table_config(state, key), state.pool_of(dbt).dialect());
+    items.extend(fk_label_pairs(state, user, key, dbt));
     let sql = format!(
-        "SELECT {sel} AS r FROM {} t {} {} LIMIT {limit} OFFSET {offset}",
+        "SELECT {} FROM {} t {} {} LIMIT {limit} OFFSET {offset}",
+        items.join(", "),
         state.qualified_of(dbt),
         lq.where_sql,
         lq.order_sql,
     );
-    let rows = lq.binds.query(&sql).fetch_all(state.pool_of(dbt)).await?;
+    let rows = crate::db::fetch_json_rows(state.pool_of(dbt), &sql, &lq.binds).await?;
     let masked = state.masked_columns(user, key);
     let bins = binary_cols(dbt);
-    Ok(rows
-        .into_iter()
-        .map(|r| {
-            let mut v: Value = r.get("r");
-            present_row(&mut v, &masked, &bins);
-            v
-        })
-        .collect())
+    let mut out = Vec::with_capacity(rows.len());
+    for m in rows {
+        let mut v = Value::Object(m);
+        present_row(&mut v, &masked, &bins);
+        out.push(v);
+    }
+    Ok(out)
 }
 
 pub async fn list_handler(
@@ -399,25 +414,21 @@ pub async fn list_handler(
             state.qualified_of(dbt),
             lq.where_sql
         );
-        lq.binds
-            .query(&count_sql)
-            .fetch_one(state.pool_of(dbt))
+        crate::db::fetch_json_rows(state.pool_of(dbt), &count_sql, &lq.binds)
             .await
-            .map(|r| r.get::<i64, _>("n"))
+            .map(|rows| {
+                rows.first()
+                    .and_then(|m| m.get("n"))
+                    .and_then(Value::as_i64)
+                    .unwrap_or(0)
+            })
     };
     let approx_req = params
         .get("approx")
         .map(|v| v == "1" || v == "true")
         .unwrap_or(false);
     let (total, approx) = if lq.where_sql.is_empty() {
-        let est: i64 = sqlx::query(
-            "SELECT GREATEST(reltuples, 0)::bigint AS n FROM pg_class WHERE oid = $1::regclass",
-        )
-        .bind(state.qualified_of(dbt))
-        .fetch_optional(state.pool_of(dbt))
-        .await?
-        .map(|r| r.get::<i64, _>("n"))
-        .unwrap_or(0);
+        let est: i64 = crate::db::estimate_rows(state.pool_of(dbt), dbt).await?;
         if approx_req || est > APPROX_THRESHOLD {
             (est, true)
         } else {
@@ -453,18 +464,24 @@ async fn fetch_one(
         .as_ref()
         .and_then(|p| dbt.column(p))
         .ok_or_else(|| AppError::bad("table has no primary key"))?;
-    let mut binds = Binds::new();
+    let pool = state.pool_of(dbt);
+    let mut binds = Binds::for_dialect(pool.dialect());
     let mut where_sql = pk_predicate(pk_col, pk, &mut binds);
     if let Some(rf) = state.row_filter(user, key) {
         where_sql = format!("{where_sql} AND ({rf})");
     }
-    let sel = crate::meta::row_select(dbt, &table_config(state, key));
+    let items = crate::meta::select_items_for(dbt, &table_config(state, key), pool.dialect());
     let sql = format!(
-        "SELECT {sel} AS r FROM {} t WHERE {where_sql}",
+        "SELECT {} FROM {} t WHERE {where_sql}",
+        items.join(", "),
         state.qualified_of(dbt)
     );
-    let row = binds.query(&sql).fetch_one(state.pool_of(dbt)).await?;
-    let mut v: Value = row.get("r");
+    let m = crate::db::fetch_json_rows(pool, &sql, &binds)
+        .await?
+        .into_iter()
+        .next()
+        .ok_or(sqlx::Error::RowNotFound)?;
+    let mut v = Value::Object(m);
     present_row(&mut v, &state.masked_columns(user, key), &binary_cols(dbt));
     Ok(v)
 }
@@ -499,9 +516,10 @@ async fn fetch_inline_page(
     pk: &str,
     page: u32,
 ) -> Result<(Vec<Value>, i64), AppError> {
-    let mut binds = Binds::new();
-    let n = binds.push(Some(pk.to_string()));
-    let mut where_sql = format!("{} = ${n}::{}", ident(&fk_c.name), fk_c.udt);
+    let pool = state.pool_of(child_t);
+    let mut binds = Binds::for_dialect(pool.dialect());
+    let p = binds.typed(Some(pk.to_string()), &fk_c.udt);
+    let mut where_sql = format!("{} = {p}", ident(&fk_c.name));
     if let Some(rf) = state.row_filter(user, key) {
         where_sql = format!("{where_sql} AND ({rf})");
     }
@@ -510,29 +528,31 @@ async fn fetch_inline_page(
         .as_ref()
         .map(|p| format!("ORDER BY {} DESC", ident(p)))
         .unwrap_or_default();
-    let mut sel = crate::meta::row_select(child_t, &table_config(state, key));
-    let pairs = fk_label_pairs(state, user, key, child_t);
-    if !pairs.is_empty() {
-        sel = format!("({sel}) || jsonb_build_object({})", pairs.join(", "));
-    }
+    let mut items =
+        crate::meta::select_items_for(child_t, &table_config(state, key), pool.dialect());
+    items.extend(fk_label_pairs(state, user, key, child_t));
     let sql = format!(
-        "SELECT {sel} AS r, count(*) OVER () AS total FROM {} t WHERE {where_sql} {order} LIMIT {INLINE_CAP} OFFSET {}",
+        "SELECT {}, count(*) OVER () AS __cartapel_total FROM {} t WHERE {where_sql} {order} LIMIT {INLINE_CAP} OFFSET {}",
+        items.join(", "),
         state.qualified_of(child_t),
         inline_offset(page),
     );
-    let rows = binds.query(&sql).fetch_all(state.pool_of(child_t)).await?;
-    let total: i64 = rows.first().map(|r| r.get("total")).unwrap_or(0);
+    let rows = crate::db::fetch_json_rows(pool, &sql, &binds).await?;
+    let total = rows
+        .first()
+        .and_then(|m| m.get("__cartapel_total"))
+        .and_then(Value::as_i64)
+        .unwrap_or(0);
     let masked = state.masked_columns(user, key);
     let bins = binary_cols(child_t);
-    let rows: Vec<Value> = rows
-        .into_iter()
-        .map(|r| {
-            let mut v: Value = r.get("r");
-            present_row(&mut v, &masked, &bins);
-            v
-        })
-        .collect();
-    Ok((rows, total))
+    let mut out = Vec::with_capacity(rows.len());
+    for mut m in rows {
+        m.shift_remove("__cartapel_total");
+        let mut v = Value::Object(m);
+        present_row(&mut v, &masked, &bins);
+        out.push(v);
+    }
+    Ok((out, total))
 }
 
 /// Resolve a child table the caller named against the parent's CONFIGURED
@@ -567,21 +587,22 @@ async fn attach_fk_labels(
     if pairs.is_empty() {
         return Ok(());
     }
-    let mut binds = Binds::new();
+    let pool = state.pool_of(dbt);
+    let mut binds = Binds::for_dialect(pool.dialect());
     let where_sql = pk_predicate(pk_col, pk, &mut binds);
     let sql = format!(
-        "SELECT jsonb_build_object({}) AS r FROM {} t WHERE {where_sql}",
+        "SELECT {} FROM {} t WHERE {where_sql}",
         pairs.join(", "),
         state.qualified_of(dbt)
     );
-    let labels: Value = binds
-        .query(&sql)
-        .fetch_one(state.pool_of(dbt))
+    let extra = crate::db::fetch_json_rows(pool, &sql, &binds)
         .await?
-        .get("r");
-    if let (Some(obj), Some(extra)) = (row.as_object_mut(), labels.as_object()) {
+        .into_iter()
+        .next()
+        .ok_or(sqlx::Error::RowNotFound)?;
+    if let Some(obj) = row.as_object_mut() {
         for (k, v) in extra {
-            obj.insert(k.clone(), v.clone());
+            obj.insert(k, v);
         }
     }
     Ok(())
@@ -685,9 +706,10 @@ pub async fn update_handler(
 }
 
 /// The single row-update path — reverts ride it so they obey the same rules as
-/// edits. `guard` cols must still hold the given jsonb values inside the
-/// UPDATE's WHERE (else 409): staleness is decided in the same statement as the
-/// write, never check-then-act.
+/// edits. `guard` cols must still hold the given values when the UPDATE lands
+/// (else 409). On tables the guard is checked under SELECT … FOR UPDATE in the
+/// same tx as the write; views can't be row-locked, so there the guard rides
+/// inside the UPDATE's WHERE — either way, never check-then-act.
 async fn apply_update(
     state: &AppState,
     user: &CurrentUser,
@@ -701,48 +723,111 @@ async fn apply_update(
     if !state.table_perms(user, table).update {
         return Err(AppError::forbidden("no write access"));
     }
-    let before = fetch_one(state, user, table, dbt, pk).await?;
+    if let Some(g) = guard {
+        for col in g.keys() {
+            if dbt.column(col).is_none() {
+                return Err(AppError::bad(format!("unknown column {col}")));
+            }
+        }
+    }
+    let pk_col = dbt.pk.as_ref().and_then(|p| dbt.column(p)).unwrap();
+    let pool = state.pool_of(dbt);
+    let dialect = pool.dialect();
+    // Writes return the row without computed fields (parity with the old
+    // RETURNING to_jsonb), and the lock-select must not evaluate computed
+    // expressions (FOR UPDATE rejects window functions).
+    let items = crate::meta::select_items_for(dbt, &Default::default(), dialect).join(", ");
+    let row_scope = |binds: &mut Binds| {
+        let mut w = pk_predicate(pk_col, pk, binds);
+        if let Some(rf) = state.row_filter(user, table) {
+            w = format!("{w} AND ({rf})");
+        }
+        w
+    };
+
+    let mut tx = pool.begin_tx().await?;
+
+    let mut binds = Binds::for_dialect(dialect);
+    let where_sql = row_scope(&mut binds);
+    let lock = if dbt.is_view { "" } else { " FOR UPDATE" };
+    let sql = format!(
+        "SELECT {items} FROM {} t WHERE {where_sql}{lock}",
+        state.qualified_of(dbt)
+    );
+    let before_raw = tx
+        .fetch_json_rows(&sql, &binds)
+        .await?
+        .into_iter()
+        .next()
+        .ok_or(sqlx::Error::RowNotFound)?;
+    if let Some(g) = guard {
+        for (col, val) in g {
+            if before_raw.get(col).unwrap_or(&Value::Null) != val {
+                return Err(AppError::conflict(
+                    "the row has changed since this edit — refresh and review before reverting",
+                ));
+            }
+        }
+    }
+    let mut before = Value::Object(before_raw);
+    present_row(
+        &mut before,
+        &state.masked_columns(user, table),
+        &binary_cols(dbt),
+    );
     let changes = editable_set(state, user, table, dbt, body, false)?;
 
-    let mut binds = Binds::new();
+    let mut binds = Binds::for_dialect(dialect);
     let mut sets = Vec::new();
     for (col_name, val) in &changes {
         let col = dbt.column(col_name).unwrap();
         let expr = value_expr(col, val, &mut binds)?;
         sets.push(format!("{} = {expr}", ident(col_name)));
     }
-    let pk_col = dbt.pk.as_ref().and_then(|p| dbt.column(p)).unwrap();
-    let mut where_sql = pk_predicate(pk_col, pk, &mut binds);
-    if let Some(rf) = state.row_filter(user, table) {
-        where_sql = format!("{where_sql} AND ({rf})");
-    }
-    if let Some(g) = guard {
-        for (col, val) in g {
-            if dbt.column(col).is_none() {
-                return Err(AppError::bad(format!("unknown column {col}")));
+    let mut where_sql = row_scope(&mut binds);
+    if dbt.is_view {
+        if let Some(g) = guard {
+            if dialect != crate::db::Dialect::Pg {
+                return Err(AppError::bad("reverts on MySQL views are not supported"));
             }
-            let k = binds.push(Some(col.clone()));
-            let v = binds.push(Some(val.to_string()));
-            where_sql = format!(
-                "{where_sql} AND to_jsonb(t.*)->(${k}::text) IS NOT DISTINCT FROM ${v}::jsonb"
-            );
+            for (col, val) in g {
+                let k = binds.ph(Some(col.clone()));
+                let v = binds.ph(Some(val.to_string()));
+                where_sql = format!(
+                    "{where_sql} AND to_jsonb(t.*)->({k}::text) IS NOT DISTINCT FROM {v}::jsonb"
+                );
+            }
         }
     }
     let sql = format!(
-        "UPDATE {} t SET {} WHERE {where_sql} RETURNING to_jsonb(t.*) AS r",
+        "UPDATE {} t SET {} WHERE {where_sql}",
         state.qualified_of(dbt),
         sets.join(", ")
     );
-    let row = match binds.query(&sql).fetch_one(state.pool_of(dbt)).await {
-        Ok(row) => row,
-        Err(sqlx::Error::RowNotFound) if guard.is_some() => {
+    if tx.execute(&sql, &binds).await?.rows_affected == 0 {
+        if guard.is_some() {
             return Err(AppError::conflict(
                 "the row has changed since this edit — refresh and review before reverting",
             ));
         }
-        Err(e) => return Err(e.into()),
-    };
-    let mut after: Value = row.get("r");
+        return Err(sqlx::Error::RowNotFound.into());
+    }
+
+    let mut binds = Binds::for_dialect(dialect);
+    let where_sql = pk_predicate(pk_col, pk, &mut binds);
+    let sql = format!(
+        "SELECT {items} FROM {} t WHERE {where_sql}",
+        state.qualified_of(dbt)
+    );
+    let after_raw = tx
+        .fetch_json_rows(&sql, &binds)
+        .await?
+        .into_iter()
+        .next()
+        .ok_or(sqlx::Error::RowNotFound)?;
+    tx.commit().await?;
+
+    let mut after = Value::Object(after_raw);
     present_row(
         &mut after,
         &state.masked_columns(user, table),
@@ -855,7 +940,8 @@ pub async fn bulk_handler(
         .and_then(|p| dbt.column(p))
         .ok_or_else(|| AppError::bad("table has no primary key"))?;
 
-    let mut binds = Binds::new();
+    let pool = state.pool_of(dbt);
+    let mut binds = Binds::for_dialect(pool.dialect());
     let mut sets = Vec::new();
     for (col_name, val) in &changes {
         let col = dbt.column(col_name).unwrap();
@@ -864,12 +950,12 @@ pub async fn bulk_handler(
     }
     let mut placeholders = Vec::with_capacity(pks.len());
     for pk in &pks {
-        let n = binds.push(Some(pk.clone()));
-        placeholders.push(format!("${n}"));
+        let n = binds.ph(Some(pk.clone()));
+        placeholders.push(n);
     }
     let mut where_sql = format!(
-        "{}::text IN ({})",
-        ident(&pk_col.name),
+        "{} IN ({})",
+        crate::sqlval::text_cast(pool.dialect(), &ident(&pk_col.name)),
         placeholders.join(", ")
     );
     if let Some(rf) = state.row_filter(&user, &table) {
@@ -880,11 +966,7 @@ pub async fn bulk_handler(
         state.qualified_of(dbt),
         sets.join(", ")
     );
-    let affected = binds
-        .query(&sql)
-        .execute(state.pool_of(dbt))
-        .await?
-        .rows_affected();
+    let affected = crate::db::execute(pool, &sql, &binds).await?.rows_affected;
 
     let diff: Map<String, Value> = changes
         .iter()
@@ -910,8 +992,10 @@ pub async fn create_handler(
     if !state.table_perms(&user, &table).create {
         return Err(AppError::forbidden("no create access"));
     }
+    let pool = state.pool_of(dbt);
+    let dialect = pool.dialect();
     let changes = editable_set(&state, &user, &table, dbt, &body, true)?;
-    let mut binds = Binds::new();
+    let mut binds = Binds::for_dialect(dialect);
     let mut cols = Vec::new();
     let mut exprs = Vec::new();
     for (col_name, val) in &changes {
@@ -919,14 +1003,65 @@ pub async fn create_handler(
         exprs.push(value_expr(col, val, &mut binds)?);
         cols.push(ident(col_name));
     }
-    let sql = format!(
-        "INSERT INTO {} AS t ({}) VALUES ({}) RETURNING to_jsonb(t.*) AS r",
-        state.qualified_of(dbt),
-        cols.join(", "),
-        exprs.join(", ")
-    );
-    let row = binds.query(&sql).fetch_one(state.pool_of(dbt)).await?;
-    let mut after: Value = row.get("r");
+    let items = crate::meta::select_items_for(dbt, &Default::default(), dialect).join(", ");
+    let after_raw = match dialect {
+        crate::db::Dialect::Pg => {
+            let sql = format!(
+                "INSERT INTO {} AS t ({}) VALUES ({}) RETURNING {items}",
+                state.qualified_of(dbt),
+                cols.join(", "),
+                exprs.join(", ")
+            );
+            crate::db::fetch_json_rows(pool, &sql, &binds)
+                .await?
+                .into_iter()
+                .next()
+                .ok_or(sqlx::Error::RowNotFound)?
+        }
+        crate::db::Dialect::MySql => {
+            let pk_col = dbt
+                .pk
+                .as_ref()
+                .and_then(|p| dbt.column(p))
+                .ok_or_else(|| AppError::bad("creating rows needs a primary key"))?;
+            let sql = format!(
+                "INSERT INTO {} ({}) VALUES ({})",
+                state.qualified_of(dbt),
+                cols.join(", "),
+                exprs.join(", ")
+            );
+            let mut tx = pool.begin_tx().await?;
+            let res = tx.execute(&sql, &binds).await?;
+            let pk_val = changes
+                .iter()
+                .find(|(c, _)| c == &pk_col.name)
+                .map(|(_, v)| match v {
+                    Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                })
+                .or_else(|| {
+                    res.last_insert_id
+                        .filter(|id| *id > 0)
+                        .map(|id| id.to_string())
+                })
+                .ok_or_else(|| AppError::bad("could not determine the new row's primary key"))?;
+            let mut binds = Binds::for_dialect(dialect);
+            let where_sql = pk_predicate(pk_col, &pk_val, &mut binds);
+            let sql = format!(
+                "SELECT {items} FROM {} t WHERE {where_sql}",
+                state.qualified_of(dbt)
+            );
+            let row = tx
+                .fetch_json_rows(&sql, &binds)
+                .await?
+                .into_iter()
+                .next()
+                .ok_or(sqlx::Error::RowNotFound)?;
+            tx.commit().await?;
+            row
+        }
+    };
+    let mut after = Value::Object(after_raw);
     present_row(
         &mut after,
         &state.masked_columns(&user, &table),
@@ -960,13 +1095,14 @@ pub async fn delete_handler(
     }
     let before = fetch_one(&state, &user, &table, dbt, &pk).await?;
     let pk_col = dbt.pk.as_ref().and_then(|p| dbt.column(p)).unwrap();
-    let mut binds = Binds::new();
+    let pool = state.pool_of(dbt);
+    let mut binds = Binds::for_dialect(pool.dialect());
     let mut where_sql = pk_predicate(pk_col, &pk, &mut binds);
     if let Some(rf) = state.row_filter(&user, &table) {
         where_sql = format!("{where_sql} AND ({rf})");
     }
     let sql = format!("DELETE FROM {} WHERE {where_sql}", state.qualified_of(dbt));
-    binds.query(&sql).execute(state.pool_of(dbt)).await?;
+    crate::db::execute(pool, &sql, &binds).await?;
     state.store.audit(
         &user.email,
         &table,
@@ -975,6 +1111,28 @@ pub async fn delete_handler(
         Some(&json!({ "row": before })),
     );
     Ok(Json(json!({})))
+}
+
+/// One short product-language reason per rejected import row, keyed off the
+/// database's own constraint code (Postgres SQLSTATE or MySQL errno).
+fn import_reject_message(row: &usize, e: &sqlx::Error) -> String {
+    let sqlx::Error::Database(db) = e else {
+        return "row rejected".into();
+    };
+    tracing::warn!("import row {row} rejected: {}", db.message());
+    let my = db
+        .try_downcast_ref::<sqlx::mysql::MySqlDatabaseError>()
+        .map(|e| e.number());
+    match (db.code().as_deref(), my) {
+        (Some("23505"), _) | (_, Some(1062)) => "duplicate key".into(),
+        (Some("23503"), _) | (_, Some(1452)) => "referenced row not found".into(),
+        (Some("23502"), _) | (_, Some(1048 | 1364)) => "missing required value".into(),
+        (Some("23514"), _) | (_, Some(3819 | 4025)) => "value violates a constraint".into(),
+        (Some("22P02" | "22007" | "22008"), _) | (_, Some(1292 | 1366 | 1406 | 1264)) => {
+            "invalid value format".into()
+        }
+        _ => "row rejected".into(),
+    }
 }
 
 const MAX_IMPORT_ROWS: usize = 10_000;
@@ -1048,6 +1206,16 @@ fn coerce_csv_cell(col: &crate::introspect::DbColumn, raw: &str) -> Value {
 }
 
 #[allow(clippy::too_many_arguments)]
+/// How one import row reports insert-vs-update: Postgres answers inside the
+/// statement (`RETURNING xmax = 0`); MySQL answers through `rows_affected`
+/// (1 = inserted, 2 = updated — an unchanged upsert also reports 1 and is
+/// counted as inserted, the closest honest reading the protocol allows).
+enum ImportStmt {
+    Returning(String, Binds),
+    Affected(String, Binds),
+}
+
+#[allow(clippy::too_many_arguments)]
 fn build_import_row(
     state: &AppState,
     user: &CurrentUser,
@@ -1059,11 +1227,12 @@ fn build_import_row(
     rec: &Map<String, Value>,
     upsert: bool,
     pk_name: Option<&str>,
-) -> Result<(String, Binds), String> {
+) -> Result<ImportStmt, String> {
     if rec.is_empty() {
         return Err("empty row".into());
     }
-    let mut binds = Binds::new();
+    let dialect = state.pool_of(dbt).dialect();
+    let mut binds = Binds::for_dialect(dialect);
     let mut cols = Vec::new();
     let mut exprs = Vec::new();
     let mut nonpk: Vec<String> = Vec::new();
@@ -1084,12 +1253,6 @@ fn build_import_row(
             nonpk.push(col.name.clone());
         }
     }
-    let mut sql = format!(
-        "INSERT INTO {} AS t ({}) VALUES ({})",
-        state.qualified_of(dbt),
-        cols.join(", "),
-        exprs.join(", ")
-    );
     if upsert {
         let pk = pk_name.ok_or_else(|| "table has no primary key".to_string())?;
         if !rec.contains_key(pk) {
@@ -1098,23 +1261,57 @@ fn build_import_row(
         if nonpk.is_empty() {
             return Err("upsert row has only the primary key".into());
         }
-        let assigns: Vec<String> = nonpk
-            .iter()
-            .map(|c| format!("{0} = EXCLUDED.{0}", ident(c)))
-            .collect();
-        sql.push_str(&format!(
-            " ON CONFLICT ({}) DO UPDATE SET {}",
-            ident(pk),
-            assigns.join(", ")
-        ));
-        if let Some(rf) = state.row_filter(user, table) {
-            sql.push_str(&format!(" WHERE ({rf})"));
-        }
-        sql.push_str(" RETURNING (xmax = 0) AS inserted");
-    } else {
-        sql.push_str(" RETURNING true AS inserted");
     }
-    Ok((sql, binds))
+    match dialect {
+        crate::db::Dialect::Pg => {
+            let mut sql = format!(
+                "INSERT INTO {} AS t ({}) VALUES ({})",
+                state.qualified_of(dbt),
+                cols.join(", "),
+                exprs.join(", ")
+            );
+            if upsert {
+                let assigns: Vec<String> = nonpk
+                    .iter()
+                    .map(|c| format!("{0} = EXCLUDED.{0}", ident(c)))
+                    .collect();
+                sql.push_str(&format!(
+                    " ON CONFLICT ({}) DO UPDATE SET {}",
+                    ident(pk_name.unwrap()),
+                    assigns.join(", ")
+                ));
+                if let Some(rf) = state.row_filter(user, table) {
+                    sql.push_str(&format!(" WHERE ({rf})"));
+                }
+                sql.push_str(" RETURNING (xmax = 0) AS inserted");
+            } else {
+                sql.push_str(" RETURNING true AS inserted");
+            }
+            Ok(ImportStmt::Returning(sql, binds))
+        }
+        crate::db::Dialect::MySql => {
+            let mut sql = format!(
+                "INSERT INTO {} ({}) VALUES ({})",
+                state.qualified_of(dbt),
+                cols.join(", "),
+                exprs.join(", ")
+            );
+            if upsert {
+                // ON DUPLICATE KEY UPDATE takes no WHERE, so a row filter can't
+                // scope which rows an upsert may touch — refuse rather than
+                // silently widen the user's write surface.
+                if state.row_filter(user, table).is_some() {
+                    return Err("upsert is not available on MySQL tables with a row filter".into());
+                }
+                let assigns: Vec<String> = nonpk
+                    .iter()
+                    .map(|c| format!("{0} = VALUES({0})", ident(c)))
+                    .collect();
+                sql.push_str(&format!(" ON DUPLICATE KEY UPDATE {}", assigns.join(", ")));
+            }
+            Ok(ImportStmt::Affected(sql, binds))
+        }
+    }
 }
 
 pub async fn import_handler(
@@ -1204,7 +1401,7 @@ pub async fn import_handler(
 
     let mut inserted = 0u64;
     let mut updated = 0u64;
-    let mut tx = state.pool_of(dbt).begin().await?;
+    let mut tx = state.pool_of(dbt).begin_tx().await?;
     for (i, rec) in &records {
         let built = build_import_row(
             &state,
@@ -1218,52 +1415,40 @@ pub async fn import_handler(
             upsert,
             pk_name.as_deref(),
         );
-        let (sql, binds) = match built {
+        let stmt = match built {
             Ok(x) => x,
             Err(msg) => {
                 errors.push(json!({ "row": i, "message": msg }));
                 continue;
             }
         };
-        sqlx::query("SAVEPOINT cartapel_import")
-            .execute(&mut *tx)
-            .await?;
-        match binds.query(&sql).fetch_optional(&mut *tx).await {
-            Ok(Some(row)) => {
-                sqlx::query("RELEASE SAVEPOINT cartapel_import")
-                    .execute(&mut *tx)
-                    .await?;
-                if row.get::<bool, _>("inserted") {
+        tx.raw("SAVEPOINT cartapel_import").await?;
+        let outcome = match &stmt {
+            ImportStmt::Returning(sql, binds) => tx.fetch_json_rows(sql, binds).await.map(|rows| {
+                rows.first()
+                    .map(|m| m.get("inserted") == Some(&Value::Bool(true)))
+            }),
+            ImportStmt::Affected(sql, binds) => tx
+                .execute(sql, binds)
+                .await
+                .map(|r| Some(r.rows_affected != 2)),
+        };
+        match outcome {
+            Ok(Some(was_insert)) => {
+                tx.raw("RELEASE SAVEPOINT cartapel_import").await?;
+                if was_insert {
                     inserted += 1;
                 } else {
                     updated += 1;
                 }
             }
             Ok(None) => {
-                sqlx::query("RELEASE SAVEPOINT cartapel_import")
-                    .execute(&mut *tx)
-                    .await?;
+                tx.raw("RELEASE SAVEPOINT cartapel_import").await?;
                 errors.push(json!({ "row": i, "message": "row exists but not permitted" }));
             }
             Err(e) => {
-                sqlx::query("ROLLBACK TO SAVEPOINT cartapel_import")
-                    .execute(&mut *tx)
-                    .await?;
-                let msg = match &e {
-                    sqlx::Error::Database(db) => {
-                        tracing::warn!("import row {i} rejected: {}", db.message());
-                        match db.code().as_deref() {
-                            Some("23505") => "duplicate key".to_string(),
-                            Some("23503") => "referenced row not found".to_string(),
-                            Some("23502") => "missing required value".to_string(),
-                            Some("23514") => "value violates a constraint".to_string(),
-                            Some("22P02" | "22007" | "22008") => "invalid value format".to_string(),
-                            _ => "row rejected".to_string(),
-                        }
-                    }
-                    _ => "row rejected".to_string(),
-                };
-                errors.push(json!({ "row": i, "message": msg }));
+                tx.raw("ROLLBACK TO SAVEPOINT cartapel_import").await?;
+                errors.push(json!({ "row": i, "message": import_reject_message(i, &e) }));
             }
         }
     }
@@ -1403,11 +1588,13 @@ pub async fn options_handler(
         .ok_or_else(|| AppError::bad(format!("{col} is not a foreign key")))?;
     let child = table_of(&state, &user, &f_table)?;
     let label = fk_label_col(child);
-    let mut binds = Binds::new();
+    let pool = state.pool_of(child);
+    let dialect = pool.dialect();
+    let mut binds = Binds::for_dialect(dialect);
     let mut clauses: Vec<String> = Vec::new();
     if let Some(q) = params.get("q").filter(|q| !q.is_empty()) {
-        let n = binds.push(Some(format!("%{q}%")));
-        clauses.push(format!("{}::text ILIKE ${n}", ident(&label)));
+        let n = binds.ph(Some(format!("%{q}%")));
+        clauses.push(crate::sqlval::ilike_clause(dialect, &ident(&label), &n));
     }
     if let Some(rf) = state.row_filter(&user, &f_table) {
         clauses.push(format!("({rf})"));
@@ -1418,19 +1605,19 @@ pub async fn options_handler(
         format!("WHERE {}", clauses.join(" AND "))
     };
     let sql = format!(
-        "SELECT {}::text AS value, {}::text AS label FROM {} {} ORDER BY 2 LIMIT 20",
-        ident(&f_col),
-        ident(&label),
+        "SELECT {} AS value, {} AS label FROM {} {} ORDER BY 2 LIMIT 20",
+        crate::sqlval::text_cast(dialect, &ident(&f_col)),
+        crate::sqlval::text_cast(dialect, &ident(&label)),
         state.qualified_of(child),
         where_sql
     );
-    let rows = binds.query(&sql).fetch_all(state.pool_of(child)).await?;
+    let rows = crate::db::fetch_json_rows(pool, &sql, &binds).await?;
     let out: Vec<Value> = rows
         .into_iter()
-        .map(|r| {
+        .map(|m| {
             json!({
-                "value": r.get::<Option<String>, _>("value"),
-                "label": r.get::<Option<String>, _>("label"),
+                "value": m.get("value").cloned().unwrap_or(Value::Null),
+                "label": m.get("label").cloned().unwrap_or(Value::Null),
             })
         })
         .collect();
@@ -1475,7 +1662,7 @@ mod tests {
     }
 
     fn clause_for(c: &DbColumn, op: &str, raw: &str) -> (String, Vec<Option<String>>) {
-        let mut binds = Binds::new();
+        let mut binds = Binds::for_dialect(crate::db::Dialect::Pg);
         let mut clauses = Vec::new();
         operator_clause(c, &c.name, op, raw, &mut binds, &mut clauses).unwrap();
         (clauses.join(" AND "), binds.values)
@@ -1515,7 +1702,7 @@ mod tests {
     #[test]
     fn operator_clauses_reject_bad_input() {
         let price = col("price", "numeric", Kind::Float);
-        let mut b = Binds::new();
+        let mut b = Binds::for_dialect(crate::db::Dialect::Pg);
         let mut c = Vec::new();
         assert!(operator_clause(&price, "price", "between", "1..", &mut b, &mut c).is_err());
         assert!(operator_clause(&price, "price", "between", "nope", &mut b, &mut c).is_err());
@@ -1782,7 +1969,7 @@ mod tests {
         Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
-            pg,
+            pg: crate::db::DbPool::Pg(pg),
             schema: "public".into(),
             db: inline_schema(),
             cfg: arc_swap::ArcSwap::from_pointee(cfg),

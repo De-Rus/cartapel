@@ -608,7 +608,7 @@ mod tests {
         Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
-            pg,
+            pg: crate::db::DbPool::Pg(pg),
             schema: "public".into(),
             db: test_schema(),
             cfg: arc_swap::ArcSwap::from_pointee(cfg),

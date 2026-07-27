@@ -405,7 +405,7 @@ pub async fn discover(
         "SELECT n.nspname, c.relname, c.reltuples::bigint FROM pg_class c
          JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('r','v','m')",
     )
-    .fetch_all(&state.pg)
+    .fetch_all(state.pg.pg())
     .await
     .map(|rs| {
         rs.into_iter()
@@ -1118,7 +1118,7 @@ pub(crate) mod test_support {
         Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
-            pg,
+            pg: crate::db::DbPool::Pg(pg),
             schema: "public".into(),
             db: schema,
             cfg: arc_swap::ArcSwap::from_pointee(cfg),

@@ -2,7 +2,6 @@ use crate::config::Variable;
 use crate::interp::VarType;
 use crate::state::{AppError, AppState, CurrentUser};
 use serde_json::Value;
-use sqlx::Row;
 use std::collections::{BTreeMap, HashMap};
 
 /// The resolved variable environment for one request: the declared type of every
@@ -24,26 +23,16 @@ async fn option_values(state: &AppState, var: &Variable) -> Result<Vec<String>, 
     let Some(sql) = &var.query else {
         return Ok(var.options.clone());
     };
-    let mut tx = state.pool_for(var.source.as_deref()).begin().await?;
-    sqlx::query("SET TRANSACTION READ ONLY")
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("SET LOCAL statement_timeout = '8000ms'")
-        .execute(&mut *tx)
-        .await?;
-    let wrapped = format!("SELECT row_to_json(sub.*) AS r FROM ({sql}) sub LIMIT 1000");
-    let rows = sqlx::query(&wrapped).fetch_all(&mut *tx).await?;
-    let _ = tx.rollback().await;
+    let rows =
+        crate::db::config_query_rows(state.pool_for(var.source.as_deref()), sql, &[], 1000, 8000)
+            .await?;
     Ok(rows
         .into_iter()
-        .filter_map(|r| {
-            let v: Value = r.get("r");
-            v.as_object()
-                .and_then(|o| o.values().next())
-                .map(|first| match first {
-                    Value::String(s) => s.clone(),
-                    other => other.to_string(),
-                })
+        .filter_map(|o| {
+            o.values().next().map(|first| match first {
+                Value::String(s) => s.clone(),
+                other => other.to_string(),
+            })
         })
         .collect())
 }
@@ -59,21 +48,12 @@ pub async fn option_pairs(state: &AppState, var: &Variable) -> Result<Vec<Value>
             .collect());
     }
     let sql = var.query.as_ref().unwrap();
-    let mut tx = state.pool_for(var.source.as_deref()).begin().await?;
-    sqlx::query("SET TRANSACTION READ ONLY")
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("SET LOCAL statement_timeout = '8000ms'")
-        .execute(&mut *tx)
-        .await?;
-    let wrapped = format!("SELECT row_to_json(sub.*) AS r FROM ({sql}) sub LIMIT 1000");
-    let rows = sqlx::query(&wrapped).fetch_all(&mut *tx).await?;
-    let _ = tx.rollback().await;
+    let rows =
+        crate::db::config_query_rows(state.pool_for(var.source.as_deref()), sql, &[], 1000, 8000)
+            .await?;
     Ok(rows
         .into_iter()
-        .filter_map(|r| {
-            let v: Value = r.get("r");
-            let obj = v.as_object()?;
+        .filter_map(|obj| {
             let mut it = obj.values();
             let value = it.next()?;
             let label = it.next().unwrap_or(value);

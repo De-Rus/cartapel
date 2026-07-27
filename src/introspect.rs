@@ -231,6 +231,130 @@ pub async fn introspect(pool: &PgPool, schemas: &[String]) -> Result<Schema, sql
     Ok(schema_out)
 }
 
+pub fn kind_of_mysql(data_type: &str, column_type: &str) -> Kind {
+    match data_type {
+        "tinyint" if column_type.starts_with("tinyint(1)") => Kind::Bool,
+        "tinyint" | "smallint" | "mediumint" | "int" | "bigint" | "year" => Kind::Int,
+        "decimal" | "float" | "double" => Kind::Float,
+        "bit" => {
+            if column_type == "bit(1)" {
+                Kind::Bool
+            } else {
+                Kind::Int
+            }
+        }
+        "date" => Kind::Date,
+        "datetime" | "timestamp" => Kind::Datetime,
+        "json" => Kind::Json,
+        "binary" | "varbinary" | "tinyblob" | "blob" | "mediumblob" | "longblob" => Kind::Binary,
+        _ => Kind::Text,
+    }
+}
+
+/// One MySQL database == one schema; the pool's current database is the scope.
+pub async fn introspect_mysql(pool: &sqlx::MySqlPool) -> Result<Schema, sqlx::Error> {
+    let cols = sqlx::query(
+        r#"SELECT CAST(c.TABLE_NAME AS CHAR) AS table_name,
+                  CAST(c.COLUMN_NAME AS CHAR) AS column_name,
+                  CAST(c.DATA_TYPE AS CHAR) AS data_type,
+                  CAST(c.COLUMN_TYPE AS CHAR) AS column_type,
+                  (c.IS_NULLABLE = 'YES') AS nullable,
+                  (c.COLUMN_DEFAULT IS NOT NULL OR c.EXTRA LIKE '%auto_increment%') AS has_default,
+                  (t.TABLE_TYPE = 'VIEW') AS is_view,
+                  (c.COLUMN_KEY = 'PRI') AS is_pk
+           FROM information_schema.COLUMNS c
+           JOIN information_schema.TABLES t
+             ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
+           WHERE c.TABLE_SCHEMA = DATABASE()
+           ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION"#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let fks = sqlx::query(
+        r#"SELECT CAST(TABLE_NAME AS CHAR) AS table_name,
+                  CAST(COLUMN_NAME AS CHAR) AS column_name,
+                  CAST(REFERENCED_TABLE_NAME AS CHAR) AS f_table,
+                  CAST(REFERENCED_COLUMN_NAME AS CHAR) AS f_col
+           FROM information_schema.KEY_COLUMN_USAGE
+           WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL"#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let db_name: String = sqlx::query_scalar("SELECT CAST(DATABASE() AS CHAR)")
+        .fetch_one(pool)
+        .await?;
+
+    // MariaDB stores `json` as longtext + an auto-named CHECK (json_valid(col));
+    // the constraint name is the column name. Empty on MySQL (native json type).
+    let json_checks: std::collections::BTreeSet<(String, String)> = sqlx::query(
+        r#"SELECT CAST(TABLE_NAME AS CHAR) AS table_name,
+                  CAST(CONSTRAINT_NAME AS CHAR) AS column_name
+           FROM information_schema.CHECK_CONSTRAINTS
+           WHERE CONSTRAINT_SCHEMA = DATABASE() AND CHECK_CLAUSE LIKE '%json_valid%'"#,
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default()
+    .into_iter()
+    .map(|r| (r.get("table_name"), r.get("column_name")))
+    .collect();
+
+    let mut fk_map: BTreeMap<(String, String), (String, String)> = BTreeMap::new();
+    for r in &fks {
+        fk_map.insert(
+            (r.get("table_name"), r.get("column_name")),
+            (r.get("f_table"), r.get("f_col")),
+        );
+    }
+
+    let mut pk_count: BTreeMap<String, u32> = BTreeMap::new();
+    for r in &cols {
+        if r.get::<i64, _>("is_pk") != 0 {
+            *pk_count.entry(r.get("table_name")).or_default() += 1;
+        }
+    }
+
+    let mut out = Schema::default();
+    for r in &cols {
+        let table: String = r.get("table_name");
+        let name: String = r.get("column_name");
+        let data_type: String = r.get("data_type");
+        let column_type: String = r.get("column_type");
+        let is_view = r.get::<i64, _>("is_view") != 0;
+        let is_pk = r.get::<i64, _>("is_pk") != 0;
+        let entry = out.tables.entry(table.clone()).or_insert_with(|| DbTable {
+            name: table.clone(),
+            schema: db_name.clone(),
+            source: String::new(),
+            is_view,
+            pk: None,
+            columns: Vec::new(),
+        });
+        if is_pk && pk_count.get(&table) == Some(&1) {
+            entry.pk = Some(name.clone());
+        }
+        let mut kind = kind_of_mysql(&data_type, &column_type);
+        if kind == Kind::Text
+            && data_type == "longtext"
+            && json_checks.contains(&(table.clone(), name.clone()))
+        {
+            kind = Kind::Json;
+        }
+        entry.columns.push(DbColumn {
+            fk: fk_map.get(&(table.clone(), name.clone())).cloned(),
+            kind,
+            udt: column_type,
+            elem_udt: None,
+            name,
+            nullable: r.get::<i64, _>("nullable") != 0,
+            has_default: r.get::<i64, _>("has_default") != 0,
+        });
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,6 +368,43 @@ mod tests {
             pk: None,
             columns: vec![],
         }
+    }
+
+    #[test]
+    fn mysql_kind_mapping() {
+        assert_eq!(kind_of_mysql("tinyint", "tinyint(1)"), Kind::Bool);
+        assert_eq!(kind_of_mysql("tinyint", "tinyint(4)"), Kind::Int);
+        assert_eq!(kind_of_mysql("bigint", "bigint(20) unsigned"), Kind::Int);
+        assert_eq!(kind_of_mysql("decimal", "decimal(10,2)"), Kind::Float);
+        assert_eq!(kind_of_mysql("bit", "bit(1)"), Kind::Bool);
+        assert_eq!(kind_of_mysql("bit", "bit(8)"), Kind::Int);
+        assert_eq!(kind_of_mysql("datetime", "datetime"), Kind::Datetime);
+        assert_eq!(kind_of_mysql("json", "json"), Kind::Json);
+        assert_eq!(kind_of_mysql("longblob", "longblob"), Kind::Binary);
+        assert_eq!(kind_of_mysql("enum", "enum('a','b')"), Kind::Text);
+        assert_eq!(kind_of_mysql("varchar", "varchar(60)"), Kind::Text);
+    }
+
+    /// Introspection against a live MySQL/MariaDB (CARTAPEL_TEST_MYSQL), using
+    /// the WordPress-shaped fixture the Phase-0 rig carries.
+    #[tokio::test]
+    async fn mysql_introspects_wordpress_shaped_tables() {
+        let Ok(url) = std::env::var("CARTAPEL_TEST_MYSQL") else {
+            eprintln!("CARTAPEL_TEST_MYSQL not set — mysql introspection test skipped");
+            return;
+        };
+        let pool = sqlx::MySqlPool::connect(&url).await.unwrap();
+        let schema = introspect_mysql(&pool).await.unwrap();
+        let posts = schema.tables.get("wp_posts").expect("wp_posts fixture");
+        assert_eq!(posts.pk.as_deref(), Some("ID"));
+        let id = posts.column("ID").unwrap();
+        assert_eq!(id.kind, Kind::Int);
+        assert!(id.udt.contains("unsigned"));
+        assert!(id.has_default, "auto_increment counts as a default");
+        assert_eq!(posts.column("ping_status").unwrap().kind, Kind::Bool);
+        assert_eq!(posts.column("post_status").unwrap().kind, Kind::Text);
+        assert_eq!(posts.column("meta").unwrap().kind, Kind::Json);
+        assert_eq!(posts.column("post_date").unwrap().kind, Kind::Datetime);
     }
 
     #[test]

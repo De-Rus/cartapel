@@ -129,20 +129,36 @@ Top-level `[cartapel]` keys:
 
 ### `source "…" { }`
 
-The database is declared as a named source. Define at least one `postgres`
-source and mark it `primary` — that is what cartapel introspects and serves.
+Databases are declared as named sources. Define at least one `postgres`
+source and mark it `primary` — that is what cartapel introspects and serves by
+default. Additional sources (more Postgres databases, or MySQL/MariaDB ones)
+plug extra tables into the same panel: point a table at one with
+`from { source = "…" }`, and lists, detail pages, editing, filters, search,
+import/export and audit all work the same way.
 
 | Key | Description |
 | --- | --- |
-| `type` | `"postgres"` for the database, or `"http"` for a read-only JSON source a custom page can call. |
-| `url` | Connection URL (postgres) or endpoint (http). Supports `env:NAME` / `${NAME}`. |
-| `schemas` | List of schemas to introspect (postgres). Defaults to `["public"]`. |
+| `type` | `"postgres"`, `"mysql"` (also accepts `"mariadb"`), or `"http"` for a read-only JSON source a custom page can call. |
+| `url` | Connection URL (`postgres://…`, `mysql://…`) or endpoint (http). Supports `env:NAME` / `${NAME}`. |
+| `schemas` | List of schemas to introspect (postgres). Defaults to `["public"]`. A MySQL source is scoped to the database in its URL. |
 | `primary` | Marks the postgres source cartapel introspects. With a single postgres source it is implied; declare it explicitly when you define several. |
 | `token_env` / `header` | For `http` sources: attach a secret from this env var under `header` (default `x-admin-token`). The secret never reaches the browser. |
 | `roles` | Restrict a source to these roles (non-admins need an explicit match). |
 
 `--db postgres://…` / `CARTAPEL_DB` overrides the `primary` source's URL, so the
 same bundle can run against dev, staging or prod by swapping one env var.
+
+::: info MySQL & MariaDB
+MySQL 8.0+ and MariaDB 10.6+ are supported as table sources and for named
+queries and query-backed variables (dashboards run on the primary source).
+The differences that matter are handled for you — `tinyint(1)` renders as a
+boolean, `enum` values become text, MariaDB's `json`-as-`longtext` is detected,
+and unsigned ids are read losslessly. Two honest limits: array columns don't
+exist on MySQL, and **upsert imports are refused on tables with a row filter**
+(MySQL's upsert can't be scoped by a WHERE, and widening a user's write surface
+silently is worse than saying no). Create the cartapel user with
+`mysql_native_password` — `ed25519` auth is not supported.
+:::
 
 ## Environment interpolation
 

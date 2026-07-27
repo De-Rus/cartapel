@@ -1,5 +1,6 @@
 use crate::config::{InlineSpec, TableConfig};
 use crate::introspect::{DbColumn, DbTable, Kind};
+use crate::sqlval::ident;
 use crate::state::{AppError, AppState, CurrentUser};
 use axum::extract::State;
 use axum::Json;
@@ -168,17 +169,56 @@ fn is_listable_column(dbt: &DbTable, cfg: &TableConfig, name: &str) -> bool {
     dbt.column(name).is_some() || cfg.fields.get(name).is_some_and(|f| f.sql.is_some())
 }
 
-/// The row-producing SELECT expression, folding computed columns into the jsonb.
-pub fn row_select(dbt: &DbTable, cfg: &TableConfig) -> String {
-    let computed = computed_columns(dbt, cfg);
-    if computed.is_empty() {
-        return "to_jsonb(t.*)".into();
+/// The row-producing SELECT list, one aliased item per column plus computed
+/// fields — replaces `to_jsonb(t.*)`. Rows come back typed and are materialized
+/// to JSON by the dialect decoder; binary columns travel as their length only.
+pub fn select_items_for(
+    dbt: &DbTable,
+    cfg: &TableConfig,
+    dialect: crate::db::Dialect,
+) -> Vec<String> {
+    let item = match dialect {
+        crate::db::Dialect::Pg => column_item,
+        crate::db::Dialect::MySql => column_item_mysql,
+    };
+    let mut out: Vec<String> = dbt.columns.iter().map(item).collect();
+    for (name, sql) in computed_columns(dbt, cfg) {
+        match dialect {
+            crate::db::Dialect::Pg => out.push(format!("to_jsonb(({sql})) AS {}", ident(name))),
+            crate::db::Dialect::MySql => out.push(format!("({sql}) AS {}", ident(name))),
+        }
     }
-    let pairs: Vec<String> = computed
-        .iter()
-        .map(|(name, sql)| format!("{}, ({sql})", crate::sqlval::sql_literal(name)))
-        .collect();
-    format!("to_jsonb(t.*) || jsonb_build_object({})", pairs.join(", "))
+    out
+}
+
+fn column_item_mysql(c: &DbColumn) -> String {
+    let id = ident(&c.name);
+    match c.kind {
+        Kind::Binary => format!("length(t.{id}) AS {id}"),
+        _ => format!("t.{id}"),
+    }
+}
+
+/// Native selection only where the Rust decode is provably byte-identical to
+/// `to_jsonb`; every other type rides per-column `to_jsonb` so infinity
+/// timestamps, NaN floats, composites, session-timezone rendering and json
+/// normalization keep the exact old semantics by construction.
+fn column_item(c: &DbColumn) -> String {
+    let id = ident(&c.name);
+    match c.kind {
+        Kind::Binary => format!("length(t.{id}) AS {id}"),
+        Kind::Int | Kind::Bool | Kind::Uuid => format!("t.{id}"),
+        Kind::Json if c.udt == "jsonb" => format!("t.{id}"),
+        Kind::Text
+            if matches!(
+                c.udt.as_str(),
+                "text" | "varchar" | "bpchar" | "name" | "citext"
+            ) =>
+        {
+            format!("t.{id}")
+        }
+        _ => format!("to_jsonb(t.{id}) AS {id}"),
+    }
 }
 
 pub fn list_columns(dbt: &DbTable, cfg: &TableConfig) -> Vec<String> {
@@ -250,30 +290,26 @@ async fn enum_options(state: &AppState, user: &CurrentUser, table: &str, col: &s
         Some(rf) => format!("WHERE ({rf})"),
         None => String::new(),
     };
+    let pool = state.pool_for_table(table);
     let sql = format!(
-        "SELECT {}::text AS v, count(*) AS n FROM {} {where_sql} GROUP BY 1 ORDER BY n DESC LIMIT {}",
-        crate::sqlval::ident(col),
+        "SELECT {} AS v, count(*) AS n FROM {} {where_sql} GROUP BY 1 ORDER BY n DESC LIMIT {}",
+        crate::sqlval::text_cast(pool.dialect(), &crate::sqlval::ident(col)),
         state.qualified_table(table),
         OPTIONS_LIMIT
     );
     let result = async {
         let _permit = ENUM_OPTIONS_GATE.acquire().await.ok()?;
-        let mut tx = state.pool_for_table(table).begin().await.ok()?;
-        sqlx::query("SET TRANSACTION READ ONLY")
-            .execute(&mut *tx)
-            .await
-            .ok()?;
-        sqlx::query("SET LOCAL statement_timeout = '4000ms'")
-            .execute(&mut *tx)
-            .await
-            .ok()?;
-        let rows = sqlx::query_as::<_, (Option<String>, i64)>(&sql)
-            .fetch_all(&mut *tx)
+        let binds = crate::sqlval::Binds::for_dialect(pool.dialect());
+        let rows = crate::db::read_only_json_rows(pool, &sql, &binds, 4000)
             .await
             .ok()?;
         Some(
             rows.into_iter()
-                .filter_map(|(v, n)| v.map(|v| json!({ "value": v, "label": v, "count": n })))
+                .filter_map(|r| {
+                    let v = r.get("v")?.as_str()?.to_string();
+                    let n = r.get("n").and_then(Value::as_i64).unwrap_or(0);
+                    Some(json!({ "value": v, "label": v, "count": n }))
+                })
                 .collect::<Vec<_>>(),
         )
     }
@@ -1104,7 +1140,7 @@ mod relation_tests {
         Arc::new(AppState {
             pools: Default::default(),
             dbs: Default::default(),
-            pg,
+            pg: crate::db::DbPool::Pg(pg),
             schema: "public".into(),
             db: schema(),
             cfg: arc_swap::ArcSwap::from_pointee(cfg),

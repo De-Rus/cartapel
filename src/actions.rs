@@ -51,7 +51,7 @@ pub async fn action_handler(
             if !state.table_perms(&user, &table).update {
                 return Err(AppError::forbidden("no write access"));
             }
-            let mut binds = Binds::new();
+            let mut binds = Binds::for_dialect(state.pool_for_table(&table).dialect());
             let mut sets = Vec::new();
             for (col_name, tv) in &action.set {
                 let col = dbt.column(col_name).ok_or_else(|| {
@@ -88,7 +88,7 @@ pub async fn action_handler(
                 &table,
                 &pk_name,
                 &pks,
-                Binds::new(),
+                Binds::for_dialect(state.pool_for_table(&table).dialect()),
                 format!("DELETE FROM {}", state.qualified_table(&table)),
             )
             .await?
@@ -172,17 +172,18 @@ async fn run_bulk(
 ) -> Result<u64, AppError> {
     let mut placeholders = Vec::with_capacity(pks.len());
     for pk in pks {
-        let n = binds.push(Some(pk.clone()));
-        placeholders.push(format!("${n}"));
+        let n = binds.ph(Some(pk.clone()));
+        placeholders.push(n);
     }
-    let mut where_sql = format!("{}::text IN ({})", ident(pk_name), placeholders.join(", "));
+    let mut where_sql = format!(
+        "{} IN ({})",
+        crate::sqlval::text_cast(binds.dialect(), &ident(pk_name)),
+        placeholders.join(", ")
+    );
     if let Some(rf) = state.row_filter(user, table) {
         where_sql = format!("{where_sql} AND ({rf})");
     }
     let sql = format!("{head} WHERE {where_sql}");
-    let result = binds
-        .query(&sql)
-        .execute(state.pool_for_table(table))
-        .await?;
-    Ok(result.rows_affected())
+    let result = crate::db::execute(state.pool_for_table(table), &sql, &binds).await?;
+    Ok(result.rows_affected)
 }

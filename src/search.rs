@@ -12,6 +12,14 @@ const PER_TABLE: i64 = 5;
 const TOTAL_CAP: usize = 40;
 const BUDGET: Duration = Duration::from_secs(8);
 
+fn json_str(v: Option<&Value>) -> Option<String> {
+    match v {
+        Some(Value::String(x)) => Some(x.clone()),
+        Some(Value::Null) | None => None,
+        Some(other) => Some(other.to_string()),
+    }
+}
+
 pub async fn search_handler(
     State(state): State<Arc<AppState>>,
     user: CurrentUser,
@@ -55,39 +63,27 @@ pub async fn search_handler(
             title_col
         };
 
+        let pool = state.pool_of(dbt);
+        let dialect = pool.dialect();
         if pkish {
-            let mut b = Binds::new();
-            let n = b.push(Some(q.clone()));
-            let mut w = format!("{}::text = ${n}", ident(&pk));
+            let mut b = Binds::for_dialect(dialect);
+            let n = b.ph(Some(q.clone()));
+            let mut w = format!("{} = {n}", crate::sqlval::text_cast(dialect, &ident(&pk)));
             if let Some(rf) = state.row_filter(&user, &table) {
                 w = format!("{w} AND ({rf})");
             }
             let sql = format!(
-                "SELECT {}::text AS pk, {}::text AS title FROM {} t WHERE {w} LIMIT 1",
-                ident(&pk),
-                ident(&title_col),
+                "SELECT {} AS pk, {} AS title FROM {} t WHERE {w} LIMIT 1",
+                crate::sqlval::text_cast(dialect, &ident(&pk)),
+                crate::sqlval::text_cast(dialect, &ident(&title_col)),
                 state.qualified_of(dbt),
             );
-            let hit: Option<(Option<String>, Option<String>)> = async {
-                let mut tx = state.pool_of(dbt).begin().await.ok()?;
-                sqlx::query("SET TRANSACTION READ ONLY")
-                    .execute(&mut *tx)
-                    .await
-                    .ok()?;
-                sqlx::query("SET LOCAL statement_timeout = '2000ms'")
-                    .execute(&mut *tx)
-                    .await
-                    .ok()?;
-                let mut qq = sqlx::query_as::<_, (Option<String>, Option<String>)>(&sql);
-                for v in &b.values {
-                    qq = qq.bind(v.as_deref());
-                }
-                qq.fetch_optional(&mut *tx)
-                    .await
-                    .map_err(|e| tracing::warn!("pk search on {table} failed: {e}"))
-                    .ok()?
-            }
-            .await;
+            let hit = crate::db::read_only_json_rows(pool, &sql, &b, 2000)
+                .await
+                .map_err(|e| tracing::warn!("pk search on {table} failed: {e}"))
+                .ok()
+                .and_then(|rows| rows.into_iter().next())
+                .map(|m| (json_str(m.get("pk")), json_str(m.get("title"))));
             if let Some((Some(pkv), titlev)) = hit {
                 if seen.insert((table.clone(), pkv.clone())) {
                     let label = cfg.label.clone().unwrap_or_else(|| humanize(&table));
@@ -98,44 +94,35 @@ pub async fn search_handler(
             }
         }
 
-        let mut binds = Binds::new();
-        let n = binds.push(Some(format!("%{q}%")));
+        let mut binds = Binds::for_dialect(dialect);
         let ors: Vec<String> = cols
             .iter()
-            .map(|c| format!("{}::text ILIKE ${n}", ident(c)))
+            .map(|c| {
+                let n = binds.ph(Some(format!("%{q}%")));
+                crate::sqlval::ilike_clause(dialect, &ident(c), &n)
+            })
             .collect();
         let mut where_sql = format!("({})", ors.join(" OR "));
         if let Some(rf) = state.row_filter(&user, &table) {
             where_sql = format!("{where_sql} AND ({rf})");
         }
         let sql = format!(
-            "SELECT {}::text AS pk, {}::text AS title FROM {} t WHERE {where_sql} LIMIT {PER_TABLE}",
-            ident(&pk),
-            ident(&title_col),
+            "SELECT {} AS pk, {} AS title FROM {} t WHERE {where_sql} LIMIT {PER_TABLE}",
+            crate::sqlval::text_cast(dialect, &ident(&pk)),
+            crate::sqlval::text_cast(dialect, &ident(&title_col)),
             state.qualified_of(dbt),
         );
 
-        let hits: Vec<(Option<String>, Option<String>)> = async {
-            let mut tx = state.pool_of(dbt).begin().await.ok()?;
-            sqlx::query("SET TRANSACTION READ ONLY")
-                .execute(&mut *tx)
-                .await
-                .ok()?;
-            sqlx::query("SET LOCAL statement_timeout = '2000ms'")
-                .execute(&mut *tx)
-                .await
-                .ok()?;
-            let mut q = sqlx::query_as::<_, (Option<String>, Option<String>)>(&sql);
-            for v in &binds.values {
-                q = q.bind(v.as_deref());
-            }
-            q.fetch_all(&mut *tx)
+        let hits: Vec<(Option<String>, Option<String>)> =
+            crate::db::read_only_json_rows(pool, &sql, &binds, 2000)
                 .await
                 .map_err(|e| tracing::warn!("search on {table} failed: {e}"))
-                .ok()
-        }
-        .await
-        .unwrap_or_default();
+                .map(|rows| {
+                    rows.into_iter()
+                        .map(|m| (json_str(m.get("pk")), json_str(m.get("title"))))
+                        .collect()
+                })
+                .unwrap_or_default();
 
         let label = cfg.label.clone().unwrap_or_else(|| humanize(&table));
         for (pkv, titlev) in hits {

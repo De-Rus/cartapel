@@ -8,7 +8,6 @@ use axum::Json;
 use hmac::{Hmac, Mac};
 use serde_json::json;
 use sha2::Sha256;
-use sqlx::PgPool;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -18,8 +17,8 @@ use std::time::Instant;
 pub type OptionsCacheKey = (String, String, Option<String>);
 
 pub struct AppState {
-    pub pg: PgPool,
-    pub pools: std::collections::HashMap<String, PgPool>,
+    pub pg: crate::db::DbPool,
+    pub pools: std::collections::HashMap<String, crate::db::DbPool>,
     pub schema: String,
     pub db: Schema,
     pub dbs: std::collections::HashMap<String, Schema>,
@@ -101,8 +100,9 @@ impl From<sqlx::Error> for AppError {
                 tracing::warn!("db error: {}", db.message());
                 // Constraint/format violations carry actionable, user-caused
                 // messages ("null value in column …"); anything else stays opaque.
+                // Postgres reports SQLSTATE; MySQL/MariaDB report errno strings.
                 let code = db.code();
-                let known = matches!(
+                let pg_known = matches!(
                     code.as_deref(),
                     Some(
                         "23502"
@@ -116,6 +116,25 @@ impl From<sqlx::Error> for AppError {
                             | "22008"
                     )
                 );
+                let my_known = db
+                    .try_downcast_ref::<sqlx::mysql::MySqlDatabaseError>()
+                    .map(|e| {
+                        matches!(
+                            e.number(),
+                            1062 | 1048
+                                | 1364
+                                | 1451
+                                | 1452
+                                | 3819
+                                | 4025
+                                | 1292
+                                | 1366
+                                | 1406
+                                | 1264
+                        )
+                    })
+                    .unwrap_or(false);
+                let known = pg_known || my_known;
                 if known {
                     AppError::bad(db.message())
                 } else {
@@ -540,7 +559,7 @@ impl AppState {
         self.db_for(src.as_deref()).find(schema.as_deref(), &phys)
     }
 
-    pub fn pool_for(&self, source: Option<&str>) -> &PgPool {
+    pub fn pool_for(&self, source: Option<&str>) -> &crate::db::DbPool {
         source.and_then(|s| self.pools.get(s)).unwrap_or(&self.pg)
     }
 
@@ -548,7 +567,7 @@ impl AppState {
         source.and_then(|s| self.dbs.get(s)).unwrap_or(&self.db)
     }
 
-    pub fn pool_of(&self, dbt: &crate::introspect::DbTable) -> &PgPool {
+    pub fn pool_of(&self, dbt: &crate::introspect::DbTable) -> &crate::db::DbPool {
         self.pools.get(&dbt.source).unwrap_or(&self.pg)
     }
 
@@ -557,7 +576,7 @@ impl AppState {
     }
 
     /// The pool a configured table lives on — its `from` source, else the primary.
-    pub fn pool_for_table(&self, table: &str) -> &PgPool {
+    pub fn pool_for_table(&self, table: &str) -> &crate::db::DbPool {
         match self.resolve_table(table) {
             Some(dbt) => self.pool_of(dbt),
             None => &self.pg,

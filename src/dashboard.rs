@@ -3,7 +3,6 @@ use crate::state::{AppError, AppState, CurrentUser};
 use axum::extract::State;
 use axum::Json;
 use serde_json::{json, Value};
-use sqlx::Row;
 use std::sync::Arc;
 
 const CHART_CAP: i64 = 500;
@@ -17,22 +16,10 @@ async fn read_only_rows(
     env: &crate::vars::Resolved,
 ) -> Result<Vec<Value>, String> {
     let (sql, binds) = crate::interp::interpolate(sql, &env.types, &env.values)?;
-    let mut tx = state.pg.begin().await.map_err(|e| e.to_string())?;
-    sqlx::query("SET TRANSACTION READ ONLY")
-        .execute(&mut *tx)
+    let rows = crate::db::config_query_rows(&state.pg, &sql, &binds, cap, 5000)
         .await
         .map_err(|e| e.to_string())?;
-    sqlx::query("SET LOCAL statement_timeout = '5000ms'")
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| e.to_string())?;
-    let wrapped = format!("SELECT row_to_json(sub.*) AS r FROM ({sql}) sub LIMIT {cap}");
-    let rows = crate::interp::bind_all(sqlx::query(&wrapped), &binds)
-        .fetch_all(&mut *tx)
-        .await
-        .map_err(|e| e.to_string())?;
-    let _ = tx.rollback().await;
-    Ok(rows.into_iter().map(|r| r.get::<Value, _>("r")).collect())
+    Ok(rows.into_iter().map(Value::Object).collect())
 }
 
 fn first_number(row: &Value) -> Option<f64> {

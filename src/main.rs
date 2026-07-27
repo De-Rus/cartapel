@@ -5,6 +5,7 @@ mod auth;
 mod config;
 mod configedit;
 mod dashboard;
+mod db;
 mod globaledit;
 mod groupsedit;
 mod images;
@@ -180,6 +181,45 @@ async fn connect_pg(url: &str) -> sqlx::PgPool {
             ));
         }
     }
+}
+
+async fn connect_mysql(alias: &str, url: &str) -> crate::db::DbPool {
+    let url = url.replacen("mariadb://", "mysql://", 1);
+    let opts: sqlx::mysql::MySqlConnectOptions = url.parse().expect("parse mysql url");
+    let pool = match sqlx::mysql::MySqlPoolOptions::new()
+        .max_connections(5)
+        .min_connections(1)
+        .idle_timeout(std::time::Duration::from_secs(60))
+        .max_lifetime(std::time::Duration::from_secs(1800))
+        .acquire_timeout(std::time::Duration::from_secs(10))
+        .after_connect(|conn, _meta| {
+            Box::pin(async move {
+                sqlx::query("SET time_zone = '+00:00'")
+                    .execute(&mut *conn)
+                    .await?;
+                sqlx::query("SET SESSION sql_mode = CONCAT(@@sql_mode, ',ANSI_QUOTES')")
+                    .execute(&mut *conn)
+                    .await
+                    .map(|_| ())
+            })
+        })
+        .connect_with(opts)
+        .await
+    {
+        Ok(pool) => pool,
+        Err(e) => die(&format!("source \"{alias}\": cannot connect to mysql: {e}")),
+    };
+    let version: String = sqlx::query_scalar("SELECT VERSION()")
+        .fetch_one(&pool)
+        .await
+        .unwrap_or_default();
+    let flavor = if version.contains("MariaDB") {
+        crate::db::MyFlavor::MariaDb
+    } else {
+        crate::db::MyFlavor::MySql
+    };
+    tracing::info!("source {alias}: connected ({version}, {flavor:?})");
+    crate::db::DbPool::MySql(pool, flavor)
 }
 
 fn die(msg: &str) -> ! {
@@ -420,16 +460,27 @@ async fn serve(
 
     let store = store::Store::open(&data).expect("open cartapel data dir");
 
-    let mut pools: std::collections::HashMap<String, sqlx::PgPool> =
+    let mut pools: std::collections::HashMap<String, crate::db::DbPool> =
         std::collections::HashMap::new();
-    pools.insert(primary_alias.clone(), connect_pg(&db).await);
+    pools.insert(
+        primary_alias.clone(),
+        crate::db::DbPool::Pg(connect_pg(&db).await),
+    );
     for (alias, src) in cfg.sources.iter() {
-        if !src.is_postgres() || alias == &primary_alias {
+        if alias == &primary_alias {
+            continue;
+        }
+        if !src.is_postgres() && !src.is_mysql() {
             continue;
         }
         let url = config::resolve_env(&src.url)
             .unwrap_or_else(|| panic!("source \"{alias}\": missing/unresolved url"));
-        pools.insert(alias.clone(), connect_pg(&url).await);
+        let pool = if src.is_mysql() {
+            connect_mysql(alias, &url).await
+        } else {
+            crate::db::DbPool::Pg(connect_pg(&url).await)
+        };
+        pools.insert(alias.clone(), pool);
     }
     let pg = pools[&primary_alias].clone();
     if store.user_count().unwrap_or(0) == 0 {
@@ -457,7 +508,7 @@ async fn serve(
 
     let mut dbs: std::collections::HashMap<String, introspect::Schema> =
         std::collections::HashMap::new();
-    let mut db_schema = introspect::introspect(&pg, &schemas)
+    let mut db_schema = introspect::introspect(pg.pg(), &schemas)
         .await
         .expect("introspect schema");
     for t in db_schema.tables.values_mut() {
@@ -473,24 +524,40 @@ async fn serve(
     }
     dbs.insert(primary_alias.clone(), db_schema.clone());
     for (alias, src) in cfg.sources.iter() {
-        if !src.is_postgres() || alias == &primary_alias {
+        if alias == &primary_alias {
             continue;
         }
-        let sch = if src.schemas.is_empty() {
-            vec!["public".into()]
-        } else {
-            src.schemas.clone()
+        let mut s = match &pools.get(alias) {
+            Some(crate::db::DbPool::Pg(pool)) => {
+                let sch = if src.schemas.is_empty() {
+                    vec!["public".into()]
+                } else {
+                    src.schemas.clone()
+                };
+                let s = introspect::introspect(pool, &sch)
+                    .await
+                    .expect("introspect source");
+                tracing::info!(
+                    "source {alias}: introspected {} tables from {sch:?}",
+                    s.tables.len()
+                );
+                s
+            }
+            Some(crate::db::DbPool::MySql(pool, flavor)) => {
+                let s = introspect::introspect_mysql(pool)
+                    .await
+                    .expect("introspect mysql source");
+                tracing::info!(
+                    "source {alias}: introspected {} tables ({flavor:?})",
+                    s.tables.len()
+                );
+                s
+            }
+            None => continue,
         };
-        let mut s = introspect::introspect(&pools[alias], &sch)
-            .await
-            .expect("introspect source");
         for t in s.tables.values_mut() {
             t.source = alias.clone();
         }
-        tracing::info!(
-            "source {alias}: introspected {} tables from {sch:?}",
-            s.tables.len()
-        );
         dbs.insert(alias.clone(), s);
     }
 

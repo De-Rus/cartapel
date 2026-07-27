@@ -397,6 +397,10 @@ impl NamedSource {
     pub fn is_postgres(&self) -> bool {
         self.kind == "postgres"
     }
+
+    pub fn is_mysql(&self) -> bool {
+        self.kind == "mysql" || self.kind == "mariadb"
+    }
 }
 
 impl ConfigDir {
@@ -1648,10 +1652,10 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                         "table \"{table}\": from.source \"{alias}\" is not a defined source"
                     ))
                 }
-                Some(s) if !s.is_postgres() => {
+                Some(s) if !s.is_postgres() && !s.is_mysql() => {
                     return Err(format!(
-                        "table \"{table}\": from.source \"{alias}\" is not a postgres source"
-                    ))
+                    "table \"{table}\": from.source \"{alias}\" is not a postgres or mysql source"
+                ))
                 }
                 _ => {}
             }
@@ -1665,9 +1669,9 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                         "query \"{name}\": source \"{alias}\" is not a defined source"
                     ))
                 }
-                Some(s) if !s.is_postgres() => {
+                Some(s) if !s.is_postgres() && !s.is_mysql() => {
                     return Err(format!(
-                        "query \"{name}\": source \"{alias}\" is not a postgres source"
+                        "query \"{name}\": source \"{alias}\" is not a postgres or mysql source"
                     ))
                 }
                 _ => {}
@@ -2626,7 +2630,7 @@ panel {
         let http = base("from-http");
         std::fs::write(http.join("bots.hcl"), "from { source = \"metrics\" }\n").unwrap();
         let err = load(Some(&http)).expect_err("http source errors");
-        assert!(err.contains("not a postgres source"), "{err}");
+        assert!(err.contains("not a postgres or mysql source"), "{err}");
         let _ = std::fs::remove_dir_all(&http);
 
         let ok = base("from-ok");
