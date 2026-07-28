@@ -33,6 +33,18 @@ describe('PanelControls', () => {
     expect(html).toMatch(/<option value=""[^>]*>[^<]+<\/option>/)
   })
 
+  it('names a column the way its header does', () => {
+    const html = renderToStaticMarkup(
+      <PanelControls
+        paged={paged({ options: { source: ['binance', 'okx'] } })}
+        search={false}
+        cols={[{ key: 'source', label: 'Feed' }] as never}
+      />,
+    )
+    expect(html).toContain('Feed')
+    expect(html).not.toContain('source')
+  })
+
   it('marks the picked value as selected', () => {
     const html = renderToStaticMarkup(
       <PanelControls

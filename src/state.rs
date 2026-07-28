@@ -95,6 +95,15 @@ impl IntoResponse for AppError {
     }
 }
 
+/// Postgres cancels on `statement_timeout` with 57014; MySQL/MariaDB report
+/// 3024 (`ER_QUERY_TIMEOUT`) and 1317 for an interrupted statement. ClickHouse
+/// has no SQLSTATE for it, so its message is matched instead.
+fn timed_out(code: Option<&str>, message: &str) -> bool {
+    matches!(code, Some("57014" | "3024" | "1317"))
+        || message.contains("statement timeout")
+        || message.contains("TIMEOUT_EXCEEDED")
+}
+
 impl From<sqlx::Error> for AppError {
     fn from(e: sqlx::Error) -> Self {
         match &e {
@@ -105,6 +114,15 @@ impl From<sqlx::Error> for AppError {
                 // messages ("null value in column …"); anything else stays opaque.
                 // Postgres reports SQLSTATE; MySQL/MariaDB report errno strings.
                 let code = db.code();
+                // A cancelled statement is the server giving up, not a bad value:
+                // saying "invalid value" sends the reader hunting for a typo when
+                // the answer is an index or a narrower filter.
+                if timed_out(code.as_deref(), db.message()) {
+                    return AppError(
+                        StatusCode::GATEWAY_TIMEOUT,
+                        "the query timed out — narrow the filter, or the sorted column may need an index".into(),
+                    );
+                }
                 let pg_known = matches!(
                     code.as_deref(),
                     Some(
@@ -662,5 +680,22 @@ mod tests {
         assert!(u.may(&[], Access::Everyone));
         assert!(!u.may(&[], Access::AdminOnly));
         assert!(user("admin").may(&ops, Access::AdminOnly));
+    }
+
+    /// A cancelled statement must not be reported as a bad value: the operator
+    /// would go hunting for a typo when the answer is an index.
+    #[test]
+    fn a_timeout_is_recognised_across_engines() {
+        assert!(timed_out(
+            Some("57014"),
+            "canceling statement due to statement timeout"
+        ));
+        assert!(timed_out(Some("3024"), "Query execution was interrupted"));
+        assert!(timed_out(None, "Timeout exceeded: TIMEOUT_EXCEEDED"));
+        assert!(!timed_out(
+            Some("23505"),
+            "duplicate key value violates unique constraint"
+        ));
+        assert!(!timed_out(None, "null value in column \"x\""));
     }
 }

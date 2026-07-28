@@ -236,7 +236,7 @@ function DeclaredTable({ w }: { w: QueryTableWidget }) {
 
   return (
     <div className="-mx-1 overflow-x-auto">
-      <PanelControls paged={paged} search={w.search ?? false} />
+      <PanelControls paged={paged} search={w.search ?? false} cols={cols} />
       <table className="w-full text-[13px]">
         <thead>
           <tr className="text-left text-xxs font-medium uppercase tracking-wide text-muted">
@@ -423,13 +423,19 @@ function useSearchAndPage(
 export function PanelControls({
   paged,
   search,
+  cols,
 }: {
   paged: ReturnType<typeof useSearchAndPage>
   search: boolean
+  cols?: TableColumn[]
 }) {
   const t = useT()
   const keys = Object.keys(paged.options)
   if (!keys.length && !search) return null
+  // A control must name its column the way the header does, or the same data
+  // appears under two names on one screen.
+  const labelOf = (key: string) =>
+    cols?.find((c) => c.key === key)?.label ?? key.replace(/_/g, ' ')
   return (
     <div className="flex flex-wrap items-center gap-1.5 px-2 pb-1.5">
       {keys.map((key) => (
@@ -439,7 +445,7 @@ export function PanelControls({
           onChange={(e) => paged.pick(key, e.target.value)}
           className="rounded border border-line bg-surface px-1.5 py-1 text-xs text-ink focus:border-accent focus:outline-none"
         >
-          <option value="">{t('filter_all', { label: key.replace(/_/g, ' ') })}</option>
+          <option value="">{t('filter_all', { label: labelOf(key) })}</option>
           {paged.options[key].map((v) => (
             <option key={v} value={v}>
               {v}
