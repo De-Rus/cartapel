@@ -542,7 +542,9 @@ fn column_meta(
     // the field names a write target (else it's a read-only join).
     for name in virtual_image_fields(dbt, cfg) {
         let fc = cfg.fields.get(name);
-        let Some(img) = fc.and_then(|f| f.image.as_ref()) else { continue };
+        let Some(img) = fc.and_then(|f| f.image.as_ref()) else {
+            continue;
+        };
         let mut params = fc.map(|f| f.params.clone()).unwrap_or_default();
         params.insert("uploadable".into(), json!(img.write_to.is_some()));
         params.insert("max_px".into(), json!(img.max_px));

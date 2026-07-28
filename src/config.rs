@@ -2609,8 +2609,16 @@ panel {
             max_px: 128,
             normalize: true,
         };
-        assert!(with_image(ImageConfig { name_col: "file".into(), ..base() }).is_ok());
-        assert!(with_image(ImageConfig { name_sql: Some("(SELECT f FROM l)".into()), ..base() }).is_ok());
+        assert!(with_image(ImageConfig {
+            name_col: "file".into(),
+            ..base()
+        })
+        .is_ok());
+        assert!(with_image(ImageConfig {
+            name_sql: Some("(SELECT f FROM l)".into()),
+            ..base()
+        })
+        .is_ok());
         assert!(with_image(base()).is_err(), "neither is a load error");
         assert!(
             with_image(ImageConfig {

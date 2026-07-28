@@ -218,7 +218,9 @@ async fn writethrough_keys(
         let v = row
             .get(parent_col)
             .and_then(|v| v.as_str().map(String::from))
-            .ok_or_else(|| AppError::bad(format!("write_key parent column {parent_col} is null")))?;
+            .ok_or_else(|| {
+                AppError::bad(format!("write_key parent column {parent_col} is null"))
+            })?;
         out.push((target_col.clone(), v));
     }
     Ok(out)
@@ -275,18 +277,35 @@ async fn writethrough_upsert(
 
     let key_pred = |binds: &mut crate::sqlval::Binds| -> String {
         keys.iter()
-            .map(|(col, val)| format!("{} = {}", crate::sqlval::ident(col), binds.ph(Some(val.clone()))))
+            .map(|(col, val)| {
+                format!(
+                    "{} = {}",
+                    crate::sqlval::ident(col),
+                    binds.ph(Some(val.clone()))
+                )
+            })
             .collect::<Vec<_>>()
             .join(" AND ")
     };
 
     // UPDATE first — filename + the write_defaults (the state a good upload has).
     let mut ub = crate::sqlval::Binds::for_dialect(pool.dialect());
-    let mut sets = vec![format!("{name_col} = {}", ub.ph(Some(filename.to_string())))];
+    let mut sets = vec![format!(
+        "{name_col} = {}",
+        ub.ph(Some(filename.to_string()))
+    )];
     for (col, val) in &cfg.write_defaults {
-        sets.push(format!("{} = {}", crate::sqlval::ident(col), ub.ph(Some(val.clone()))));
+        sets.push(format!(
+            "{} = {}",
+            crate::sqlval::ident(col),
+            ub.ph(Some(val.clone()))
+        ));
     }
-    let usql = format!("UPDATE {qual} SET {} WHERE {}", sets.join(", "), key_pred(&mut ub));
+    let usql = format!(
+        "UPDATE {qual} SET {} WHERE {}",
+        sets.join(", "),
+        key_pred(&mut ub)
+    );
     let updated = crate::db::execute(pool, &usql, &ub).await?.rows_affected;
 
     if updated == 0 {
@@ -299,7 +318,11 @@ async fn writethrough_upsert(
             cols.push(crate::sqlval::ident(col));
             vals.push(ib.ph(Some(val.clone())));
         }
-        let isql = format!("INSERT INTO {qual} ({}) VALUES ({})", cols.join(", "), vals.join(", "));
+        let isql = format!(
+            "INSERT INTO {qual} ({}) VALUES ({})",
+            cols.join(", "),
+            vals.join(", ")
+        );
         crate::db::execute(pool, &isql, &ib).await?;
     }
     Ok(())
