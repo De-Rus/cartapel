@@ -136,6 +136,17 @@ fn parse_listing(xml: &str) -> (Vec<(String, u64, String)>, Option<String>) {
     (out, truncated.then_some(next).flatten())
 }
 
+/// How many objects a listing will walk before giving up, regardless of how few
+/// of them the pattern matches.
+///
+/// `max_entries` bounds the rows a listing *returns*; on its own that leaves the
+/// *work* unbounded, because a selective pattern matches nothing and the cap is
+/// never reached. A real bucket taught us this: 1.4M objects under one prefix,
+/// of which ~6.5k matched a three-segment pattern, so every refresh paged
+/// through 1,411 requests and took ~5 minutes. Bound the scan, not just the
+/// harvest.
+pub const DEFAULT_MAX_SCAN: usize = 50_000;
+
 #[allow(clippy::too_many_arguments)]
 pub async fn list(
     http: &reqwest::Client,
@@ -145,6 +156,7 @@ pub async fn list(
     creds: &Creds,
     pattern: &crate::files::Pattern,
     max_entries: usize,
+    max_scan: usize,
 ) -> Result<Vec<Value>, String> {
     let base = reqwest::Url::parse(endpoint).map_err(|e| format!("bad endpoint: {e}"))?;
     let host = base
@@ -158,6 +170,7 @@ pub async fn list(
     let path = format!("/{}", bucket.trim_matches('/'));
     let mut token: Option<String> = None;
     let mut rows = Vec::new();
+    let mut scanned = 0usize;
     loop {
         let mut query: Vec<(String, String)> = vec![
             ("list-type".into(), "2".into()),
@@ -188,6 +201,7 @@ pub async fn list(
             return Err(format!("list failed: {reason}"));
         }
         let (objects, next) = parse_listing(&body);
+        scanned += objects.len();
         for (key, size, modified) in objects {
             let stripped = key
                 .strip_prefix(prefix)
@@ -205,6 +219,17 @@ pub async fn list(
                 tracing::warn!("s3 listing hit the {max_entries}-entry cap — raise max_entries");
                 return Ok(rows);
             }
+        }
+        if scanned >= max_scan {
+            // Truncation must never read as "that is all there is".
+            tracing::warn!(
+                matched = rows.len(),
+                scanned,
+                max_scan,
+                "s3 listing stopped at the scan cap — the pattern matches a small \
+                 share of this prefix; narrow `prefix`, widen `pattern`, or raise `max_scan`"
+            );
+            return Ok(rows);
         }
         match next {
             Some(t) => token = Some(t),

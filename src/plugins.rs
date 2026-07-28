@@ -325,6 +325,7 @@ async fn listing_source_rows(
             &creds,
             &pattern,
             max_entries,
+            src.max_scan.unwrap_or(crate::s3::DEFAULT_MAX_SCAN),
         )
         .await
         .map_err(bad)?

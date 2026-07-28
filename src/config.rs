@@ -451,6 +451,11 @@ pub struct NamedSource {
     pub ttl_secs: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_entries: Option<usize>,
+    /// `s3` only: how many objects a refresh may walk before stopping, however
+    /// few of them the pattern matches. Guards a selective pattern over a large
+    /// prefix from turning every refresh into a full bucket walk.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_scan: Option<usize>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub schemas: Vec<String>,
     #[serde(default)]
@@ -508,6 +513,7 @@ impl NamedSource {
             prefix: None,
             access_key_env: None,
             secret_key_env: None,
+            max_scan: None,
             root: None,
             pattern: None,
             ttl_secs: None,

@@ -202,6 +202,7 @@ source "ohlcv" {
   pattern        = "{source}/{symbol}/{tf}.parquet"
   access_key_env = "R2_ACCESS_KEY_ID"    # the env var, never the key itself
   secret_key_env = "R2_SECRET_ACCESS_KEY"
+  max_scan       = 50000                 # objects walked per refresh (default 50000)
 }
 ```
 
@@ -210,6 +211,16 @@ Rows carry the same columns a `files` source produces — the captures plus
 answered. Listing only: cartapel signs a `ListObjectsV2` and reads names, sizes
 and mtimes, never object bodies. Credentials come from the environment, so they
 stay out of the config you commit.
+
+**Mind the difference between `max_entries` and `max_scan`.** `max_entries`
+bounds the rows a listing *returns*; `max_scan` bounds the objects it *walks*.
+They are not the same number, and only the second one protects you: a pattern
+that matches a small share of a large prefix never reaches the entry cap, so
+without a scan cap every refresh pages through the whole bucket a thousand
+objects at a time. A real bucket held 1.4M objects under one prefix, ~6.5k of
+which matched a three-segment pattern; each refresh cost 1,411 requests and
+about five minutes. When a listing stops at the scan cap it says so in the log —
+narrow `prefix`, widen `pattern`, or raise `max_scan` deliberately.
 
 **Metadata only.** cartapel reports names, sizes and mtimes and never reads a
 file's contents — a listing must not become a way to read arbitrary files.
