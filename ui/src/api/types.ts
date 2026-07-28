@@ -419,6 +419,8 @@ export interface DashboardResponse {
   label?: string
   widgets: Widget[]
   columns?: number | null
+  /** Seconds between automatic refreshes; absent or null = a static page. */
+  refresh_secs?: number | null
 }
 
 export interface AuditChange {

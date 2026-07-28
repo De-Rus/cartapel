@@ -65,6 +65,10 @@ pub struct PutDashboard {
     widgets: Vec<PanelConfig>,
     #[serde(default)]
     columns: Option<u8>,
+    /// Carried through the editor so saving the layout cannot silently drop a
+    /// refresh the config author set by hand.
+    #[serde(default)]
+    refresh: Option<String>,
 }
 
 pub async fn put_dashboard(
@@ -79,6 +83,7 @@ pub async fn put_dashboard(
     crate::config::validate_panel_fields(&body.widgets).map_err(AppError::bad)?;
     let dashboard = DashboardConfig {
         columns: body.columns,
+        refresh: body.refresh,
         widgets: body.widgets,
     };
     let hcl = hcl::to_string(&dashboard)
@@ -218,6 +223,7 @@ mod tests {
             axum::extract::State(state.clone()),
             admin(),
             Json(PutDashboard {
+                refresh: None,
                 widgets: vec![iframe("Docs", "https://x.io")],
                 columns: None,
             }),
@@ -241,6 +247,7 @@ mod tests {
             axum::extract::State(state),
             admin(),
             Json(PutDashboard {
+                refresh: None,
                 widgets: vec![bad],
                 columns: None,
             }),
@@ -294,6 +301,7 @@ mod tests {
             axum::extract::State(state),
             viewer(),
             Json(PutDashboard {
+                refresh: None,
                 widgets: vec![],
                 columns: None,
             }),
@@ -313,6 +321,7 @@ mod tests {
             axum::extract::State(state.clone()),
             admin(),
             Json(PutDashboard {
+                refresh: None,
                 widgets: vec![iframe("One", "https://one.io")],
                 columns: None,
             }),
@@ -323,6 +332,7 @@ mod tests {
             axum::extract::State(state.clone()),
             admin(),
             Json(PutDashboard {
+                refresh: None,
                 widgets: vec![iframe("Two", "https://two.io")],
                 columns: None,
             }),
@@ -355,6 +365,7 @@ mod tests {
             axum::extract::State(state),
             admin(),
             Json(PutDashboard {
+                refresh: None,
                 widgets: vec![iframe("Docs", "https://x.io")],
                 columns: None,
             }),

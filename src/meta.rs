@@ -829,6 +829,7 @@ mod nav_tests {
             group: Some("overview".into()),
             label: "Fleet".into(),
             columns: Some(4),
+            refresh: None,
             widgets: vec![],
             icon: Some("satellite".into()),
             roles: vec!["ops".into()],

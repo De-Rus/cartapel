@@ -145,6 +145,30 @@ panel {
 
 `iframe` panels require a `url` instead of `sql`.
 
+## `refresh` — a live page
+
+```hcl
+label   = "Background jobs"
+refresh = "30s"     # also accepts "5m", "1h", or a bare number of seconds
+```
+
+Set it on a page (`screen.hcl` / `page.hcl`) or on `config/dashboard.hcl`, and
+the whole surface re-queries on that clock without a reload. Two guarantees
+worth knowing, because they are what keep a live page from becoming a problem:
+
+- **A hidden tab never polls.** A dashboard left open on a spare monitor would
+  otherwise re-run every panel's SQL forever, all night.
+- **There is a five-second floor.** Every poll re-runs *every* panel on the
+  page, so a one-second dashboard is a load generator aimed at your production
+  database. Faster values are raised to the floor rather than refused; a value
+  of `0` or an unparseable one leaves the page static.
+
+Pick the interval from how fast the underlying thing actually moves. A queue
+depth or a fleet health count is worth 30s; a revenue chart is not worth more
+than a few minutes. If a panel reads a `files` or `s3` source, remember the
+listing has its own `ttl_secs` — polling faster than that just re-serves the
+same cached scan.
+
 ## Where a panel reads from
 
 Every panel reads from exactly one origin. `sql` is the common case; the others

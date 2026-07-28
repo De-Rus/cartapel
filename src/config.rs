@@ -191,6 +191,12 @@ pub struct PageConfig {
     pub roles: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub columns: Option<u8>,
+    /// Re-run this page's panels on a clock, e.g. `refresh = "30s"`. Accepts
+    /// `30s` / `5m` / a bare number of seconds; anything under the floor is
+    /// raised to it, because a dashboard is not a tick feed and every poll
+    /// re-runs every panel's SQL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refresh: Option<String>,
     #[serde(
         default,
         rename = "panel",
@@ -199,6 +205,32 @@ pub struct PageConfig {
         deserialize_with = "de_block_seq"
     )]
     pub widgets: Vec<PanelConfig>,
+}
+
+/// The floor below which a dashboard stops being a dashboard: every poll
+/// re-runs every panel's SQL, so a 1-second page is a load generator aimed at
+/// the production database. Values under this are raised, not rejected —
+/// the intent ("as live as sensible") is honored.
+pub const MIN_REFRESH_SECS: u64 = 5;
+
+/// `"30s"` / `"5m"` / `"45"` → seconds. `None` for absent or unparseable, so a
+/// typo leaves a static page rather than an accidental hammer.
+pub fn refresh_secs(spec: Option<&str>) -> Option<u64> {
+    let raw = spec?.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    let (digits, mult) = match raw.chars().last() {
+        Some('s') => (&raw[..raw.len() - 1], 1),
+        Some('m') => (&raw[..raw.len() - 1], 60),
+        Some('h') => (&raw[..raw.len() - 1], 3600),
+        _ => (raw, 1),
+    };
+    let n: u64 = digits.trim().parse().ok()?;
+    if n == 0 {
+        return None;
+    }
+    Some((n * mult).max(MIN_REFRESH_SECS))
 }
 
 /// A page loaded from a `page.hcl`, tagged with its folder-derived `slug` (the
@@ -210,6 +242,7 @@ pub struct LoadedPage {
     pub group: Option<String>,
     pub label: String,
     pub columns: Option<u8>,
+    pub refresh: Option<String>,
     pub widgets: Vec<PanelConfig>,
     pub icon: Option<String>,
     pub roles: Vec<String>,
@@ -1176,6 +1209,12 @@ pub struct TablePerm {
 pub struct DashboardConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub columns: Option<u8>,
+    /// Re-run this page's panels on a clock, e.g. `refresh = "30s"`. Accepts
+    /// `30s` / `5m` / a bare number of seconds; anything under the floor is
+    /// raised to it, because a dashboard is not a tick feed and every poll
+    /// re-runs every panel's SQL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refresh: Option<String>,
     #[serde(
         default,
         rename = "panel",
@@ -1649,6 +1688,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                     group,
                     label: p.label,
                     columns: p.columns,
+                    refresh: p.refresh,
                     widgets: p.widgets,
                     icon: p.icon,
                     roles: p.roles,
@@ -1701,6 +1741,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                         group,
                         label: p.label,
                         columns: p.columns,
+                        refresh: p.refresh,
                         widgets: p.widgets,
                         icon: p.icon,
                         roles: p.roles,
@@ -2019,6 +2060,23 @@ action "pause" {
         let gated: TableConfig =
             hcl::from_str("permissions {\n  export = false\n}\n").expect("parse");
         assert!(!gated.permissions.export);
+        // A live page must never be able to ask for a poll faster than the floor.
+        assert_eq!(refresh_secs(Some("30s")), Some(30));
+        assert_eq!(refresh_secs(Some("5m")), Some(300));
+        assert_eq!(refresh_secs(Some("45")), Some(45));
+        assert_eq!(
+            refresh_secs(Some("1s")),
+            Some(MIN_REFRESH_SECS),
+            "raised to the floor"
+        );
+        assert_eq!(refresh_secs(None), None);
+        assert_eq!(refresh_secs(Some("")), None);
+        assert_eq!(refresh_secs(Some("0s")), None, "zero is off, not infinite");
+        assert_eq!(
+            refresh_secs(Some("soon")),
+            None,
+            "a typo leaves a static page"
+        );
 
         let out = hcl::to_string(&a).expect("serialize");
         let b: TableConfig = hcl::from_str(&out).expect("re-parse serialized");

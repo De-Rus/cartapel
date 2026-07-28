@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { api } from '../api/client'
 import type {
+  DashboardResponse,
   QueryTableWidget,
   Row,
   ScreenTableWidget,
@@ -738,6 +739,20 @@ function DashboardView({ widgets, columns = DEFAULT_COLS }: { widgets: Widget[];
   )
 }
 
+/// `refresh = "30s"` on a page or the dashboard turns it into a live view.
+///
+/// The interval is read from the response, so it must be a callback — reading
+/// the query's own `data` while building its options is a use-before-init.
+/// Never polls a hidden tab: a forgotten dashboard is otherwise a load
+/// generator pointed at production, re-running every panel's SQL forever.
+const livePolling = {
+  refetchInterval: (query: { state: { data?: DashboardResponse } }) => {
+    const secs = query.state.data?.refresh_secs
+    return secs ? secs * 1000 : false
+  },
+  refetchIntervalInBackground: false,
+}
+
 export default function Dashboard() {
   const meta = useMeta()
   const vq = useVarQuery()
@@ -746,6 +761,7 @@ export default function Dashboard() {
     queryFn: () => api.dashboard(vq),
     enabled: meta.has_dashboard,
     placeholderData: (prev) => prev,
+    ...livePolling,
   })
 
   if (meta.tables.length === 0 && meta.can_manage_access) {
@@ -778,6 +794,7 @@ export function PageDashboard() {
     queryFn: () => api.pageWidgets(id, vq),
     enabled: known,
     placeholderData: (prev) => prev,
+    ...livePolling,
   })
 
   if (!known) return <Navigate to="/" replace />

@@ -350,6 +350,7 @@ pub async fn dashboard_handler(
     Ok(Json(json!({
         "widgets": widgets,
         "columns": cfg.dashboard.columns,
+        "refresh_secs": crate::config::refresh_secs(cfg.dashboard.refresh.as_deref()),
         "variables": referenced_vars(&cfg.dashboard.widgets),
     })))
 }
@@ -381,6 +382,7 @@ pub async fn page_widgets_handler(
     }
     Ok(Json(json!({
         "label": page.label, "widgets": widgets, "columns": page.columns,
+        "refresh_secs": crate::config::refresh_secs(page.refresh.as_deref()),
         "variables": referenced_vars(&page.widgets),
     })))
 }
