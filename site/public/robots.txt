@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://cartapel.com/sitemap-index.xml
