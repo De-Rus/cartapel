@@ -166,7 +166,22 @@ pub fn computed_columns<'a>(dbt: &DbTable, cfg: &'a TableConfig) -> Vec<(&'a Str
 }
 
 fn is_listable_column(dbt: &DbTable, cfg: &TableConfig, name: &str) -> bool {
-    dbt.column(name).is_some() || cfg.fields.get(name).is_some_and(|f| f.sql.is_some())
+    dbt.column(name).is_some()
+        || cfg
+            .fields
+            .get(name)
+            .is_some_and(|f| f.sql.is_some() || f.image.is_some())
+}
+
+/// Config-only image fields — an `image` widget whose name isn't a real column
+/// (its filename comes from `name_sql`). Served/uploaded by pk, so they render
+/// as virtual columns like `sql` computed fields do.
+pub fn virtual_image_fields<'a>(dbt: &DbTable, cfg: &'a TableConfig) -> Vec<&'a String> {
+    cfg.fields
+        .iter()
+        .filter(|(name, f)| f.image.is_some() && f.sql.is_none() && dbt.column(name).is_none())
+        .map(|(name, _)| name)
+        .collect()
 }
 
 /// The row-producing SELECT list, one aliased item per column plus computed
@@ -520,6 +535,34 @@ fn column_meta(
             obj.insert("ref_table".into(), json!(ref_table));
             obj.insert("ref_column".into(), json!(ref_column));
         }
+        out.push(m);
+    }
+    // Config-only image columns — served/uploaded by pk. Uploadable only when
+    // the field names a write target (else it's a read-only join).
+    for name in virtual_image_fields(dbt, cfg) {
+        let fc = cfg.fields.get(name);
+        let Some(img) = fc.and_then(|f| f.image.as_ref()) else { continue };
+        let mut params = fc.map(|f| f.params.clone()).unwrap_or_default();
+        params.insert("uploadable".into(), json!(img.write_to.is_some()));
+        params.insert("max_px".into(), json!(img.max_px));
+        let mut m = json!({
+            "name": name,
+            "label": localize(
+                state,
+                fc.map(|f| &f.labels).unwrap_or(&Default::default()),
+                fc.and_then(|f| f.label.clone()).unwrap_or_else(|| humanize(name)),
+            ),
+            "kind": "text",
+            "nullable": true,
+            "has_default": false,
+            "widget": "image",
+            "params": Value::Object(params),
+            "readonly": img.write_to.is_none(),
+            "computed": true,
+            "masked": masked.contains(name),
+            "fk": Value::Null,
+        });
+        apply_presentation(&mut m, fc);
         out.push(m);
     }
     out

@@ -419,8 +419,11 @@ async fn check(config: &std::path::Path, db: Option<String>, schema: Option<Stri
             continue;
         };
         let mut missing = |what: &str, col: &str| {
-            let computed = tc.fields.get(col).is_some_and(|f| f.sql.is_some());
-            if dbt.column(col).is_none() && !computed {
+            let virtual_col = tc
+                .fields
+                .get(col)
+                .is_some_and(|f| f.sql.is_some() || f.image.is_some());
+            if dbt.column(col).is_none() && !virtual_col {
                 eprintln!("✗ {key}: {what} column '{col}' does not exist");
                 errors += 1;
             }

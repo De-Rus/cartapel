@@ -1009,11 +1009,23 @@ pub struct ImageConfig {
     #[serde(default)]
     pub name_col: String,
     /// A scalar SQL expression (correlated to the row via the `t` alias) that
-    /// yields the filename — for an image joined from a related table. Read-only:
-    /// upload targets the owning table, not a join. Exactly one of name_col /
-    /// name_sql must be set.
+    /// yields the filename — for an image joined from a related table. Exactly
+    /// one of name_col / name_sql must be set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name_sql: Option<String>,
+    /// Related table an upload writes to (upsert), so a `name_sql` image is
+    /// editable — the file belongs to that table, not this one. Absent ⇒ the
+    /// join is read-only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub write_to: Option<String>,
+    /// `target_col = parent_col` — how the upload locates/creates the target row
+    /// from this row's values. Also names the filename (`<vals joined by _>.png`).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub write_key: BTreeMap<String, String>,
+    /// Constant target columns set when the upload INSERTs a new target row
+    /// (e.g. `status = "ok"`). Ignored on UPDATE.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub write_defaults: BTreeMap<String, String>,
     #[serde(default = "default_max_px", skip_serializing_if = "is_default_max_px")]
     pub max_px: u32,
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
@@ -1488,7 +1500,15 @@ fn collect_hcl(dir: &Path, out: &mut Vec<std::path::PathBuf>) -> Result<(), Stri
 fn validate_table_config(tc: &TableConfig) -> Result<(), String> {
     for (name, f) in &tc.fields {
         if let Some(img) = &f.image {
-            if img.name_col.is_empty() == img.name_sql.is_none() {
+            if img.write_to.is_some() {
+                // Related-table image: name_sql reads, name_col names the
+                // filename column IN the target, write_key locates the row.
+                if img.name_sql.is_none() || img.name_col.is_empty() || img.write_key.is_empty() {
+                    return Err(format!(
+                        "field \"{name}\": image `write_to` needs `name_sql`, `name_col` (the target's filename column) and a non-empty `write_key`"
+                    ));
+                }
+            } else if img.name_col.is_empty() == img.name_sql.is_none() {
                 return Err(format!(
                     "field \"{name}\": image needs exactly one of `name_col` or `name_sql`"
                 ));
@@ -2583,6 +2603,9 @@ panel {
             dir: "/d".into(),
             name_col: String::new(),
             name_sql: None,
+            write_to: None,
+            write_key: Default::default(),
+            write_defaults: Default::default(),
             max_px: 128,
             normalize: true,
         };
@@ -2597,6 +2620,30 @@ panel {
             })
             .is_err(),
             "both is a load error"
+        );
+        // Write-through: needs name_sql + name_col (target's filename col) + write_key.
+        let mut key = BTreeMap::new();
+        key.insert("symbol".to_string(), "symbol".to_string());
+        assert!(
+            with_image(ImageConfig {
+                name_sql: Some("(SELECT f FROM l)".into()),
+                name_col: "filename".into(),
+                write_to: Some("logos".into()),
+                write_key: key.clone(),
+                ..base()
+            })
+            .is_ok(),
+            "complete write-through is valid"
+        );
+        assert!(
+            with_image(ImageConfig {
+                name_sql: Some("(SELECT f FROM l)".into()),
+                write_to: Some("logos".into()),
+                write_key: key,
+                ..base()
+            })
+            .is_err(),
+            "write_to without name_col (target filename column) is a load error"
         );
     }
 
