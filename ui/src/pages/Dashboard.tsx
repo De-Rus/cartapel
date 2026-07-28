@@ -15,6 +15,7 @@ import type {
 } from '../api/types'
 import { applyFormat, fmtByFormat, fmtDateTime, fmtPercent } from '../lib/format'
 import { useT } from '../lib/i18n'
+import { useResolvedTheme } from '../lib/theme'
 import { useMeta } from '../lib/meta'
 import { VarBar, useVarQuery } from '../components/VarBar'
 import { Badge, CellValue, NUMERIC_WIDGETS } from '../components/CellValue'
@@ -626,17 +627,27 @@ export function WidgetCard({ w }: { w: Widget }) {
       </CardFrame>
     )
   }
+  return <IframePanel w={w} />
+}
+
+/// `{{theme}}` in an iframe url becomes the viewer's actual theme, so embedded
+/// content (a Grafana panel, say) follows the admin instead of staying stuck on
+/// whichever theme the config author happened to write.
+function IframePanel({ w }: { w: { label: string; url?: string | null } }) {
+  const theme = useResolvedTheme()
+  const src = (w.url ?? '').replace(/\{\{\s*theme\s*\}\}/g, theme)
   return (
     <CardFrame
       label={w.label}
       action={
-        <a href={w.url} target="_blank" rel="noreferrer" className="text-xxs text-muted hover:text-ink">
+        <a href={src} target="_blank" rel="noreferrer" className="text-xxs text-muted hover:text-ink">
           ↗
         </a>
       }
     >
       <iframe
-        src={w.url}
+        key={theme}
+        src={src}
         title={w.label}
         className="h-72 w-full rounded-ctl border bg-page"
         sandbox="allow-scripts allow-same-origin"

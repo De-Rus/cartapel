@@ -155,6 +155,26 @@ panel {
 
 `iframe` panels require a `url` instead of `sql`.
 
+`{{theme}}` anywhere in the url is replaced with the viewer's actual theme
+(`light` or `dark`), resolving `system` against the OS and re-rendering when
+either changes — so an embedded panel follows the admin instead of staying on
+whichever theme the config author happened to write:
+
+```hcl
+panel {
+  type  = "iframe"
+  label = "Host"
+  url   = "https://grafana.example/d-solo/abc?panelId=13&refresh=1m&theme={{theme}}"
+  w     = 2
+  h     = 2
+}
+```
+
+Embedding someone else's page is a negotiation with that server, not with
+cartapel: it must allow framing (Grafana needs `allow_embedding`), and if it
+requires a login the viewer needs a session with it — which for a cross-site
+iframe means its session cookie must be `SameSite=None`.
+
 ## `refresh` — a live page
 
 ```hcl

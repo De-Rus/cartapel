@@ -30,6 +30,34 @@ export function initChromePrefs(): void {
   applyDensity(readDensity())
 }
 
+/// What the viewer is actually looking at, resolving `system` against the OS.
+/// Embedded content (a Grafana panel in an `iframe`) has to be told the theme
+/// in its URL, so a static config cannot know it — this does.
+export function resolvedTheme(): 'light' | 'dark' {
+  const attr = document.documentElement.getAttribute('data-theme')
+  if (attr === 'light' || attr === 'dark') return attr
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+/// Re-renders when the theme changes, whether the viewer toggled it or the OS
+/// did. Watches the attribute rather than the preference state, so it stays
+/// correct no matter which component flipped it.
+export function useResolvedTheme(): 'light' | 'dark' {
+  const [theme, setTheme] = useState<'light' | 'dark'>(resolvedTheme)
+  useEffect(() => {
+    const sync = () => setTheme(resolvedTheme())
+    const observer = new MutationObserver(sync)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    media.addEventListener('change', sync)
+    return () => {
+      observer.disconnect()
+      media.removeEventListener('change', sync)
+    }
+  }, [])
+  return theme
+}
+
 export function useTheme(): [ThemeMode, (m: ThemeMode) => void, () => void] {
   const [mode, setMode] = useState<ThemeMode>(readTheme)
   useEffect(() => {
