@@ -1034,6 +1034,10 @@ pub struct TablePermissions {
     pub delete: bool,
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub write: bool,
+    /// Bulk CSV/JSON extraction. Separate from `write` because a table can be
+    /// safe to read a page at a time and unsafe to carry out of the building.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub export: bool,
 }
 
 impl Default for TablePermissions {
@@ -1042,6 +1046,7 @@ impl Default for TablePermissions {
             create: true,
             delete: true,
             write: true,
+            export: true,
         }
     }
 }
@@ -2008,6 +2013,12 @@ action "pause" {
         assert!(a.list.filter_defs.contains_key("needs_attention"));
         assert_eq!(a.actions["pause"].set.get("mode").unwrap(), "off");
         assert!(!a.permissions.create);
+        // An unstated ceiling stays open — adding `export` must not silently
+        // break every table that never mentioned it.
+        assert!(a.permissions.export, "export defaults to allowed");
+        let gated: TableConfig =
+            hcl::from_str("permissions {\n  export = false\n}\n").expect("parse");
+        assert!(!gated.permissions.export);
 
         let out = hcl::to_string(&a).expect("serialize");
         let b: TableConfig = hcl::from_str(&out).expect("re-parse serialized");

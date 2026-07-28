@@ -138,7 +138,10 @@ can be disabled outright with `disable_webhooks` — see
 
 Every write — create, update, delete, bulk action, config change, user/role
 change — is recorded in cartapel's SQLite audit log with actor, timestamp and, for
-row edits, a before/after diff. Per-record history is available on each detail
+row edits, a before/after diff. **Bulk exports are recorded too**, with the row
+count and the filter that was active: a CSV of a whole table leaves the building
+the same way a write changes it, so it is not treated as an ordinary page view.
+Gate it per table with `permissions { export = false }`. Per-record history is available on each detail
 view; the full log is an admin-only view.
 
 ### One-click revert

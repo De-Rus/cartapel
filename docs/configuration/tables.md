@@ -99,7 +99,7 @@ default.
 | `detail { }` | block | The detail-view layout — [Detail views](/configuration/detail-views). |
 | `edit { }` | block | Columns read-only on the edit form. |
 | `relations { }` | block | Inline child tables — [Inlines](/configuration/detail-views#inlines). |
-| `permissions { }` | block | Create / update / delete ceilings for the whole table. |
+| `permissions { }` | block | Create / update / delete / export ceilings for the whole table. |
 | `field "col" { }` | block | Per-column widget & presentation (repeatable) — [Fields & widgets](/configuration/fields-and-widgets). |
 | `action "name" { }` | block | Bulk actions (repeatable). |
 
@@ -170,6 +170,7 @@ permissions {
   create = false
   delete = false
   write  = true
+  export = false
 }
 ```
 
@@ -178,6 +179,14 @@ permissions {
 | `create` | `true` | Whether new rows can be created. |
 | `delete` | `true` | Whether rows can be deleted. |
 | `write` | `true` | Whether existing rows can be updated. |
+| `export` | `true` | Whether the whole result set can be downloaded as CSV/JSON. |
+
+`export` is separate from `write` on purpose: a table can be perfectly safe to
+read a page at a time and unsafe to carry out of the building in bulk. Masking
+and role `row_filter`s apply to an export exactly as they do to a list, so an
+export never reveals more than the screen does — but it does remove up to
+100,000 rows of it at once. Every export is recorded in the
+[audit log](/security#audit-log) with the row count and the active filter.
 
 These are the **ceiling** for the whole table. A role can only ever narrow them
 further — never widen them. A structurally read-only table (a view, or a table

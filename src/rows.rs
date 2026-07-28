@@ -1552,6 +1552,9 @@ pub async fn export_handler(
 ) -> Result<Response, AppError> {
     let dbt = table_of(&state, &user, &table)?;
     let cfg = table_config(&state, &table);
+    if !cfg.permissions.export {
+        return Err(AppError::forbidden("this table cannot be exported"));
+    }
     let lq = build_list_query(&state, &user, &table, dbt, &params)?;
     let mut rows = fetch_rows(&state, &user, &table, dbt, &lq, EXPORT_CAP + 1, 0).await?;
     let truncated = rows.len() as i64 > EXPORT_CAP;
@@ -1569,6 +1572,20 @@ pub async fn export_handler(
         ),
         _ => (rows_to_csv(&cols, &rows), "text/csv; charset=utf-8", "csv"),
     };
+    // Carrying rows out of the building is closer to a write than to a page
+    // view: record who took what, and under which filter.
+    state.store.audit(
+        &user.email,
+        &table,
+        None,
+        "export",
+        Some(&serde_json::json!({
+            "rows": rows.len(),
+            "format": format,
+            "truncated": truncated,
+            "filter": params,
+        })),
+    );
     let filename = format!("{}.{ext}", table.replace(['"', '\\', '/'], ""));
     Response::builder()
         .header(header::CONTENT_TYPE, content_type)
