@@ -510,6 +510,7 @@ fn inline_json(ri: &ResolvedInline, rows: Vec<Value>, total: i64) -> Value {
 /// A page of an inline's child rows, filtered to `fk_col = pk`, with the child
 /// table's `row_filter` and `masked_columns` re-applied exactly as the detail
 /// page does. Returns the rows plus the total matching count.
+#[allow(clippy::too_many_arguments)]
 async fn fetch_inline_page(
     state: &AppState,
     user: &CurrentUser,
@@ -1913,8 +1914,8 @@ mod tests {
 
     // An explicit inline may target a table with no screen of its own; the
     // detail path resolves it via resolve_table, not the configured-table gate.
-    #[test]
-    fn explicit_inline_resolves_unconfigured_child() {
+    #[tokio::test]
+    async fn explicit_inline_resolves_unconfigured_child() {
         let mut cfg = ConfigDir::default();
         let mut bots = TableConfig::default();
         bots.relations.inlines = vec![InlineSpec::Full {
@@ -1928,7 +1929,7 @@ mod tests {
         cfg.tables.insert("bots".into(), bots);
         let state = inline_state(cfg);
         assert!(
-            state.cfg().tables.get("bot_journal").is_none(),
+            !state.cfg().tables.contains_key("bot_journal"),
             "the child is deliberately unconfigured"
         );
         assert!(
