@@ -809,42 +809,8 @@ mod nav_tests {
     use super::{derive_nav_groups, pages_meta};
     use crate::state::CurrentUser;
 
-    /// The emitted page JSON carries the group *label* ("Overview", not the slug
-    /// "overview") and the group-qualified folder-derived `id` ("overview/cache").
-    #[test]
-    fn page_meta_emits_group_label_and_qualified_id() {
-        let dir = std::path::Path::new("../admin");
-        if !dir.exists() {
-            return;
-        }
-        let cfg = crate::config::load(Some(dir)).expect("load admin");
-        let admin = CurrentUser {
-            email: "a@x.io".into(),
-            role: "admin".into(),
-        };
-        let pages = pages_meta(&cfg, &admin);
-        let cache = pages
-            .iter()
-            .find(|p| p["slug"] == "cache")
-            .expect("cache page emitted");
-        assert_eq!(
-            cache["id"], "overview/cache",
-            "id is group-qualified, folder-derived"
-        );
-        assert_eq!(
-            cache["group"], "Overview",
-            "group is the LABEL, not the slug"
-        );
-        assert_eq!(
-            cache["module"], "screens/overview/cache/cache.tsx",
-            "module is the admin-relative path"
-        );
-        assert_eq!(cache["roles"], serde_json::json!(["ops"]));
-    }
-
-    /// A declarative page (widgets, no module) is emitted with `module = null` and
-    /// `declarative = true`; a role-gated one is hidden from the wrong role but
-    /// shown to an admin.
+    /// A page is emitted with a group-qualified id and the group's *label*; a
+    /// role-gated one is hidden from the wrong role but shown to an admin.
     #[test]
     fn pages_meta_is_group_qualified_and_role_gated() {
         use crate::config::{ConfigDir, LoadedGroup, LoadedPage};
@@ -903,105 +869,22 @@ mod nav_tests {
         );
     }
 
-    /// The nav derived from the shipped `admin/**` folders matches the intended
-    /// group order, labels, icons, and membership — the invariant that the
-    /// folders=groups reorg must keep equivalent to the old `group {}` blocks.
+    /// The nav derived from the shipped demo `admin/**` folders matches the
+    /// intended group order, labels, icons and membership — the invariant that
+    /// folders-as-groups must keep equivalent to the old `group {}` blocks.
     #[test]
     fn shipped_folders_derive_the_expected_nav() {
-        let dir = std::path::Path::new("../admin");
-        if !dir.exists() {
-            return;
-        }
-        let cfg = crate::config::load(Some(dir)).expect("load admin");
+        let dir = std::path::Path::new("demo/admin");
+        let cfg = crate::config::load(Some(dir)).expect("load demo admin");
         let order: Vec<&str> = cfg.tables.keys().map(String::as_str).collect();
         let nav = derive_nav_groups(&cfg.groups, &cfg.table_sources, &order);
 
-        // (label, icon, member set). Overview is empty → absent from the nav.
+        // (label, icon, member set), in `order =` order. Overview holds only a
+        // dashboard page, so with no tables it is absent from the nav.
         let expected: &[(&str, &str, &[&str])] = &[
-            (
-                "Bots & live",
-                "bot",
-                &[
-                    "bots",
-                    "bot_signals",
-                    "bot_notifications",
-                    "bot_symbol_cursor",
-                    "bot_journal",
-                ],
-            ),
-            (
-                "Paper trading",
-                "file-text",
-                &[
-                    "paper_account",
-                    "paper_position",
-                    "paper_order",
-                    "paper_fill",
-                    "paper_funding",
-                    "paper_equity",
-                ],
-            ),
-            (
-                "Market data",
-                "trending-up",
-                &[
-                    "instruments",
-                    "exchanges",
-                    "universes",
-                    "funding_rates",
-                    "md_symbol_hits",
-                    "logos",
-                ],
-            ),
-            (
-                "Stock prices & ingest",
-                "database",
-                &["stock_snapshot", "stock_backfill", "ingest_runs"],
-            ),
-            (
-                "Fundamentals · SEC",
-                "landmark",
-                &[
-                    "companies",
-                    "company_tickers",
-                    "concepts",
-                    "facts",
-                    "ratios",
-                ],
-            ),
-            ("Watchlists", "star", &["watchlists", "watchlist_items"]),
-            (
-                "User data",
-                "user",
-                &[
-                    "user_scripts",
-                    "script_favorites",
-                    "chart_layouts",
-                    "chart_drawings",
-                    "user_settings",
-                ],
-            ),
-            (
-                "Billing & entitlements",
-                "credit-card",
-                &[
-                    "subscriptions",
-                    "subscription_events",
-                    "entitlement_overrides",
-                    "ai_chat_usage",
-                ],
-            ),
-            (
-                "Marketplace",
-                "shopping-bag",
-                &[
-                    "marketplace_scripts",
-                    "marketplace_installs",
-                    "marketplace_ratings",
-                    "marketplace_favorites",
-                    "users",
-                ],
-            ),
+            ("Customers", "users", &["customers", "subscriptions"]),
+            ("Catalog", "package", &["products"]),
+            ("Sales", "receipt", &["orders", "order_items"]),
         ];
 
         assert_eq!(nav.len(), expected.len(), "group count + order:\n{nav:#?}");

@@ -2507,27 +2507,21 @@ panel {
     }
 
     #[test]
-    fn shipped_admin_configs_have_no_duplicate_labels() {
-        let dir = std::path::Path::new("../admin");
-        if !dir.exists() {
-            return;
-        }
+    fn shipped_demo_configs_have_no_duplicate_labels() {
+        let dir = std::path::Path::new("demo/admin");
         let mut files = Vec::new();
         collect_hcl(dir, &mut files).unwrap();
         for path in &files {
             let raw = std::fs::read_to_string(path).unwrap();
             reject_duplicate_labels(&raw).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         }
-        // Layout-relative: cover every `_group.hcl` and at least the three root
-        // globals, recursively — no magic total that a new table would break.
+        // Layout-relative: every `_group.hcl` plus the three root globals get
+        // read, so adding a table cannot quietly leave files unchecked.
         let groups = files
             .iter()
             .filter(|p| p.file_stem().unwrap() == "_group")
             .count();
-        assert_eq!(
-            groups, 10,
-            "one _group.hcl per folder (9 groups + Overview)"
-        );
+        assert_eq!(groups, 4, "one _group.hcl per screens/ folder");
         for g in ["cartapel", "auth", "dashboard"] {
             assert!(
                 files.iter().any(|p| p.file_stem().unwrap() == g
@@ -2537,16 +2531,16 @@ panel {
         }
     }
 
-    /// The shipped `admin/**/*.hcl` files all parse into their config structs, and
-    /// grouping now comes from the folder `_group.hcl` files.
+    /// The shipped demo `admin/**/*.hcl` files all parse into their config
+    /// structs, and grouping comes from the folder `_group.hcl` files.
     #[test]
-    fn shipped_admin_configs_load() {
-        let dir = std::path::Path::new("../admin");
-        if !dir.exists() {
-            return;
-        }
-        let cfg = load(Some(dir)).expect("admin configs load");
-        assert!(cfg.tables.contains_key("bots"), "bots table config present");
+    fn shipped_demo_configs_load() {
+        let dir = std::path::Path::new("demo/admin");
+        let cfg = load(Some(dir)).expect("demo configs load");
+        assert!(
+            cfg.tables.contains_key("orders"),
+            "orders table config present"
+        );
         assert!(!cfg.groups.is_empty(), "folder groups present");
         assert!(
             !cfg.tables.contains_key("dashboard"),
@@ -2554,16 +2548,16 @@ panel {
         );
         assert_eq!(
             cfg.table_sources
-                .get("bots")
+                .get("orders")
                 .and_then(|s| s.group.as_deref()),
-            Some("bots-live"),
-            "bots is sourced from the bots-live folder",
+            Some("sales"),
+            "orders is sourced from the sales folder",
         );
-        assert_eq!(
-            cfg.table_group_label("bots").as_deref(),
-            Some("Bots & live")
+        assert_eq!(cfg.table_group_label("orders").as_deref(), Some("Sales"));
+        assert!(
+            cfg.auth.roles.contains_key("support"),
+            "support role present"
         );
-        assert!(cfg.auth.roles.contains_key("ops"), "ops role present");
         assert!(
             !cfg.dashboard.widgets.is_empty(),
             "global dashboard widgets present"
@@ -3109,144 +3103,5 @@ panel {
         let err = load(Some(&root)).expect_err("an empty page must be refused");
         assert!(err.contains("at least one"), "{err}");
         let _ = std::fs::remove_dir_all(&root);
-    }
-
-    // ---- one-shot TOML -> HCL converter (run explicitly) --------------------
-    // `cargo test -p cartapel convert_admin_toml_to_hcl -- --ignored --nocapture`
-    // Parses each admin/*.toml, renames the container keys HCL spells differently,
-    // emits pretty labeled-block HCL, and PROVES equivalence by reparsing the HCL,
-    // inverse-renaming, and comparing (number/default-normalized) to the original
-    // TOML tree. Writes the .hcl and deletes the .toml on success.
-    #[test]
-    #[ignore]
-    fn convert_admin_toml_to_hcl() {
-        use serde_json::{Map, Value};
-
-        fn de<T: serde::de::DeserializeOwned>(v: &Value) -> T {
-            serde_json::from_value(v.clone()).expect("deserialize renamed tree")
-        }
-        fn swap(m: &mut Map<String, Value>, from: &str, to: &str) {
-            if let Some(v) = m.remove(from) {
-                m.insert(to.to_string(), v);
-            }
-        }
-        fn rename_path(m: &mut Map<String, Value>, from: &str, to: &str) {
-            match from.split_once('.') {
-                Some((a, fb)) => {
-                    let tb = to.split_once('.').unwrap().1;
-                    if let Some(Value::Object(inner)) = m.get_mut(a) {
-                        swap(inner, fb, tb);
-                    }
-                }
-                None => swap(m, from, to),
-            }
-        }
-        // (hcl_singular, toml_plural)
-        fn pairs(stem: &str) -> Vec<(&'static str, &'static str)> {
-            match stem {
-                "cartapel" => vec![("page", "pages"), ("query", "queries"), ("group", "groups")],
-                "auth" => vec![("role", "roles")],
-                "dashboard" => vec![("widget", "widgets")],
-                _ => vec![
-                    ("field", "fields"),
-                    ("action", "actions"),
-                    ("detail.section", "detail.sections"),
-                    ("list.filter_def", "list.filter_defs"),
-                ],
-            }
-        }
-        fn rename(stem: &str, v: Value, forward: bool) -> Value {
-            let Value::Object(mut m) = v else { return v };
-            for (singular, plural) in pairs(stem) {
-                let (from, to) = if forward {
-                    (plural, singular)
-                } else {
-                    (singular, plural)
-                };
-                rename_path(&mut m, from, to);
-            }
-            if stem == "auth" {
-                let key = if forward { "role" } else { "roles" };
-                if let Some(Value::Object(roles)) = m.get_mut(key) {
-                    for (_n, role) in roles.iter_mut() {
-                        if let Value::Object(rb) = role {
-                            let (from, to) = if forward {
-                                ("perms", "perm")
-                            } else {
-                                ("perm", "perms")
-                            };
-                            swap(rb, from, to);
-                        }
-                    }
-                }
-            }
-            Value::Object(m)
-        }
-        fn normalize(v: &Value) -> Value {
-            match v {
-                Value::Number(n) => Value::from(n.as_f64().unwrap_or(0.0)),
-                Value::Array(a) => Value::Array(a.iter().map(normalize).collect()),
-                Value::Object(m) => Value::Object(
-                    m.iter()
-                        .filter(|(_, v)| !v.is_null())
-                        .map(|(k, v)| (k.clone(), normalize(v)))
-                        .collect(),
-                ),
-                other => other.clone(),
-            }
-        }
-        fn to_hcl(stem: &str, v: &Value) -> String {
-            match stem {
-                "cartapel" => hcl::to_string(&de::<CartapelConfig>(v)),
-                "auth" => hcl::to_string(&de::<AuthConfig>(v)),
-                "dashboard" => hcl::to_string(&de::<DashboardConfig>(v)),
-                _ => hcl::to_string(&de::<TableConfig>(v)),
-            }
-            .expect("serialize hcl")
-        }
-        fn reparse(stem: &str, text: &str) -> Value {
-            match stem {
-                "cartapel" => {
-                    serde_json::to_value(hcl::from_str::<CartapelConfig>(text).unwrap()).unwrap()
-                }
-                "auth" => serde_json::to_value(hcl::from_str::<AuthConfig>(text).unwrap()).unwrap(),
-                "dashboard" => {
-                    serde_json::to_value(hcl::from_str::<DashboardConfig>(text).unwrap()).unwrap()
-                }
-                _ => serde_json::to_value(hcl::from_str::<TableConfig>(text).unwrap()).unwrap(),
-            }
-        }
-
-        let dir = std::path::Path::new("../admin");
-        let mut tomls: Vec<std::path::PathBuf> = std::fs::read_dir(dir)
-            .expect("read admin dir")
-            .filter_map(|e| e.ok().map(|e| e.path()))
-            .filter(|p| p.extension().is_some_and(|x| x == "toml"))
-            .collect();
-        tomls.sort();
-        assert!(!tomls.is_empty(), "no .toml files to convert");
-
-        for path in &tomls {
-            let stem = path.file_stem().unwrap().to_string_lossy().to_string();
-            let raw = std::fs::read_to_string(path).unwrap();
-            let toml_tree: Value =
-                toml::from_str(&raw).unwrap_or_else(|e| panic!("{stem}: bad toml: {e}"));
-
-            let hcl_shaped = rename(&stem, toml_tree.clone(), true);
-            let hcl_text = to_hcl(&stem, &hcl_shaped);
-
-            let back = reparse(&stem, &hcl_text);
-            let back_toml_shaped = rename(&stem, back, false);
-            assert_eq!(
-                normalize(&back_toml_shaped),
-                normalize(&toml_tree),
-                "{stem}: generated HCL is NOT equivalent to the source TOML",
-            );
-
-            std::fs::write(path.with_extension("hcl"), &hcl_text).unwrap();
-            std::fs::remove_file(path).unwrap();
-            println!("converted + verified: {stem}");
-        }
-        println!("{} files converted", tomls.len());
     }
 }
