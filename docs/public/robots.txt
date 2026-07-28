@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://de-rus.github.io/cartapel/sitemap.xml

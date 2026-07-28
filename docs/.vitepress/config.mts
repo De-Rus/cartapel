@@ -63,6 +63,18 @@ export default defineConfig({
     ],
   ],
 
+  // robots.txt has to be generated, not shipped as a static asset: the same
+  // build output is published to two hosts, and a hard-coded Sitemap line meant
+  // the canonical site advertised its mirror's sitemap.
+  async buildEnd(config) {
+    const { writeFile } = await import('node:fs/promises')
+    const { join } = await import('node:path')
+    await writeFile(
+      join(config.outDir, 'robots.txt'),
+      `User-agent: *\nAllow: /\n\nSitemap: ${SITE}sitemap.xml\n`,
+    )
+  },
+
   transformPageData(pageData) {
     const path = pageData.relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')
     const canonical = SITE + path

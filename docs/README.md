@@ -42,7 +42,16 @@ root) works too.
 
 ## Publishing
 
-`.github/workflows/docs.yml` builds this site and deploys it to GitHub Pages on
-every push to `main` that touches `docs/**` — live at
-<https://de-rus.github.io/cartapel/>. The site is built with `base: '/cartapel/'`
-(overridable via the `DOCS_BASE` env var for a custom domain).
+`.github/workflows/docs.yml` builds this site twice on every push to `main`
+that touches `docs/**`:
+
+- **<https://docs.cartapel.com/>** — the canonical docs, on Cloudflare Pages,
+  built at the domain root (`DOCS_BASE=/`).
+- **<https://de-rus.github.io/cartapel/>** — a mirror on GitHub Pages, served
+  under `/cartapel/`. It is built with `DOCS_SITE` pointing at the canonical
+  host, so its `<link rel="canonical">` and sitemap hand authority to
+  docs.cartapel.com rather than competing with it for the same 29 pages.
+
+`robots.txt` is generated per build from `DOCS_SITE` (see `buildEnd` in
+`.vitepress/config.mts`) — as a static asset it was shipped to both hosts and
+pointed the canonical site at the mirror's sitemap.

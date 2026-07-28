@@ -33,6 +33,10 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         working-directory: docs
+        env:
+          # A mirror, not a second home: canonical + sitemap point at the real
+          # docs so the two copies consolidate instead of competing.
+          DOCS_SITE: https://docs.cartapel.com/
         run: pnpm build
       - uses: actions/configure-pages@v5
         with:
