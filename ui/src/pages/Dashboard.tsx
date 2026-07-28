@@ -654,7 +654,7 @@ function DashboardGrid({ widgets, columns = DEFAULT_COLS }: { widgets: Widget[];
         // Stat tiles share the page grid so `w` means the same thing on a tile
         // as on a table. An auto-fit track was stretching a lone tile across the
         // whole page — a single number rendered a metre wide reads as broken.
-        <div className={clsx('grid gap-3', gridColsClass(columns))}>
+        <div className={clsx('grid grid-flow-row-dense gap-3', gridColsClass(columns))}>
           {stats.map((w) => (
             <div key={w.id} className={spanClass(w, columns)}>
               <WidgetCard w={w} />
@@ -663,7 +663,7 @@ function DashboardGrid({ widgets, columns = DEFAULT_COLS }: { widgets: Widget[];
         </div>
       )}
       {rest.length > 0 && (
-        <div className={clsx('grid gap-3', gridColsClass(columns))}>
+        <div className={clsx('grid grid-flow-row-dense gap-3', gridColsClass(columns))}>
           {rest.map((w) => (
             <div key={w.id} className={spanClass(w, columns)}>
               <WidgetCard w={w} />

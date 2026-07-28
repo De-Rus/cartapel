@@ -193,7 +193,7 @@ pub fn select_items_for(
     out
 }
 
-fn column_item_mysql(c: &DbColumn) -> String {
+pub(crate) fn column_item_mysql(c: &DbColumn) -> String {
     let id = ident(&c.name);
     match c.kind {
         Kind::Binary => format!("length(t.{id}) AS {id}"),
@@ -205,7 +205,7 @@ fn column_item_mysql(c: &DbColumn) -> String {
 /// `to_jsonb`; every other type rides per-column `to_jsonb` so infinity
 /// timestamps, NaN floats, composites, session-timezone rendering and json
 /// normalization keep the exact old semantics by construction.
-fn column_item(c: &DbColumn) -> String {
+pub(crate) fn column_item(c: &DbColumn) -> String {
     let id = ident(&c.name);
     match c.kind {
         Kind::Binary => format!("length(t.{id}) AS {id}"),

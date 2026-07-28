@@ -33,6 +33,16 @@ panel {
 Panels flow into the grid in declaration order. Each may set its own `w` (column
 span) and `h` (row span), and a `category` used to group panels under headings.
 
+The grid packs **densely**: when a wide panel leaves a hole at the end of a row,
+a later panel narrow enough to fit slides up into it rather than leaving a gap.
+So `w = 3` in a four-column grid is not a mistake you have to correct by hand —
+the next `w = 1` panel fills the remainder. The trade is that a panel can appear
+earlier than you declared it; if a strict reading order matters more than a
+tight layout, size the panels so each row adds up.
+
+Stat tiles and the other panels pack as two separate rows within a category —
+tiles first, then the rest — so a tile never slots into a hole left by a table.
+
 ## Panel types
 
 Set `type` to one of `stat`, `chart`, `table`, `iframe`.

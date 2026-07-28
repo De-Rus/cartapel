@@ -516,6 +516,7 @@ async fn fetch_inline_page(
     key: &str,
     child_t: &DbTable,
     fk_c: &DbColumn,
+    columns: &[String],
     pk: &str,
     page: u32,
 ) -> Result<(Vec<Value>, i64), AppError> {
@@ -531,8 +532,22 @@ async fn fetch_inline_page(
         .as_ref()
         .map(|p| format!("ORDER BY {} DESC", ident(p)))
         .unwrap_or_default();
-    let mut items =
-        crate::meta::select_items_for(child_t, &table_config(state, key), pool.dialect());
+    // An explicit inline may pin its columns; otherwise show the child's own
+    // list projection. A pinned name that isn't a real column is dropped.
+    let mut items = if columns.is_empty() {
+        crate::meta::select_items_for(child_t, &table_config(state, key), pool.dialect())
+    } else {
+        let dialect = pool.dialect();
+        child_t
+            .columns
+            .iter()
+            .filter(|c| columns.iter().any(|w| w == &c.name))
+            .map(|c| match dialect {
+                crate::db::Dialect::Pg => crate::meta::column_item(c),
+                _ => crate::meta::column_item_mysql(c),
+            })
+            .collect()
+    };
     items.extend(fk_label_pairs(state, user, key, child_t));
     let sql = format!(
         "SELECT {}, count(*) OVER () AS __cartapel_total FROM {} t WHERE {where_sql} {order} LIMIT {INLINE_CAP} OFFSET {}",
@@ -622,14 +637,17 @@ pub async fn detail_handler(
 
     let mut inlines = Vec::new();
     for ri in resolve_inlines(&state, &user, &table) {
-        let Ok(child_t) = table_of(&state, &user, &ri.child) else {
+        // resolve_inlines already gated the child on view perms; resolve the
+        // DbTable directly so an inline can target a table that has no screen
+        // of its own (an inline-only child — a queue, a journal, a join table).
+        let Some(child_t) = state.resolve_table(&ri.child) else {
             continue;
         };
         let Some(fk_c) = child_t.column(&ri.fk_col) else {
             continue;
         };
         let (rows, total) =
-            fetch_inline_page(&state, &user, &ri.child, child_t, fk_c, &pk, 1).await?;
+            fetch_inline_page(&state, &user, &ri.child, child_t, fk_c, &ri.columns, &pk, 1).await?;
         inlines.push(inline_json(&ri, rows, total));
     }
     Ok(Json(json!({ "row": row, "inlines": inlines })))
@@ -644,7 +662,9 @@ pub async fn inline_page_handler(
     let dbt = table_of(&state, &user, &table)?;
     let ri = resolve_configured_inline(&state, &user, &table, &child)?;
     fetch_one(&state, &user, &table, dbt, &pk).await?;
-    let child_t = table_of(&state, &user, &ri.child)?;
+    let child_t = state
+        .resolve_table(&ri.child)
+        .ok_or_else(|| AppError::not_found(format!("unknown table {}", ri.child)))?;
     let fk_c = child_t
         .column(&ri.fk_col)
         .ok_or_else(|| AppError::bad(format!("inline {child} has no column {}", ri.fk_col)))?;
@@ -653,8 +673,17 @@ pub async fn inline_page_handler(
         .and_then(|p| p.parse().ok())
         .unwrap_or(1)
         .max(1);
-    let (rows, total) =
-        fetch_inline_page(&state, &user, &ri.child, child_t, fk_c, &pk, page).await?;
+    let (rows, total) = fetch_inline_page(
+        &state,
+        &user,
+        &ri.child,
+        child_t,
+        fk_c,
+        &ri.columns,
+        &pk,
+        page,
+    )
+    .await?;
     let mut out = inline_json(&ri, rows, total);
     out.as_object_mut()
         .unwrap()
@@ -1866,7 +1895,50 @@ mod tests {
                 columns: vec![tcol("symbol")],
             },
         );
+        // Introspected but never given a screen — an inline-only child.
+        schema.tables.insert(
+            "bot_journal".into(),
+            DbTable {
+                name: "bot_journal".into(),
+                schema: "public".into(),
+                source: String::new(),
+                is_view: false,
+                extra_unique: false,
+                pk: Some("bot_id".into()),
+                columns: vec![col("bot_id", "int8", Kind::Int), tcol("fingerprint")],
+            },
+        );
         schema
+    }
+
+    // An explicit inline may target a table with no screen of its own; the
+    // detail path resolves it via resolve_table, not the configured-table gate.
+    #[test]
+    fn explicit_inline_resolves_unconfigured_child() {
+        let mut cfg = ConfigDir::default();
+        let mut bots = TableConfig::default();
+        bots.relations.inlines = vec![InlineSpec::Full {
+            table: "bot_journal".into(),
+            fk_col: Some("bot_id".into()),
+            label: Some("State journal".into()),
+            columns: vec!["fingerprint".into()],
+            can_create: Some(false),
+            can_delete: Some(false),
+        }];
+        cfg.tables.insert("bots".into(), bots);
+        let state = inline_state(cfg);
+        assert!(
+            state.cfg().tables.get("bot_journal").is_none(),
+            "the child is deliberately unconfigured"
+        );
+        assert!(
+            state.resolve_table("bot_journal").is_some(),
+            "an unconfigured but introspected child still resolves"
+        );
+        let inlines = resolve_inlines(&state, &admin(), "bots");
+        assert_eq!(inlines.len(), 1, "the inline-only child surfaces");
+        assert_eq!(inlines[0].child, "bot_journal");
+        assert_eq!(inlines[0].columns, vec!["fingerprint".to_string()]);
     }
 
     fn inline_cfg() -> ConfigDir {
