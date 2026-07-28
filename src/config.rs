@@ -1005,7 +1005,15 @@ where
 #[serde(deny_unknown_fields)]
 pub struct ImageConfig {
     pub dir: String,
+    /// Real column holding the filename. Empty when `name_sql` supplies it.
+    #[serde(default)]
     pub name_col: String,
+    /// A scalar SQL expression (correlated to the row via the `t` alias) that
+    /// yields the filename — for an image joined from a related table. Read-only:
+    /// upload targets the owning table, not a join. Exactly one of name_col /
+    /// name_sql must be set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name_sql: Option<String>,
     #[serde(default = "default_max_px", skip_serializing_if = "is_default_max_px")]
     pub max_px: u32,
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
@@ -1479,6 +1487,13 @@ fn collect_hcl(dir: &Path, out: &mut Vec<std::path::PathBuf>) -> Result<(), Stri
 /// field's `color` (named strategy or the rule DSL) must be well-formed.
 fn validate_table_config(tc: &TableConfig) -> Result<(), String> {
     for (name, f) in &tc.fields {
+        if let Some(img) = &f.image {
+            if img.name_col.is_empty() == img.name_sql.is_none() {
+                return Err(format!(
+                    "field \"{name}\": image needs exactly one of `name_col` or `name_sql`"
+                ));
+            }
+        }
         if let Some(fmt) = &f.format {
             if !FORMAT_VOCAB.contains(&fmt.as_str()) {
                 return Err(format!("field \"{name}\": unknown format `{fmt}`"));
@@ -2548,6 +2563,40 @@ panel {
             serde_json::to_value(&p).unwrap(),
             serde_json::to_value(&p2).unwrap(),
             "widget columns round-trip",
+        );
+    }
+
+    #[test]
+    fn image_field_needs_exactly_one_name_source() {
+        let with_image = |img: ImageConfig| -> Result<(), String> {
+            let mut tc = TableConfig::default();
+            tc.fields.insert(
+                "logo".into(),
+                FieldConfig {
+                    image: Some(img),
+                    ..Default::default()
+                },
+            );
+            validate_table_config(&tc)
+        };
+        let base = || ImageConfig {
+            dir: "/d".into(),
+            name_col: String::new(),
+            name_sql: None,
+            max_px: 128,
+            normalize: true,
+        };
+        assert!(with_image(ImageConfig { name_col: "file".into(), ..base() }).is_ok());
+        assert!(with_image(ImageConfig { name_sql: Some("(SELECT f FROM l)".into()), ..base() }).is_ok());
+        assert!(with_image(base()).is_err(), "neither is a load error");
+        assert!(
+            with_image(ImageConfig {
+                name_col: "file".into(),
+                name_sql: Some("(SELECT 1)".into()),
+                ..base()
+            })
+            .is_err(),
+            "both is a load error"
         );
     }
 

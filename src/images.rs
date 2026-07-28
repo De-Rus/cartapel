@@ -33,9 +33,6 @@ async fn resolve_path(
     }
     let cfg = image_cfg(state, table, col)
         .ok_or_else(|| AppError::bad(format!("{col} is not an image field")))?;
-    let name_col = dbt
-        .column(&cfg.name_col)
-        .ok_or_else(|| AppError::internal("image name_col not in schema"))?;
     let pk_col = dbt
         .pk
         .as_ref()
@@ -48,9 +45,18 @@ async fn resolve_path(
     if let Some(rf) = state.row_filter(user, table) {
         where_sql = format!("{where_sql} AND ({rf})");
     }
+    // The filename comes from a real column, or — for an image joined from a
+    // related table — from a correlated `name_sql` expression over the `t` alias.
+    let name_expr = if let Some(sql) = &cfg.name_sql {
+        format!("({sql})")
+    } else {
+        let name_col = dbt
+            .column(&cfg.name_col)
+            .ok_or_else(|| AppError::internal("image name_col not in schema"))?;
+        crate::sqlval::text_cast(pool.dialect(), &crate::sqlval::ident(&name_col.name))
+    };
     let sql = format!(
-        "SELECT {} AS n FROM {} WHERE {where_sql}",
-        crate::sqlval::text_cast(pool.dialect(), &crate::sqlval::ident(&name_col.name)),
+        "SELECT {name_expr} AS n FROM {} t WHERE {where_sql}",
         state.qualified_of(dbt)
     );
     let name = crate::db::fetch_json_rows(pool, &sql, &binds)
@@ -107,6 +113,11 @@ pub async fn put_image(
     }
     let cfg = image_cfg(&state, &table, &col)
         .ok_or_else(|| AppError::bad(format!("{col} is not an image field")))?;
+    if cfg.name_sql.is_some() {
+        return Err(AppError::bad(
+            "this image is joined from another table (name_sql) — upload it on that table instead",
+        ));
+    }
     let (path, name) = resolve_path(&state, &user, &table, &col, &pk).await?;
 
     let mut raw: Option<Bytes> = None;
