@@ -178,12 +178,13 @@ load error.
 
 ## Image uploads
 
-An `image { }` block turns a column into an uploadable, on-disk-resized image:
+An `image { }` block turns a column into an uploadable, on-disk-resized image.
+The filename lives in a column; the file lives on the storage backend (`dir`).
 
 ```hcl
 field "image" {
   image {
-    dir       = "products"     # subdirectory under the config bundle
+    dir       = "products"     # directory the files live in
     name_col  = "sku"          # column supplying the stored filename
     max_px    = 256            # longest edge, default 256
     normalize = true           # re-encode/normalize on upload, default true
@@ -191,7 +192,60 @@ field "image" {
 }
 ```
 
-Uploaded images are served back through cartapel's static asset route.
+Uploaded images are served back through cartapel's static asset route. The field
+renders in the list (thumbnail) and the record view; upload happens right there —
+no edit-mode round-trip.
+
+### From a related table
+
+An image often belongs to a *different* table than the one you're looking at — a
+product's logo living in a shared `assets` table, keyed by SKU rather than by the
+product row's id. Point `name_sql` at a correlated expression (the current row is
+`t`) that yields the filename, and the image shows without denormalising anything:
+
+```hcl
+field "logo" {
+  widget = "image"
+  image {
+    name_sql = "SELECT a.filename FROM assets a WHERE a.sku = t.sku LIMIT 1"
+    dir      = "logos"
+  }
+}
+```
+
+The field needs no real column of its own — it renders as a virtual column,
+served by primary key. With only `name_sql` it is **read-only** (you edit the
+image on the table that owns it).
+
+### Editable across the join (write-through)
+
+Add `write_to` to make the joined image uploadable *here* — an upload writes the
+file and upserts the target row, like Django's `ImageField` on a related model:
+
+```hcl
+field "logo" {
+  widget = "image"
+  image {
+    name_sql       = "SELECT a.filename FROM assets a WHERE a.sku = t.sku AND a.status = 'ok' LIMIT 1"
+    dir            = "logos"
+    write_to       = "assets"                    # the table the upload writes to
+    name_col       = "filename"                  # its filename column
+    write_key      = { sku = "sku" }             # target_col = this row's column
+    write_defaults = { status = "ok" }           # extra columns set on a fresh row
+    max_px         = 128
+  }
+}
+```
+
+On upload cartapel writes the file (under a deterministic name built from the
+`write_key` values) and upserts `write_to`: it UPDATEs the row matched by
+`write_key` — setting `name_col` and the `write_defaults` — or INSERTs one if none
+exists. The owning table stays the single source of truth; the parent never keeps
+a copy. Exactly one of `name_col` / `name_sql` is required, and `write_to` needs
+all of `name_sql`, `name_col` and a non-empty `write_key`.
+
+The storage backend is `dir` — a filesystem path today; point it at object
+storage the same way once your deployment stores assets there.
 
 ---
 
