@@ -109,14 +109,21 @@ export async function uploadImage(
   } catch {
     data = null
   }
-  if (!res.ok) {
-    const msg =
-      data && typeof data === 'object' && 'error' in data
-        ? String((data as { error: unknown }).error)
-        : res.statusText
-    throw new ApiError(res.status, msg)
-  }
+  if (!res.ok) throw new ApiError(res.status, errorMessage(res.status, data, res.statusText))
   return data as { ok: boolean; bytes: number }
+}
+
+/// A CDN or proxy in front of cartapel replaces a 5xx body with its own error
+/// page, so the server's explanation never reaches the browser. When the body
+/// is gone, recover as much meaning as the status carries.
+export function errorMessage(status: number, data: unknown, statusText: string): string {
+  if (data && typeof data === 'object' && 'error' in data) {
+    return String((data as { error: unknown }).error)
+  }
+  if (status === 502 || status === 503 || status === 504) {
+    return 'la consulta expiró o el servidor no respondió — acota el filtro, o la columna por la que ordenas puede necesitar un índice'
+  }
+  return statusText
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -147,13 +154,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   } catch {
     data = null
   }
-  if (!res.ok) {
-    const msg =
-      data && typeof data === 'object' && 'error' in data
-        ? String((data as { error: unknown }).error)
-        : res.statusText
-    throw new ApiError(res.status, msg)
-  }
+  if (!res.ok) throw new ApiError(res.status, errorMessage(res.status, data, res.statusText))
   return data as T
 }
 
