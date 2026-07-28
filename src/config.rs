@@ -816,6 +816,11 @@ const COLUMN_FORMAT_VOCAB: &[&str] = &[
     "money", "currency", "percent", "pct", "number", "num", "bytes", "duration", "dur", "date",
     "datetime", "rel",
 ];
+/// What a stat tile can actually render (`fmtByFormat`). Anything else silently
+/// falls through to compact-number formatting, which is how `format = "rel"`
+/// turned a timestamp into "1785,3 M" on a live dashboard.
+const PANEL_FORMAT_VOCAB: &[&str] = &["number", "money", "percent", "duration", "bytes"];
+
 const COLOR_STRATEGIES: &[&str] = &["sign", "positive", "negative", "stale"];
 const COLOR_CLASSES: &[&str] = &["good", "warning", "critical", "neutral", "accent", "muted"];
 
@@ -1492,6 +1497,15 @@ fn validate_table_config(tc: &TableConfig) -> Result<(), String> {
 /// must be in the column-format vocab.
 pub(crate) fn validate_panel_fields(widgets: &[PanelConfig]) -> Result<(), String> {
     for w in widgets {
+        if let Some(fmt) = &w.format {
+            if !PANEL_FORMAT_VOCAB.contains(&fmt.as_str()) {
+                return Err(format!(
+                    "panel \"{}\": unknown format `{fmt}` — a tile renders {}",
+                    w.label,
+                    PANEL_FORMAT_VOCAB.join(", ")
+                ));
+            }
+        }
         for c in &w.columns {
             if let Some(fmt) = &c.format {
                 if !COLUMN_FORMAT_VOCAB.contains(&fmt.as_str()) {
