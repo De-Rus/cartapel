@@ -651,9 +651,14 @@ function DashboardGrid({ widgets, columns = DEFAULT_COLS }: { widgets: Widget[];
   return (
     <div className="space-y-3">
       {stats.length > 0 && (
-        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
+        // Stat tiles share the page grid so `w` means the same thing on a tile
+        // as on a table. An auto-fit track was stretching a lone tile across the
+        // whole page — a single number rendered a metre wide reads as broken.
+        <div className={clsx('grid gap-3', gridColsClass(columns))}>
           {stats.map((w) => (
-            <WidgetCard key={w.id} w={w} />
+            <div key={w.id} className={spanClass(w, columns)}>
+              <WidgetCard w={w} />
+            </div>
           ))}
         </div>
       )}
