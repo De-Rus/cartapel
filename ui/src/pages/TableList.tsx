@@ -283,6 +283,9 @@ function ListInner({ table }: { table: TableMeta }) {
   )
 
   const openRow = (pk: string) => {
+    // No single-column pk (composite key) — the record view can't address a
+    // row, so the list is display-only.
+    if (!table.pk) return
     if (mode === 'page') {
       navigate(`/${table.name}/${encodeURIComponent(pk)}`, {
         state: { siblings: pks, from: sp.toString() },

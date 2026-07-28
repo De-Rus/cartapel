@@ -1086,6 +1086,14 @@ pub enum InlineSpec {
         can_create: Option<bool>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         can_delete: Option<bool>,
+        /// Rows per page for this inline (default 50).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pp: Option<u32>,
+        /// Grid columns this inline occupies in the detail's inline row — set
+        /// two inlines to `span = 1` under a 2-column detail to sit them
+        /// side by side. Default: full width.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        span: Option<u8>,
     },
 }
 

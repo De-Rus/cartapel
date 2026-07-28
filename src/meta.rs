@@ -619,6 +619,8 @@ pub struct ResolvedInline {
     pub columns: Vec<String>,
     pub can_create: bool,
     pub can_delete: bool,
+    pub pp: Option<u32>,
+    pub span: Option<u8>,
 }
 
 /// Zero-config inlines: every configured table with an introspected FK into
@@ -651,8 +653,8 @@ pub fn resolve_inlines(state: &AppState, user: &CurrentUser, table: &str) -> Vec
     };
     let mut out = Vec::new();
     for spec in &specs {
-        let (child, fk_col, label, columns, want_create, want_delete) = match spec {
-            InlineSpec::Table(t) => (t.clone(), None, None, Vec::new(), None, None),
+        let (child, fk_col, label, columns, want_create, want_delete, pp, span) = match spec {
+            InlineSpec::Table(t) => (t.clone(), None, None, Vec::new(), None, None, None, None),
             InlineSpec::Full {
                 table,
                 fk_col,
@@ -660,6 +662,8 @@ pub fn resolve_inlines(state: &AppState, user: &CurrentUser, table: &str) -> Vec
                 columns,
                 can_create,
                 can_delete,
+                pp,
+                span,
             } => (
                 table.clone(),
                 fk_col.clone(),
@@ -667,6 +671,8 @@ pub fn resolve_inlines(state: &AppState, user: &CurrentUser, table: &str) -> Vec
                 columns.clone(),
                 *can_create,
                 *can_delete,
+                *pp,
+                *span,
             ),
         };
         let Some(child_t) = state.resolve_table(&child) else {
@@ -701,6 +707,8 @@ pub fn resolve_inlines(state: &AppState, user: &CurrentUser, table: &str) -> Vec
             columns,
             can_create: want_create.unwrap_or(true) && child_perms.create,
             can_delete: want_delete.unwrap_or(true) && child_perms.delete,
+            pp,
+            span,
         });
     }
     out

@@ -873,6 +873,8 @@ mod tests {
                 columns: vec!["mode".into(), "status".into()],
                 can_create: None,
                 can_delete: None,
+                pp: None,
+                span: None,
             },
             InlineSpec::Full {
                 table: "locked".into(),
@@ -881,6 +883,8 @@ mod tests {
                 columns: vec![],
                 can_create: None,
                 can_delete: Some(true),
+                pp: None,
+                span: None,
             },
         ];
         cfg.tables.insert("bots".into(), bots_cfg);
@@ -944,6 +948,8 @@ mod tests {
             columns: vec![],
             can_create: None,
             can_delete: None,
+            pp: None,
+            span: None,
         }];
         cfg.tables.insert("bots".into(), bots_cfg);
         let state = state_from(cfg, None);

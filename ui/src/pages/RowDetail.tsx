@@ -854,14 +854,20 @@ export function DetailBody({
       </div>
     ) : null
 
-  const inlines = data.inlines.map((inline) => (
-    <InlineTable
-      key={`${inline.table}-${inline.fk_col}`}
-      inline={inline}
-      parentTable={tableName}
-      parentPk={pk}
-    />
-  ))
+  // Inlines lay out in the same grid as the detail sections. An inline's `span`
+  // (default: full width) lets two narrow ones sit side by side.
+  const inlines = data.inlines.length ? (
+    <div className={clsx('grid gap-4', SECTION_GRID[cols])}>
+      {data.inlines.map((inline) => (
+        <div
+          key={`${inline.table}-${inline.fk_col}`}
+          style={{ gridColumn: `span ${Math.min(inline.span ?? cols, cols)}` }}
+        >
+          <InlineTable inline={inline} parentTable={tableName} parentPk={pk} />
+        </div>
+      ))}
+    </div>
+  ) : null
 
   const errorBanner =
     saveMut.isError && Object.keys(fieldErrors).length === 0 ? (

@@ -489,8 +489,13 @@ async fn fetch_one(
     Ok(v)
 }
 
-fn inline_offset(page: u32) -> i64 {
-    (page.max(1) as i64 - 1) * INLINE_CAP
+/// This inline's page size — its own `pp`, else the default cap.
+fn inline_cap(ri: &ResolvedInline) -> i64 {
+    ri.pp.map(|p| (p as i64).max(1)).unwrap_or(INLINE_CAP)
+}
+
+fn inline_offset(page: u32, cap: i64) -> i64 {
+    (page.max(1) as i64 - 1) * cap
 }
 
 fn inline_json(ri: &ResolvedInline, rows: Vec<Value>, total: i64) -> Value {
@@ -503,7 +508,8 @@ fn inline_json(ri: &ResolvedInline, rows: Vec<Value>, total: i64) -> Value {
         "can_delete": ri.can_delete,
         "rows": rows,
         "total": total,
-        "cap": INLINE_CAP,
+        "cap": inline_cap(ri),
+        "span": ri.span,
     })
 }
 
@@ -518,6 +524,7 @@ async fn fetch_inline_page(
     child_t: &DbTable,
     fk_c: &DbColumn,
     columns: &[String],
+    cap: i64,
     pk: &str,
     page: u32,
 ) -> Result<(Vec<Value>, i64), AppError> {
@@ -551,10 +558,10 @@ async fn fetch_inline_page(
     };
     items.extend(fk_label_pairs(state, user, key, child_t));
     let sql = format!(
-        "SELECT {}, count(*) OVER () AS __cartapel_total FROM {} t WHERE {where_sql} {order} LIMIT {INLINE_CAP} OFFSET {}",
+        "SELECT {}, count(*) OVER () AS __cartapel_total FROM {} t WHERE {where_sql} {order} LIMIT {cap} OFFSET {}",
         items.join(", "),
         state.qualified_of(child_t),
-        inline_offset(page),
+        inline_offset(page, cap),
     );
     let rows = crate::db::fetch_json_rows(pool, &sql, &binds).await?;
     let total = rows
@@ -648,7 +655,8 @@ pub async fn detail_handler(
             continue;
         };
         let (rows, total) =
-            fetch_inline_page(&state, &user, &ri.child, child_t, fk_c, &ri.columns, &pk, 1).await?;
+            fetch_inline_page(&state, &user, &ri.child, child_t, fk_c, &ri.columns, inline_cap(&ri), &pk, 1)
+                .await?;
         inlines.push(inline_json(&ri, rows, total));
     }
     Ok(Json(json!({ "row": row, "inlines": inlines })))
@@ -681,6 +689,7 @@ pub async fn inline_page_handler(
         child_t,
         fk_c,
         &ri.columns,
+        inline_cap(&ri),
         &pk,
         page,
     )
@@ -1925,6 +1934,8 @@ mod tests {
             columns: vec!["fingerprint".into()],
             can_create: Some(false),
             can_delete: Some(false),
+            pp: None,
+            span: None,
         }];
         cfg.tables.insert("bots".into(), bots);
         let state = inline_state(cfg);
@@ -1952,6 +1963,8 @@ mod tests {
             columns: vec!["kind".into()],
             can_create: None,
             can_delete: None,
+            pp: None,
+            span: None,
         }];
         cfg.tables.insert("bots".into(), bots);
         cfg.tables
@@ -2121,10 +2134,10 @@ mod tests {
 
     #[test]
     fn inline_offset_paginates_by_cap() {
-        assert_eq!(inline_offset(0), 0);
-        assert_eq!(inline_offset(1), 0);
-        assert_eq!(inline_offset(2), INLINE_CAP);
-        assert_eq!(inline_offset(3), INLINE_CAP * 2);
+        assert_eq!(inline_offset(0, INLINE_CAP), 0);
+        assert_eq!(inline_offset(1, INLINE_CAP), 0);
+        assert_eq!(inline_offset(2, INLINE_CAP), INLINE_CAP);
+        assert_eq!(inline_offset(3, INLINE_CAP), INLINE_CAP * 2);
     }
 
     #[tokio::test]

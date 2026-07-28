@@ -245,6 +245,9 @@ export function DataTable({
     }
   }
 
+  // A table with no single-column primary key (composite key) can't open a
+  // record view — its rows are display-only, not clickable.
+  const canOpen = !!table.pk
   const renderRow = (row: Row, ri: number) => {
     const pk = String(row[table.pk])
     const isCursor = ri === cursor
@@ -254,12 +257,13 @@ export function DataTable({
       <tr
         key={pk}
         className={clsx(
-          'group data-row cursor-pointer border-t',
+          'group data-row border-t',
+          canOpen && 'cursor-pointer',
           isSel ? 'bg-selected' : isCursor || isPeek ? 'bg-hover' : 'hover:bg-hover',
         )}
         style={{ height: rowH, ...(isCursor || isPeek ? { boxShadow: 'inset 2px 0 0 var(--accent)' } : {}) }}
-        onClick={() => onOpenRow(pk)}
-        onMouseEnter={() => onPrefetch?.(pk)}
+        onClick={canOpen ? () => onOpenRow(pk) : undefined}
+        onMouseEnter={canOpen ? () => onPrefetch?.(pk) : undefined}
       >
         {hasSelection && (
           <td className="data-cell w-px pl-2.5 pr-1" onClick={(e) => e.stopPropagation()}>

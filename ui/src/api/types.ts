@@ -100,6 +100,7 @@ export interface InlineMeta {
   columns?: string[]
   can_create?: boolean
   can_delete?: boolean
+  span?: number
 }
 
 export interface Perms {
