@@ -23,7 +23,7 @@ const faq = [
   },
   {
     q: 'Does it need Node?',
-    a: 'No. The frontend is compiled once and embedded in the binary, so at runtime the only dependency is your database. Even custom .tsx pages are transpiled in the browser — no build step, no npm.',
+    a: 'No. The frontend is compiled once and embedded in the binary, so at runtime the only dependency is your database. Pages and dashboards are HCL, so adding one needs no build step and no npm.',
   },
   {
     q: 'How do I deploy it?',
@@ -163,8 +163,8 @@ action "refund" {
         <p>Postgres, MySQL and MariaDB are fully editable; ClickHouse joins read-only for browsing and SQL. Declare each as a <code>source</code> and mix their tables in the same sidebar.</p>
       </div>
       <div class="card">
-        <h3>Custom pages</h3>
-        <p>Drop a <code>.tsx</code> module next to your config — transpiled in the browser with the <code>sx</code> SDK in scope. No build step, no npm.</p>
+        <h3>Pages of your own</h3>
+        <p>A folder with a <code>screen.hcl</code> becomes a page: stat tiles, charts and tables from your SQL, live on a <code>refresh</code> clock, or a Grafana panel in an <code>iframe</code>. Configuration, not a build step.</p>
       </div>
       <div class="card">
         <h3>Yours to theme</h3>

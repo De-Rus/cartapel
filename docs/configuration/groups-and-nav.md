@@ -59,8 +59,8 @@ its group. Moving a table's folder from one group to another changes which
 sidebar group it appears in but does not change its identity or any deep links
 to its records.
 
-::: warning Renaming a group changes custom page URLs
-Custom pages are identified as `<group-slug>/<page-slug>` (both folder-derived).
+::: warning Renaming a group changes page URLs
+Pages are identified as `<group-slug>/<page-slug>` (both folder-derived).
 Renaming a group folder therefore changes the ids of any pages inside it and
 breaks existing deep links to those pages. Table record links are unaffected.
 :::

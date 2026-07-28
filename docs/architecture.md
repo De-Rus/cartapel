@@ -50,8 +50,8 @@ its own state never contaminates yours.
 ## The config bundle
 
 The `--config` directory is a portable, self-contained bundle: HCL config,
-role/permission definitions, dashboards, named queries, and any custom widget or
-page JavaScript, all in one folder. It reads like the sidebar — one folder per
+role/permission definitions, dashboards, named queries, and any custom widget
+JavaScript, all in one folder. It reads like the sidebar — one folder per
 navigation group plus the reserved `config/`. See
 [Configuration overview](/configuration/overview).
 
@@ -60,8 +60,8 @@ reviewable in pull requests.
 
 ## Config hot-reload
 
-The config directory is **watched** (notify-based, `.hcl` and widget/page
-`.ts`/`.tsx`/`.js` files): edits from your editor, a `git checkout` or a volume
+The config directory is **watched** (notify-based, `.hcl` files and the
+custom widget `.js` under `config/widgets/`): edits from your editor, a `git checkout` or a volume
 sync all hot-swap the live configuration with no restart. In-app builder edits
 don't need the watcher — they are trial-parsed, written atomically (temp file +
 rename) and reloaded synchronously; the watcher just re-runs an idempotent load

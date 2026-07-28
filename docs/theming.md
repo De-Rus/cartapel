@@ -68,7 +68,7 @@ The token vocabulary:
 
 Any key you put in a `light { }` / `dark { }` map is emitted as `--<key>` — the
 vocabulary above is what the built-in UI consumes, but you can define extra
-variables for your own custom pages the same way.
+variables for your own custom widgets the same way.
 
 Custom field widgets ([docs](/configuration/pages-and-queries#custom-widgets))
 consume the same tokens (`var(--accent)`, `var(--surface-2)`, …), so they

@@ -22,7 +22,7 @@ docs/
 │   ├── fields-and-widgets.md   # the widget library, params, format, color, interpolation
 │   ├── detail-views.md         # detail.mode, sections, sidebar, inlines
 │   ├── groups-and-nav.md       # _group.hcl, ordering
-│   ├── pages-and-queries.md    # custom pages, queries.hcl, custom widgets
+│   ├── pages-and-queries.md    # pages, queries.hcl, custom widgets
 │   └── dashboard.md            # config/dashboard.hcl widgets
 └── .vitepress/config.mts       # site nav + theme
 ```

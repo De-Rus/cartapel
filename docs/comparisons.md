@@ -12,7 +12,7 @@ instead.
 cartapel's shape, in one line: a single self-hosted Rust binary that
 introspects an existing Postgres, MySQL or MariaDB database and serves a CRUD
 panel — roles with inheritance, an audit log with revert, SQL dashboards,
-custom pages — all configured as HCL files you review in pull requests. MIT
+pages of your own — all configured as HCL files you review in pull requests. MIT
 licensed, free.
 
 ## At a glance
