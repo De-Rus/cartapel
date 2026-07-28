@@ -399,6 +399,7 @@ fn detail_sections(dbt: &DbTable, cfg: &TableConfig) -> Vec<Value> {
                 .into_iter()
                 .map(|(n, _)| n.clone()),
         )
+        .chain(virtual_image_fields(dbt, cfg).into_iter().cloned())
         .collect();
     let known = |f: &String| all.contains(f);
 

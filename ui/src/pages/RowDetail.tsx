@@ -717,7 +717,18 @@ export function DetailBody({
         </div>
         <div className="min-w-0 text-[13.5px] leading-relaxed text-ink [overflow-wrap:anywhere]">
           {col.widget === 'image' ? (
-            <ImageField table={tableName} col={col} pk={pk} row={effective} canUpload={false} />
+            <ImageField
+              table={tableName}
+              col={col}
+              pk={pk}
+              row={effective}
+              canUpload={
+                !!(col.params as { uploadable?: boolean }).uploadable &&
+                table.perms.write &&
+                !table.read_only &&
+                !col.readonly
+              }
+            />
           ) : (
             <CellValue col={col} value={effective[col.name]} row={effective} mode="detail" pkName={table.pk} tableName={tableName} />
           )}
