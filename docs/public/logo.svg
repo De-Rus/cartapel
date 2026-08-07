@@ -1,22 +1,48 @@
-<svg width="220" height="64" viewBox="0 0 220 64" xmlns="http://www.w3.org/2000/svg">
-  <g fill="none" fill-rule="evenodd">
-    <!-- Icon -->
-    <path d="M46 8
-             C24 8 8 24 8 46
-             C8 68 24 84 46 84"
-          stroke="#F5F5F5"
-          stroke-width="10"
-          stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="820"
+     height="220"
+     viewBox="0 0 820 220"
+     fill="none">
 
-    <path d="M46 46 L66 46 L46 66 Z"
-          fill="#B98B4D"/>
+  <defs>
+    <style>
+      .wordmark{
+        font-family: "Cormorant Garamond","Libre Baskerville","Georgia",serif;
+        font-size:96px;
+        fill:#F5F5F5;
+        font-weight:600;
+      }
+    </style>
+  </defs>
 
-    <!-- Text -->
-    <text x="90" y="52"
-          font-family="Cormorant Garamond, Georgia, serif"
-          font-size="42"
-          fill="#F5F5F5">
-      cartapel
-    </text>
+  <!-- Icon -->
+  <g transform="translate(20 20)">
+
+    <!-- Main C -->
+    <path
+      d="M120 20
+         C63 20 20 63 20 120
+         C20 177 63 220 120 220
+         L120 188
+         C80 188 52 160 52 120
+         C52 80 80 52 120 52
+         C146 52 168 64 183 82
+         L206 60
+         C185 35 155 20 120 20Z"
+      fill="#F5F5F5"/>
+
+    <!-- Fold -->
+    <path
+      d="M118 118
+         L166 118
+         L118 166Z"
+      fill="#B78947"/>
+
   </g>
+
+  <!-- Wordmark -->
+  <text x="270" y="145" class="wordmark">
+    cartapel
+  </text>
+
 </svg>

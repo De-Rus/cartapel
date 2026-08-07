@@ -1,12 +1,20 @@
-<svg width="74" height="92" viewBox="0 0 74 92" xmlns="http://www.w3.org/2000/svg">
-  <g fill="none" fill-rule="evenodd">
-    <path d="M46 8
-             C24 8 8 24 8 46
-             C8 68 24 84 46 84"
-          stroke="#F5F5F5"
-          stroke-width="10"
-          stroke-linecap="round"/>
-    <path d="M46 46 L66 46 L46 66 Z"
-          fill="#B98B4D"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="246" height="260" viewBox="0 0 246 260" fill="none">
+  <g transform="translate(20 20)">
+    <path
+      d="M120 20
+         C63 20 20 63 20 120
+         C20 177 63 220 120 220
+         L120 188
+         C80 188 52 160 52 120
+         C52 80 80 52 120 52
+         C146 52 168 64 183 82
+         L206 60
+         C185 35 155 20 120 20Z"
+      fill="#F5F5F5"/>
+    <path
+      d="M118 118
+         L166 118
+         L118 166Z"
+      fill="#B78947"/>
   </g>
 </svg>
