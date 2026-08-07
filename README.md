@@ -19,7 +19,9 @@
 
 Every project ends up needing an admin: support wants to fix a record, ops wants
 a dashboard, someone needs to flip a flag. The usual options are heavy (Retool),
-framework-locked (Django admin) or become a second codebase to maintain.
+framework-locked (Django admin) or become a second codebase to maintain. If you
+already have Grafana for metrics, cartapel sits beside it — CRUD and a few SQL
+tiles in the same panel, not another product to learn.
 
 cartapel takes a different bet: **your database schema is the source of truth,
 and every customization is code you version** — a directory of small HCL files
@@ -81,8 +83,7 @@ commit.
 | **Introspected CRUD** | Lists, detail pages, inline child tables from reverse FKs, bulk actions, CSV/JSON import & export. Views and PK-less tables degrade to read-only. |
 | **Roles & permissions** | Per-table / per-column / row-level, in versioned config. Role inheritance (`extends`), multi-role union, a per-role `customize` grant, and a read-only **view-as** mode to verify what a role sees. |
 | **Audit & revert** | Every write logged with before/after diffs. Field edits revert in one click — and the revert is itself audited. |
-| **SQL dashboards** | Stat tiles, charts and tables straight from SQL, with template variables (`{{window}}`), all in read-only transactions with timeouts. |
-| **Pages & dashboards** | Grids of panels defined in HCL — each reads inline SQL, a named query, a configured table, or a source (an HTTP endpoint, a directory, a bucket). No JavaScript anywhere. |
+| **Pages & dashboards** | Stat tiles, charts and tables from SQL (`{{window}}` and friends), grids of panels in HCL — each from inline SQL, a named query, a table, or a source (HTTP, directory, bucket). Embed an existing Grafana panel in an `iframe` when you already have one. Read-only transactions, timeouts, no JavaScript. |
 | **Theming & i18n** | Presets (including a faithful Django look), your accent, per-mode design tokens, per-locale labels — one hot-reloaded HCL block. |
 | **Several databases at once** | Postgres, MySQL and MariaDB are fully editable — the connection URL's scheme picks the engine. ClickHouse joins as a read-only source for browsing and SQL. Extra databases are `source` blocks; their tables share one sidebar. |
 | **Ops-friendly** | Single static binary or Docker image. Config hot-reloads from disk (a broken edit keeps the last good config). `cartapel check` validates the bundle in CI. Optional `public_role` for kiosk/demo access. |

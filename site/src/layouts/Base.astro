@@ -1,0 +1,63 @@
+---
+import '../styles/site.css'
+
+interface Props {
+  title: string
+  description: string
+  path?: string
+  ogTitle?: string
+}
+
+const GH = 'https://github.com/De-Rus/cartapel'
+const DEMO = 'https://demo.cartapel.com'
+const DOCS = 'https://docs.cartapel.com'
+const SITE = 'https://cartapel.com'
+
+const { title, description, path = '/', ogTitle = title } = Astro.props
+const canonicalPath = path.endsWith('/') ? path : `${path}/`
+const canonical = path === '/' ? `${SITE}/` : `${SITE}${canonicalPath}`
+const current = path === '/' ? '/' : canonicalPath.replace(/\/$/, '') || '/'
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/logo.svg" />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={ogTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content="https://cartapel.com/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <slot name="head" />
+  </head>
+  <body>
+    <nav>
+      <a class="brand" href="/">
+        <img src="/logo.svg" alt="" width="26" height="26" />
+        cartapel
+      </a>
+      <div class="links">
+        <a href="/compare/" aria-current={current === '/compare' ? 'page' : undefined}>Compare</a>
+        <a href={DOCS}>Docs</a>
+        <a href={DEMO}>Live demo</a>
+        <a href={GH}>GitHub</a>
+      </div>
+    </nav>
+    <slot />
+    <footer>
+      <img src="/logo.svg" alt="" width="20" height="20" />
+      <span>cartapel — MIT licensed</span>
+      <div class="links">
+        <a href="/compare/">Compare</a>
+        <a href={DOCS}>Docs</a>
+        <a href={DEMO}>Demo</a>
+        <a href={GH}>GitHub</a>
+      </div>
+    </footer>
+  </body>
+</html>

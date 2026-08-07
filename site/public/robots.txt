@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
 
+# Landing pages (home + /compare/)
 Sitemap: https://cartapel.com/sitemap-index.xml

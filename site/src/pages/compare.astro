@@ -1,0 +1,304 @@
+---
+import Base from '../layouts/Base.astro'
+
+const DEMO = 'https://demo.cartapel.com'
+const DOCS = 'https://docs.cartapel.com'
+const GH = 'https://github.com/De-Rus/cartapel'
+
+const alts = [
+  {
+    id: 'django',
+    name: 'Django admin',
+    body: 'If your application is already a Django app, Django admin is very hard to beat: it lives inside your codebase, shares your models, your auth, and your deploy pipeline. Where it costs you is when the database is not born from Django — inspectdb forever, hand-corrected models, ORM as source of truth. cartapel inverts that: the live schema is the model, and the panel runs as one binary beside any stack.',
+    pick: 'Already on Django with real models → stay. Adopting Python and an ORM just for the admin → cartapel.',
+  },
+  {
+    id: 'retool',
+    name: 'Retool',
+    body: 'Retool is a far broader product: a general app builder over dozens of data sources with custom JavaScript everywhere. If you need approval flows and multi-step wizards spanning three services, that breadth is the honest answer. The trade-offs are proprietary per-user pricing, a multi-container self-host (or SaaS), and GUI-first apps — git sync exists on paid tiers, as generated JSON.',
+    pick: 'Many sources and custom app logic → Retool. A database admin panel you want to own → cartapel.',
+  },
+  {
+    id: 'metabase',
+    name: 'Metabase',
+    body: 'Metabase is a BI tool, and at BI it is simply better: self-serve questions, drill-through, scheduled reports, alerts. What it is not is an admin panel — editing rows, bulk actions, imports, and per-field write permissions are not its job. Many teams run both: Metabase for analytics, cartapel for operations (fix a record, refund an order, audited and revertible).',
+    pick: 'Charts and self-serve exploration → Metabase. Safe CRUD for support/ops → cartapel.',
+  },
+  {
+    id: 'nocodb',
+    name: 'NocoDB / Baserow',
+    body: 'Airtable-style grids, kanban, gallery, forms — friendlier for non-technical teams than a classic admin. Baserow prefers owning its own tables; NocoDB can connect to Postgres but layers its own metadata. Both are configured by clicking, so the admin state lives in their database, not in files you can diff.',
+    pick: 'Starting from a spreadsheet → NocoDB/Baserow. Starting from a production database → cartapel.',
+  },
+  {
+    id: 'directus',
+    name: 'Directus',
+    body: 'Closest philosophical neighbor: introspects an existing SQL database. On top of that it generates REST/GraphQL, flows, DAM, and a headless CMS. If your admin layer must also be your API layer, Directus is the stronger platform. Footprint differs: Node app, config in system tables (exportable snapshots), BSL 1.1 since v10. cartapel is deliberately smaller — one MIT binary, no API generation, plain HCL in git.',
+    pick: 'Platform (API + CMS + admin) → Directus. Just the panel → cartapel.',
+  },
+  {
+    id: 'pgadmin',
+    name: 'pgAdmin',
+    body: 'A DBA workbench, not an application admin. For query plans, vacuum, replication, grants — pgAdmin (or psql, DBeaver) is right and cartapel does not replace it. Do not hand pgAdmin to support: raw SQL over every table, no app-level roles, no column masking, no audit of who changed what.',
+    pick: 'Administering the server → pgAdmin. Handing a panel to support/ops → cartapel. Most teams keep both.',
+  },
+]
+---
+
+<Base
+  title="cartapel vs Django admin, Retool, Metabase & friends"
+  description="Honest comparison of database admin panels: cartapel vs Django admin, Retool, Metabase, NocoDB, Baserow, Directus and pgAdmin — who each tool is for, and where cartapel is not the right choice."
+  path="/compare"
+  ogTitle="cartapel vs the alternatives"
+>
+  <script
+    slot="head"
+    type="application/ld+json"
+    set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: 'cartapel vs the alternatives',
+      description:
+        'Honest comparison of cartapel with Django admin, Retool, Metabase, NocoDB, Baserow, Directus and pgAdmin.',
+      url: 'https://cartapel.com/compare/',
+      isPartOf: { '@type': 'WebSite', name: 'cartapel', url: 'https://cartapel.com/' },
+    })}
+  />
+
+  <div class="page-head">
+    <h1>cartapel vs the alternatives</h1>
+    <p class="sub">
+      There are many good ways to put an admin UI in front of a database. This page is the
+      comparison a fair-minded engineer would trust: what cartapel does well, what each
+      alternative does <em>better</em>, and when you should pick them instead.
+    </p>
+    <nav class="toc" aria-label="On this page">
+      <a href="#glance">At a glance</a>
+      <a href="#django-syntax">Django syntax</a>
+      {alts.map((a) => (
+        <a href={`#${a.id}`}>{a.name}</a>
+      ))}
+      <a href="#not">When not cartapel</a>
+    </nav>
+  </div>
+
+  <section id="glance">
+    <h2>At a glance</h2>
+    <div class="glance">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>cartapel</th>
+            <th>Django admin</th>
+            <th>Retool</th>
+            <th>Metabase</th>
+            <th>NocoDB / Baserow</th>
+            <th>Directus</th>
+            <th>pgAdmin</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Databases</td>
+            <td class="yes">Postgres, MySQL, MariaDB (+ ClickHouse RO)</td>
+            <td class="mid">via Django models</td>
+            <td class="yes">many sources</td>
+            <td class="yes">many sources</td>
+            <td class="mid">Postgres/MySQL ± own tables</td>
+            <td class="yes">several SQL DBs</td>
+            <td class="no">Postgres only</td>
+          </tr>
+          <tr>
+            <td>Single binary</td>
+            <td class="yes">one Rust binary</td>
+            <td class="no">part of a Python app</td>
+            <td class="no">multi-container / SaaS</td>
+            <td class="no">JVM app</td>
+            <td class="no">Node/Python services</td>
+            <td class="no">Node app</td>
+            <td class="no">Python app</td>
+          </tr>
+          <tr>
+            <td>Existing DB, no schema ownership</td>
+            <td class="yes">introspects live schema</td>
+            <td class="mid">ORM models to sync</td>
+            <td class="yes">queries any source</td>
+            <td class="yes">read-oriented</td>
+            <td class="mid">NocoDB yes; Baserow prefers own</td>
+            <td class="yes">introspects</td>
+            <td class="yes">raw access</td>
+          </tr>
+          <tr>
+            <td>Config as code / PR review</td>
+            <td class="yes">HCL in git</td>
+            <td class="yes">Python in git</td>
+            <td class="mid">GUI-first; git sync paid</td>
+            <td class="mid">GUI-first; serialize paid</td>
+            <td class="no">GUI-configured</td>
+            <td class="mid">config in DB; snapshots</td>
+            <td class="no">n/a</td>
+          </tr>
+          <tr>
+            <td>Roles + audit</td>
+            <td class="yes">inheritance, audit + revert</td>
+            <td class="mid">roles solid; audit via packages</td>
+            <td class="mid">full audit on higher tiers</td>
+            <td class="mid">sandboxing is paid</td>
+            <td class="mid">roles yes; audit varies</td>
+            <td class="yes">granular roles</td>
+            <td class="no">Postgres roles only</td>
+          </tr>
+          <tr>
+            <td>Dashboards</td>
+            <td class="yes">SQL tiles, charts, vars</td>
+            <td class="no">not built in</td>
+            <td class="yes">build anything</td>
+            <td class="yes">best-in-class BI</td>
+            <td class="mid">basic views/charts</td>
+            <td class="mid">insights panels</td>
+            <td class="no">DBA charts only</td>
+          </tr>
+          <tr>
+            <td>License + price</td>
+            <td class="yes">MIT, free</td>
+            <td class="yes">BSD, free</td>
+            <td class="no">proprietary, per-user</td>
+            <td class="mid">AGPL core; paid Pro</td>
+            <td class="mid">AGPL / open-core</td>
+            <td class="mid">BSL 1.1</td>
+            <td class="yes">Postgres license, free</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="glance-note">Yellow cells are nuanced — read the sections below before deciding.</p>
+  </section>
+
+  <section id="django-syntax">
+    <h2>If you know Django admin</h2>
+    <p class="sub" style="margin: 0 0 8px; max-width: 640px; font-size: 16px;">
+      Same jobs you already do in <code>ModelAdmin</code> — without models, without Python,
+      without keeping an ORM in sync. Glance left → right.
+    </p>
+
+    <div class="pair">
+      <div class="pair-head">
+        <span>Expose a table</span>
+        <span class="pair-note">Django needs a model · cartapel reads the live schema</span>
+      </div>
+      <div class="pair-cols">
+        <figure>
+          <figcaption>Django</figcaption>
+          <pre><code>{`# models.py — or inspectdb forever
+class Order(models.Model):
+    customer = models.ForeignKey(...)
+    status = models.CharField(...)
+    total = models.DecimalField(...)
+    placed_at = models.DateTimeField(...)
+
+# admin.py
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    pass`}</code></pre>
+        </figure>
+        <figure>
+          <figcaption>cartapel</figcaption>
+          <pre><code>{`# screens/sales/orders/screen.hcl
+# empty file → working list already
+# (search, filters, sort, FKs as links)`}</code></pre>
+        </figure>
+      </div>
+    </div>
+
+    <div class="pair">
+      <div class="pair-head">
+        <span>Shape the list</span>
+        <span class="pair-note"><code>list_display</code> / <code>list_filter</code> / <code>ordering</code></span>
+      </div>
+      <div class="pair-cols">
+        <figure>
+          <figcaption>Django</figcaption>
+          <pre><code>{`@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = (
+        "id", "customer", "status",
+        "total", "placed_at",
+    )
+    list_filter = ("status",)
+    ordering = ("-placed_at",)`}</code></pre>
+        </figure>
+        <figure>
+          <figcaption>cartapel</figcaption>
+          <pre><code>{`list {
+  columns = [
+    "id", "customer_id", "status",
+    "total", "placed_at",
+  ]
+  filters = ["status"]
+  sort    = "-placed_at"
+}`}</code></pre>
+        </figure>
+      </div>
+    </div>
+
+    <div class="pair">
+      <div class="pair-head">
+        <span>Bulk action</span>
+        <span class="pair-note"><code>@admin.action</code> → <code>action</code> block</span>
+      </div>
+      <div class="pair-cols">
+        <figure>
+          <figcaption>Django</figcaption>
+          <pre><code>{`@admin.action(description="Refund")
+def refund(self, request, qs):
+    qs.update(status="refunded")
+
+class OrderAdmin(admin.ModelAdmin):
+    actions = ["refund"]`}</code></pre>
+        </figure>
+        <figure>
+          <figcaption>cartapel</figcaption>
+          <pre><code>{`action "refund" {
+  label   = "Refund"
+  kind    = "update"
+  set     = { status = "refunded" }
+  confirm = "Refund {count} orders?"
+}`}</code></pre>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Each alternative, honestly</h2>
+    {alts.map((a) => (
+      <article class="alt" id={a.id}>
+        <h3>{a.name}</h3>
+        <p>{a.body}</p>
+        <p class="pick"><strong>Pick:</strong> {a.pick}</p>
+      </article>
+    ))}
+  </section>
+
+  <section id="not">
+    <h2>Where cartapel is not the right choice</h2>
+    <ul class="not-list">
+      <li><strong>Already on Django with real models</strong> — use Django admin.</li>
+      <li><strong>Apps over many data sources, not a panel over your databases</strong> — Retool (or Appsmith / Budibase).</li>
+      <li><strong>Analytics and self-serve exploration</strong> — Metabase.</li>
+      <li><strong>Non-technical users owning data in a spreadsheet UI</strong> — NocoDB or Baserow.</li>
+      <li><strong>Generated API, automations and a CMS with the admin</strong> — Directus.</li>
+      <li><strong>Administering the database server itself</strong> — pgAdmin.</li>
+    </ul>
+    <p style="margin-top: 28px; max-width: 680px; font-size: 15.5px;">
+      What cartapel is for: a team with an existing production database that wants a safe,
+      audited, role-scoped operations panel — one binary, config reviewable in a pull request.
+    </p>
+    <div class="cta" style="justify-content: flex-start; margin-top: 22px;">
+      <a class="btn primary" href={DEMO}>Try the live demo</a>
+      <a class="btn" href={`${DOCS}/getting-started`}>Get started</a>
+      <a class="btn ghost" href={GH}>GitHub</a>
+    </div>
+  </section>
+</Base>

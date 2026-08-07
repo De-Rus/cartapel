@@ -7,7 +7,8 @@ description: "An honest comparison of database admin panels: cartapel vs Django 
 There are many good ways to put an admin UI in front of a database. This page
 tries to be the comparison a fair-minded engineer would trust: what cartapel
 does well, what each alternative does *better*, and when you should pick them
-instead.
+instead. A glanceable version — including Django side-by-side syntax — also
+lives on the [cartapel.com compare page](https://cartapel.com/compare/).
 
 cartapel's shape, in one line: a single self-hosted Rust binary that
 introspects an existing Postgres, MySQL or MariaDB database and serves a CRUD
