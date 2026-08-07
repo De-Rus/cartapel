@@ -96,7 +96,10 @@ export default defineConfig({
   },
 
   themeConfig: {
-    logo: '/logo.svg',
+    logo: {
+      light: '/logo-mark-light.png',
+      dark: '/logo-mark.png',
+    },
 
     nav: [
       { text: 'Guide', link: '/getting-started' },

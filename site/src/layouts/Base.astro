@@ -25,7 +25,8 @@ const current = path === '/' ? '/' : canonicalPath.replace(/\/$/, '') || '/'
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="icon" href="/logo.svg" />
+    <link rel="icon" href="/logo-mark.png" />
+    <link rel="apple-touch-icon" href="/logo-mark.png" />
     <link rel="canonical" href={canonical} />
     <meta property="og:type" content="website" />
     <meta property="og:title" content={ogTitle} />
@@ -38,7 +39,7 @@ const current = path === '/' ? '/' : canonicalPath.replace(/\/$/, '') || '/'
   <body>
     <nav>
       <a class="brand" href="/">
-        <img src="/logo.svg" alt="" width="26" height="26" />
+        <img src="/logo-mark.png" alt="" width="28" height="28" />
         cartapel
       </a>
       <div class="links">
@@ -50,7 +51,7 @@ const current = path === '/' ? '/' : canonicalPath.replace(/\/$/, '') || '/'
     </nav>
     <slot />
     <footer>
-      <img src="/logo.svg" alt="" width="20" height="20" />
+      <img src="/logo-mark.png" alt="" width="20" height="20" />
       <span>cartapel — MIT licensed</span>
       <div class="links">
         <a href="/compare/">Compare</a>

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="site/public/logo.svg" width="84" alt="cartapel logo" />
+  <img src="site/public/logo-light.png" width="160" alt="cartapel logo" />
 
   # cartapel
 

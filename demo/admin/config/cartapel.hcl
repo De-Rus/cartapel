@@ -1,5 +1,5 @@
 brand      = "cartapel"
-brand_logo = "config/widgets/logo.svg"
+brand_logo = "config/widgets/logo-mark.png"
 per_page = 50
 
 # Public demo: the login is a full admin (so visitors see the real thing), but
