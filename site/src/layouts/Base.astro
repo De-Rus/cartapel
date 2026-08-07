@@ -25,7 +25,7 @@ const current = path === '/' ? '/' : canonicalPath.replace(/\/$/, '') || '/'
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="icon" href="/logo-mark.svg" type="image/svg+xml" />
+    <link rel="icon" href="/logo-mark.png" />
     <link rel="apple-touch-icon" href="/logo-mark.png" />
     <link rel="canonical" href={canonical} />
     <meta property="og:type" content="website" />
@@ -34,41 +34,12 @@ const current = path === '/' ? '/' : canonicalPath.replace(/\/$/, '') || '/'
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content="https://cartapel.com/og.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&display=swap"
-      rel="stylesheet"
-    />
     <slot name="head" />
   </head>
   <body>
     <nav>
-      <a class="brand" href="/" aria-label="cartapel">
-        <!-- Exact lockup from brand SVG; light fills for the dark site -->
-        <svg
-          class="brand-logo"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 820 260"
-          fill="none"
-          aria-hidden="true"
-        >
-          <g transform="translate(20 20)">
-            <path
-              d="M120 20 C63 20 20 63 20 120 C20 177 63 220 120 220 L120 188 C80 188 52 160 52 120 C52 80 80 52 120 52 C146 52 168 64 183 82 L206 60 C185 35 155 20 120 20Z"
-              fill="#F4F4F5"
-            ></path>
-            <path d="M118 118 L166 118 L118 166Z" fill="#B78947"></path>
-          </g>
-          <text
-            x="270"
-            y="165"
-            fill="#F4F4F5"
-            font-family="Cormorant Garamond, Libre Baskerville, Georgia, serif"
-            font-size="96"
-            font-weight="600"
-          >cartapel</text>
-        </svg>
+      <a class="brand" href="/">
+        <img src="/logo.png" width="200" height="168" alt="cartapel" />
       </a>
       <div class="links">
         <a href="/compare/" aria-current={current === '/compare' ? 'page' : undefined}>Compare</a>
@@ -79,15 +50,7 @@ const current = path === '/' ? '/' : canonicalPath.replace(/\/$/, '') || '/'
     </nav>
     <slot />
     <footer>
-      <svg class="footer-mark" viewBox="0 0 246 260" aria-hidden="true">
-        <g transform="translate(20 20)">
-          <path
-            d="M120 20 C63 20 20 63 20 120 C20 177 63 220 120 220 L120 188 C80 188 52 160 52 120 C52 80 80 52 120 52 C146 52 168 64 183 82 L206 60 C185 35 155 20 120 20Z"
-            fill="currentColor"
-          ></path>
-          <path d="M118 118 L166 118 L118 166Z" fill="#B78947"></path>
-        </g>
-      </svg>
+      <img src="/logo-mark.png" width="28" height="28" alt="" />
       <span>cartapel — MIT licensed</span>
       <div class="links">
         <a href="/compare/">Compare</a>

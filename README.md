@@ -1,7 +1,7 @@
 <div align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="site/public/logo.svg" />
-    <img src="site/public/logo-light.svg" width="320" alt="cartapel" />
+    <source media="(prefers-color-scheme: dark)" srcset="site/public/logo.png" />
+    <img src="site/public/logo-light.png" width="200" alt="cartapel" />
   </picture>
 
   **An admin panel for your existing database — Postgres, MySQL or MariaDB (and ClickHouse, read-only).**
