@@ -281,6 +281,7 @@ function BrandMark({
         className={clsx(h, 'mx-auto block w-auto max-w-full object-contain')}
       />
     )
+  }
   const cls =
     size === 'sidebar'
       ? 'text-[15px] font-medium lowercase tracking-[0.3em]'
