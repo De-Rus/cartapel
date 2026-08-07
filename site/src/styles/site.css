@@ -26,7 +26,7 @@ nav {
   color: var(--ink); text-decoration: none;
 }
 .brand:hover { text-decoration: none; opacity: 0.92; }
-.brand img { display: block; height: 44px; width: auto; }
+.brand-logo { display: block; height: 48px; width: auto; }
 nav .links { display: flex; gap: 22px; font-size: 14.5px; flex-wrap: wrap; justify-content: flex-end; }
 nav .links a { color: var(--sec); text-decoration: none; }
 nav .links a:hover { color: var(--ink); text-decoration: none; }
@@ -158,6 +158,7 @@ footer {
   font-size: 14px; color: var(--muted);
 }
 footer img { display: block; flex-shrink: 0; height: 22px; width: auto; }
+.footer-mark { display: block; flex-shrink: 0; height: 22px; width: auto; color: var(--sec); }
 footer .links { display: flex; gap: 16px; margin-left: 12px; }
 footer a { color: var(--sec); text-decoration: none; }
 footer a:hover { color: var(--ink); }

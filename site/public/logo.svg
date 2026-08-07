@@ -9,7 +9,7 @@
       .wordmark{
         font-family: "Cormorant Garamond","Libre Baskerville","Georgia",serif;
         font-size:96px;
-        fill:#F5F5F5;
+        fill:#F4F4F5;
         font-weight:600;
       }
     </style>
@@ -29,7 +29,7 @@
          C146 52 168 64 183 82
          L206 60
          C185 35 155 20 120 20Z"
-      fill="#F5F5F5"/>
+      fill="#F4F4F5"/>
 
     <!-- Fold -->
     <path
