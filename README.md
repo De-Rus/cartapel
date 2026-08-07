@@ -1,7 +1,8 @@
 <div align="center">
-  <img src="site/public/logo-light.png" width="160" alt="cartapel logo" />
-
-  # cartapel
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/public/logo.svg" />
+    <img src="site/public/logo-light.svg" width="220" alt="cartapel" />
+  </picture>
 
   **An admin panel for your existing database — Postgres, MySQL or MariaDB (and ClickHouse, read-only).**
   One Rust binary · config as code · no framework, no ORM, no Node runtime.

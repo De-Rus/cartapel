@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 92" role="img" aria-label="cartapel">
+  <g fill="none" fill-rule="evenodd">
+    <path
+      d="M46 8C24 8 8 24 8 46C8 68 24 84 46 84"
+      stroke="#F5F5F5"
+      stroke-width="10"
+      stroke-linecap="round"
+    />
+    <path d="M46 46L66 46L46 66Z" fill="#B98B4D" />
+    <text
+      x="90"
+      y="58"
+      font-family="Georgia, 'Times New Roman', Times, serif"
+      font-size="42"
+      fill="#F5F5F5"
+    >cartapel</text>
+  </g>
+</svg>
