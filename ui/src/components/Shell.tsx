@@ -274,8 +274,13 @@ function BrandMark({
   if (logo) {
     // Full lockups already include the wordmark — don't duplicate the name.
     const h = size === 'sidebar' ? 'h-10' : 'h-14'
-    return <img src={logo} alt={brand} className={clsx(h, 'w-auto max-w-full object-contain')} />
-  }
+    return (
+      <img
+        src={logo}
+        alt={brand}
+        className={clsx(h, 'mx-auto block w-auto max-w-full object-contain')}
+      />
+    )
   const cls =
     size === 'sidebar'
       ? 'text-[15px] font-medium lowercase tracking-[0.3em]'
@@ -466,7 +471,7 @@ function MobileDrawer({
     <div className="fixed inset-0 z-50 flex" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="absolute inset-0 bg-black/50" />
       <aside className="sheet-in-left relative flex h-full w-64 flex-col border-r bg-surface1 px-3 py-4" aria-label="Primary">
-        <div className="mb-3 flex min-h-6 items-center px-2">
+        <div className="mb-3 flex min-h-10 items-center justify-center px-2">
           <BrandMark logo={logo} name={meta.brand} size="sidebar" />
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto">
@@ -660,21 +665,19 @@ function ShellChrome({ meta }: { meta: Meta }) {
         )}
         aria-label="Primary"
       >
-        <div className="mb-3 flex min-h-6 items-center px-2">
+        <div className="mb-3 flex min-h-10 items-center justify-center px-2">
           {rail ? (
-            <div className="mx-auto">
-              {mark ? (
-                <img src={mark} alt="" className="h-6 w-auto object-contain" />
-              ) : (
-                <span className="text-[15px] font-medium text-ink">s</span>
-              )}
-            </div>
+            mark ? (
+              <img src={mark} alt="" className="h-6 w-auto object-contain" />
+            ) : (
+              <span className="text-[15px] font-medium text-ink">s</span>
+            )
           ) : (
             <>
-              <div className="hidden wide:block">
+              <div className="hidden w-full justify-center wide:flex">
                 <BrandMark logo={logo} name={meta.brand} size="sidebar" />
               </div>
-              <div className="mx-auto wide:hidden">
+              <div className="flex justify-center wide:hidden">
                 {mark ? (
                   <img src={mark} alt="" className="h-6 w-auto object-contain" />
                 ) : (
