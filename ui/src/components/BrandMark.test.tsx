@@ -5,11 +5,12 @@ import { BrandMark } from './Shell'
 const html = (node: React.ReactElement) => renderToStaticMarkup(node)
 
 describe('BrandMark', () => {
-  it('renders the logo image AND the brand name together when a logo is present', () => {
+  it('renders only the logo image when a logo is present (lockup includes the wordmark)', () => {
     const out = html(<BrandMark logo="data:image/svg+xml,mark" name="Acme" size="sidebar" />)
     expect(out).toContain('<img')
     expect(out).toContain('src="data:image/svg+xml,mark"')
-    expect(out).toContain('Acme')
+    expect(out).toContain('alt="Acme"')
+    expect(out).not.toMatch(/>Acme</)
   })
 
   it('renders the lowercase wordmark from name when no logo, defaulting to cartapel', () => {
@@ -22,9 +23,9 @@ describe('BrandMark', () => {
   })
 
   it('colors the name with --band-ink on the band, --ink otherwise', () => {
-    const onBand = html(<BrandMark logo="x" name="Acme" size="sidebar" onBand />)
+    const onBand = html(<BrandMark logo={null} name="Acme" size="sidebar" onBand />)
     expect(onBand).toContain('var(--band-ink)')
-    const offBand = html(<BrandMark logo="x" name="Acme" size="sidebar" />)
+    const offBand = html(<BrandMark logo={null} name="Acme" size="sidebar" />)
     expect(offBand).toContain('text-ink')
   })
 })

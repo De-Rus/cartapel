@@ -7,7 +7,7 @@ import type { Meta, PageMeta, TableMeta } from '../api/types'
 import { fmtCompact, setFormatLocale } from '../lib/format'
 import { MetaContext } from '../lib/meta'
 import { I18nProvider, makeT, TFn, useT } from '../lib/i18n'
-import { pickBrandLogo } from '../lib/brand'
+import { pickBrandLogo, resolveBrandLogo } from '../lib/brand'
 import { buildSidebarNav, type SidebarGroup } from '../lib/nav'
 import { AppIcon } from '../lib/icon'
 import { useMediaQuery } from '../lib/hooks'
@@ -272,17 +272,9 @@ function BrandMark({
   const brand = (name ?? '').trim() || 'cartapel'
   const inkCls = onBand ? 'text-[color:var(--band-ink)]' : 'text-ink'
   if (logo) {
-    const h = size === 'sidebar' ? 'h-5' : 'h-7'
-    const nameCls =
-      size === 'sidebar'
-        ? 'text-[14px] font-semibold tracking-tight'
-        : 'text-xl font-semibold tracking-tight'
-    return (
-      <span className="flex items-center gap-2">
-        <img src={logo} alt="" className={clsx(h, 'w-auto max-w-full object-contain')} />
-        <span className={clsx(nameCls, inkCls)}>{brand}</span>
-      </span>
-    )
+    // Full lockups already include the wordmark — don't duplicate the name.
+    const h = size === 'sidebar' ? 'h-10' : 'h-14'
+    return <img src={logo} alt={brand} className={clsx(h, 'w-auto max-w-full object-contain')} />
   }
   const cls =
     size === 'sidebar'
@@ -474,7 +466,7 @@ function MobileDrawer({
     <div className="fixed inset-0 z-50 flex" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="absolute inset-0 bg-black/50" />
       <aside className="sheet-in-left relative flex h-full w-64 flex-col border-r bg-surface1 px-3 py-4" aria-label="Primary">
-        <div className="mb-3 flex h-6 items-center px-2">
+        <div className="mb-3 flex min-h-6 items-center px-2">
           <BrandMark logo={logo} name={meta.brand} size="sidebar" />
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto">
@@ -601,6 +593,7 @@ function ShellChrome({ meta }: { meta: Meta }) {
   const t = useT()
   const isDark = useIsDark(meta.theme?.mode)
   const logo = pickBrandLogo(meta, isDark)
+  const mark = resolveBrandLogo(meta.brand_logo) ?? logo
 
   const [theme, , cycleTheme] = useTheme()
   const [density, toggleDensity] = useDensity()
@@ -667,11 +660,11 @@ function ShellChrome({ meta }: { meta: Meta }) {
         )}
         aria-label="Primary"
       >
-        <div className="mb-3 flex h-6 items-center px-2">
+        <div className="mb-3 flex min-h-6 items-center px-2">
           {rail ? (
             <div className="mx-auto">
-              {logo ? (
-                <img src={logo} alt="" className="h-5 w-auto object-contain" />
+              {mark ? (
+                <img src={mark} alt="" className="h-6 w-auto object-contain" />
               ) : (
                 <span className="text-[15px] font-medium text-ink">s</span>
               )}
@@ -682,8 +675,8 @@ function ShellChrome({ meta }: { meta: Meta }) {
                 <BrandMark logo={logo} name={meta.brand} size="sidebar" />
               </div>
               <div className="mx-auto wide:hidden">
-                {logo ? (
-                  <img src={logo} alt="" className="h-5 w-auto object-contain" />
+                {mark ? (
+                  <img src={mark} alt="" className="h-6 w-auto object-contain" />
                 ) : (
                   <span className="text-[15px] font-medium text-ink">s</span>
                 )}
