@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg"
      width="820"
-     height="220"
-     viewBox="0 0 820 220"
+     height="260"
+     viewBox="0 0 820 260"
      fill="none">
 
   <defs>
@@ -41,7 +41,7 @@
   </g>
 
   <!-- Wordmark -->
-  <text x="270" y="145" class="wordmark">
+  <text x="270" y="165" class="wordmark">
     cartapel
   </text>
 
