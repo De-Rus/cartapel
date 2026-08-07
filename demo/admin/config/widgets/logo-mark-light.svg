@@ -1,11 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 92" role="img" aria-label="cartapel">
+<svg width="74" height="92" viewBox="0 0 74 92" xmlns="http://www.w3.org/2000/svg">
   <g fill="none" fill-rule="evenodd">
-    <path
-      d="M46 8C24 8 8 24 8 46C8 68 24 84 46 84"
-      stroke="#202020"
-      stroke-width="10"
-      stroke-linecap="round"
-    />
-    <path d="M46 46L66 46L46 66Z" fill="#B98B4D" />
+    <path d="M46 8
+             C24 8 8 24 8 46
+             C8 68 24 84 46 84"
+          stroke="#202020"
+          stroke-width="10"
+          stroke-linecap="round"/>
+    <path d="M46 46 L66 46 L46 66 Z"
+          fill="#B98B4D"/>
   </g>
 </svg>

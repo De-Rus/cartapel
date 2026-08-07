@@ -1,18 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 92" role="img" aria-label="cartapel">
+<svg width="220" height="64" viewBox="0 0 220 64" xmlns="http://www.w3.org/2000/svg">
   <g fill="none" fill-rule="evenodd">
-    <path
-      d="M46 8C24 8 8 24 8 46C8 68 24 84 46 84"
-      stroke="#202020"
-      stroke-width="10"
-      stroke-linecap="round"
-    />
-    <path d="M46 46L66 46L46 66Z" fill="#B98B4D" />
-    <text
-      x="90"
-      y="58"
-      font-family="Georgia, 'Times New Roman', Times, serif"
-      font-size="42"
-      fill="#202020"
-    >cartapel</text>
+    <!-- Icon -->
+    <path d="M46 8
+             C24 8 8 24 8 46
+             C8 68 24 84 46 84"
+          stroke="#202020"
+          stroke-width="10"
+          stroke-linecap="round"/>
+
+    <path d="M46 46 L66 46 L46 66 Z"
+          fill="#B98B4D"/>
+
+    <!-- Text -->
+    <text x="90" y="52"
+          font-family="Cormorant Garamond, Georgia, serif"
+          font-size="42"
+          fill="#202020">
+      cartapel
+    </text>
   </g>
 </svg>

@@ -34,28 +34,12 @@ const current = path === '/' ? '/' : canonicalPath.replace(/\/$/, '') || '/'
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content="https://cartapel.com/og.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&display=swap"
-      rel="stylesheet"
-    />
     <slot name="head" />
   </head>
   <body>
     <nav>
-      <a class="brand" href="/" aria-label="cartapel">
-        <svg class="brand-mark" viewBox="0 0 80 92" aria-hidden="true">
-          <path
-            d="M46 8C24 8 8 24 8 46C8 68 24 84 46 84"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="10"
-            stroke-linecap="round"
-          ></path>
-          <path d="M46 46L66 46L46 66Z" fill="#B98B4D"></path>
-        </svg>
-        <span class="brand-word">cartapel</span>
+      <a class="brand" href="/">
+        <img src="/logo.svg" width="220" height="64" alt="cartapel" />
       </a>
       <div class="links">
         <a href="/compare/" aria-current={current === '/compare' ? 'page' : undefined}>Compare</a>
@@ -66,16 +50,7 @@ const current = path === '/' ? '/' : canonicalPath.replace(/\/$/, '') || '/'
     </nav>
     <slot />
     <footer>
-      <svg class="footer-mark" viewBox="0 0 80 92" aria-hidden="true">
-        <path
-          d="M46 8C24 8 8 24 8 46C8 68 24 84 46 84"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="10"
-          stroke-linecap="round"
-        ></path>
-        <path d="M46 46L66 46L46 66Z" fill="#B98B4D"></path>
-      </svg>
+      <img src="/logo-mark.svg" width="22" height="27" alt="" />
       <span>cartapel — MIT licensed</span>
       <div class="links">
         <a href="/compare/">Compare</a>
