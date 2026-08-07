@@ -654,9 +654,18 @@ pub async fn detail_handler(
         let Some(fk_c) = child_t.column(&ri.fk_col) else {
             continue;
         };
-        let (rows, total) =
-            fetch_inline_page(&state, &user, &ri.child, child_t, fk_c, &ri.columns, inline_cap(&ri), &pk, 1)
-                .await?;
+        let (rows, total) = fetch_inline_page(
+            &state,
+            &user,
+            &ri.child,
+            child_t,
+            fk_c,
+            &ri.columns,
+            inline_cap(&ri),
+            &pk,
+            1,
+        )
+        .await?;
         inlines.push(inline_json(&ri, rows, total));
     }
     Ok(Json(json!({ "row": row, "inlines": inlines })))
