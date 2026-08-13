@@ -1111,7 +1111,11 @@ const en: Dict = {
 }
 
 export const DICTS: Record<string, Dict> = { es, en }
-const DEFAULT_LOCALE = 'es'
+// English, because it is also the fallback for a key missing from another
+// locale (below) and because a config that names no locale — every fresh
+// install, and the public demo — gets this one. It shipped as 'es', so every
+// visitor met a Spanish panel wrapped in English docs.
+const DEFAULT_LOCALE = 'en'
 
 export type TFn = (key: string, vars?: Record<string, unknown>) => string
 
