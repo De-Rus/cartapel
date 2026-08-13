@@ -7,6 +7,7 @@ import {
   interpolate,
   interpolateHref,
   isIdColumn,
+  setFormatLocale,
   truncateUuid,
 } from './format'
 
@@ -22,9 +23,22 @@ describe('isIdColumn', () => {
 })
 
 describe('fmtNumber', () => {
+  /** Both assertions used to encode a Spanish default. Naming the locale says
+   *  what is under test — grouping and decimals — instead of pinning whichever
+   *  language happens to be the fallback. */
   it('renders integers without decimals', () => {
-    expect(fmtNumber(1202218)).not.toContain(',')
+    setFormatLocale('en')
+    expect(fmtNumber(1202218)).toBe('1,202,218')
     expect(fmtNumber(3)).toBe('3')
+
+    setFormatLocale('es')
+    expect(fmtNumber(1202218)).toBe('1.202.218')
+  })
+
+  it('defaults to English when no locale is configured', () => {
+    setFormatLocale(null)
+
+    expect(fmtNumber(1202218)).toBe('1,202,218')
   })
 })
 
@@ -66,7 +80,8 @@ describe('interpolate', () => {
 describe('applyFormat', () => {
   it('formats by kind then composes prefix/suffix', () => {
     expect(applyFormat(1234.5, { format: 'currency', currency: 'EUR' })).toContain('€')
-    expect(applyFormat(12.4, { format: 'percent' })).toBe('12,4 %')
+    setFormatLocale('en')
+    expect(applyFormat(12.4, { format: 'percent' })).toBe('12.4 %')
     expect(applyFormat(1048576, { format: 'bytes' })).toMatch(/MB$/)
     expect(applyFormat(5, { format: 'number', prefix: '≈ ', suffix: ' u' })).toBe('≈ 5 u')
   })

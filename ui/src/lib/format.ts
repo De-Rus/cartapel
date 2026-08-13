@@ -2,13 +2,23 @@ import { BASE } from './base'
 
 // Formatters follow the instance locale (meta.locale); Shell calls
 // setFormatLocale once the meta arrives, before anything renders rows.
-let nf = new Intl.NumberFormat('es')
-let nf2 = new Intl.NumberFormat('es', { maximumFractionDigits: 2 })
-let nfCompact = new Intl.NumberFormat('es', { notation: 'compact', maximumFractionDigits: 1 })
-let moneyLocale = 'es'
+let nf = new Intl.NumberFormat('en')
+let nf2 = new Intl.NumberFormat('en', { maximumFractionDigits: 2 })
+let nfCompact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+let moneyLocale = 'en'
+
+/** Axis formatters live in Chart.tsx but must follow the same locale, so they
+ *  are rebuilt from here rather than built once at import. */
+const axisSubscribers: Array<(loc: string) => void> = []
+export function onFormatLocale(fn: (loc: string) => void): void {
+  axisSubscribers.push(fn)
+  fn(moneyLocale)
+}
 
 export function setFormatLocale(locale: string | null | undefined): void {
-  const loc = locale || 'es'
+  // A config that names no locale gets English, like the rest of the panel —
+  // this defaulted to 'es', so an English instance showed 1693,00 US$.
+  const loc = locale || 'en'
   if (loc === moneyLocale) return
   moneyLocale = loc
   nf = new Intl.NumberFormat(loc)
@@ -16,6 +26,7 @@ export function setFormatLocale(locale: string | null | undefined): void {
   nfCompact = new Intl.NumberFormat(loc, { notation: 'compact', maximumFractionDigits: 1 })
   dtf = new Intl.DateTimeFormat(loc, DTF_OPTS)
   df = new Intl.DateTimeFormat(loc, DF_OPTS)
+  for (const fn of axisSubscribers) fn(loc)
 }
 
 export function fmtInt(n: number): string {

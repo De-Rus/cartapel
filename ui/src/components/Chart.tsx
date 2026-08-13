@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ChartPoint, ChartSeries } from '../api/types'
-import { fmtByFormat, fmtCompact, fmtDateTime } from '../lib/format'
+import { fmtByFormat, fmtCompact, fmtDateTime, onFormatLocale } from '../lib/format'
 import { useElementWidth } from '../lib/hooks'
 import { useT } from '../lib/i18n'
 import { EmptyState } from './EmptyState'
@@ -25,8 +25,14 @@ function barPath(x: number, y: number, w: number, h: number, r: number): string 
   return `M${x},${y + h} L${x},${y + rr} Q${x},${y} ${x + rr},${y} L${x + w - rr},${y} Q${x + w},${y} ${x + w},${y + rr} L${x + w},${y + h} Z`
 }
 
-const dayFmt = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short' })
-const hourFmt = new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit' })
+// Built once at import with a hardcoded locale, these were the one place the
+// instance's language could not reach.
+let dayFmt = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' })
+let hourFmt = new Intl.DateTimeFormat('en', { hour: '2-digit', minute: '2-digit' })
+onFormatLocale((loc) => {
+  dayFmt = new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' })
+  hourFmt = new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit' })
+})
 
 export function Chart({
   kind,
