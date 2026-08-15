@@ -4,7 +4,7 @@ import { BASE } from './base'
 // setFormatLocale once the meta arrives, before anything renders rows.
 let nf = new Intl.NumberFormat('en')
 let nf2 = new Intl.NumberFormat('en', { maximumFractionDigits: 2 })
-let nfCompact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+let nf1 = new Intl.NumberFormat('en', { maximumFractionDigits: 1 })
 let moneyLocale = 'en'
 
 /** Axis formatters live in Chart.tsx but must follow the same locale, so they
@@ -23,7 +23,7 @@ export function setFormatLocale(locale: string | null | undefined): void {
   moneyLocale = loc
   nf = new Intl.NumberFormat(loc)
   nf2 = new Intl.NumberFormat(loc, { maximumFractionDigits: 2 })
-  nfCompact = new Intl.NumberFormat(loc, { notation: 'compact', maximumFractionDigits: 1 })
+  nf1 = new Intl.NumberFormat(loc, { maximumFractionDigits: 1 })
   dtf = new Intl.DateTimeFormat(loc, DTF_OPTS)
   df = new Intl.DateTimeFormat(loc, DF_OPTS)
   for (const fn of axisSubscribers) fn(loc)
@@ -46,8 +46,15 @@ export function isIdColumn(
   )
 }
 
+// K/M/B are the dashboard vernacular in every locale; Intl's compact notation
+// spells them out in the instance language ("17,9 mil", "17,9 тыс.") which
+// reads as prose, not as a metric. The locale still owns the decimal separator.
 export function fmtCompact(n: number): string {
-  return Math.abs(n) >= 10000 ? nfCompact.format(n) : nf2.format(n)
+  const abs = Math.abs(n)
+  if (abs < 10000) return nf2.format(n)
+  if (abs >= 1e9) return nf1.format(n / 1e9) + 'B'
+  if (abs >= 1e6) return nf1.format(n / 1e6) + 'M'
+  return nf1.format(n / 1e3) + 'K'
 }
 
 export function fmtMoney(n: number, currency = 'USD'): string {
