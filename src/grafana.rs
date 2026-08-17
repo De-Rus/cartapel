@@ -228,20 +228,26 @@ pub async fn rows(
     let proxy = format!("/api/datasources/proxy/uid/{}", ds.uid);
     let end = now_secs();
     let start = end.saturating_sub(q.range.as_secs());
-    let expr = percent_encoding::utf8_percent_encode(&q.expr, percent_encoding::NON_ALPHANUMERIC)
+    let step = step_for(q.range, q.step);
+    let expr = with_intervals(&q.expr, step);
+    let expr = percent_encoding::utf8_percent_encode(&expr, percent_encoding::NON_ALPHANUMERIC)
         .to_string();
     match ds.kind.as_str() {
         "prometheus" => {
             let path = if q.instant {
                 format!("{proxy}/api/v1/query?query={expr}&time={end}")
             } else {
-                let step = step_for(q.range, q.step);
                 format!(
                     "{proxy}/api/v1/query_range?query={expr}&start={start}&end={end}&step={step}"
                 )
             };
             let v = get_json(state, &src, &path, "prometheus").await?;
-            prometheus_rows(&v).map_err(AppError::bad)
+            let rows = prometheus_rows(&v).map_err(AppError::bad)?;
+            Ok(if q.instant {
+                rows
+            } else {
+                fill_grid(rows, start, end, step)
+            })
         }
         "loki" => {
             let path = if q.instant {
@@ -250,7 +256,6 @@ pub async fn rows(
                     end as u128 * 1_000_000_000
                 )
             } else {
-                let step = step_for(q.range, q.step);
                 format!(
                     "{proxy}/loki/api/v1/query_range?query={expr}&start={}&end={}&step={step}&limit={}&direction=backward",
                     start as u128 * 1_000_000_000,
@@ -259,7 +264,13 @@ pub async fn rows(
                 )
             };
             let v = get_json(state, &src, &path, "loki").await?;
-            loki_rows(&v).map_err(AppError::bad)
+            let rows = loki_rows(&v).map_err(AppError::bad)?;
+            let metric = rows.first().is_some_and(|r| r.get("__series").is_some());
+            Ok(if q.instant || !metric {
+                rows
+            } else {
+                fill_grid(rows, start, end, step)
+            })
         }
         "tempo" => {
             let path = format!(
@@ -274,6 +285,75 @@ pub async fn rows(
             q.ds
         ))),
     }
+}
+
+/// Grafana's interval tokens, so a rate window follows the resolution instead
+/// of a hard-coded `[1m]` that turns into noise at a 7-day step: `$__interval`
+/// is the step, `$__rate_interval` four times a scrape or the step plus one,
+/// whichever is larger (Grafana's own rule, with a 15s scrape assumed).
+fn with_intervals(expr: &str, step_secs: u64) -> String {
+    const SCRAPE: u64 = 15;
+    let rate = (4 * SCRAPE).max(step_secs + SCRAPE);
+    expr.replace("$__rate_interval", &format!("{rate}s"))
+        .replace("$__interval", &format!("{step_secs}s"))
+}
+
+/// Range rows on the full `start..=end` grid at `step`: every series gets one
+/// row per slot, `v` null where it had no sample. Series then line up point
+/// for point and a chart spans the window asked for, not the span the data
+/// happened to cover.
+pub fn fill_grid(rows: Vec<Value>, start: u64, end: u64, step: u64) -> Vec<Value> {
+    if rows.is_empty() || step == 0 {
+        return rows;
+    }
+    let slots: Vec<u64> = (0..=(end.saturating_sub(start)) / step)
+        .map(|k| start + k * step)
+        .collect();
+    let mut order: Vec<String> = Vec::new();
+    let mut labels: HashMap<String, Map<String, Value>> = HashMap::new();
+    let mut samples: HashMap<String, HashMap<u64, f64>> = HashMap::new();
+    for r in &rows {
+        let Some(obj) = r.as_object() else { continue };
+        let Some(t) = obj
+            .get("t")
+            .and_then(Value::as_str)
+            .and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok())
+        else {
+            continue;
+        };
+        let key = obj
+            .get("__series")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        if !labels.contains_key(&key) {
+            order.push(key.clone());
+            let mut l = obj.clone();
+            l.remove("t");
+            l.remove("v");
+            labels.insert(key.clone(), l);
+        }
+        let ts = t.timestamp().max(0) as u64;
+        let slot = start + ((ts.saturating_sub(start) + step / 2) / step) * step;
+        if let Some(v) = obj.get("v").and_then(Value::as_f64) {
+            samples.entry(key).or_default().insert(slot, v);
+        }
+    }
+    let mut out = Vec::with_capacity(order.len() * slots.len());
+    for key in order {
+        let l = labels.remove(&key).unwrap_or_default();
+        let s = samples.remove(&key).unwrap_or_default();
+        for slot in &slots {
+            let mut row = l.clone();
+            row.insert("t".into(), json!(rfc3339(*slot as f64)));
+            row.insert(
+                "v".into(),
+                s.get(slot).map(|v| json!(v)).unwrap_or(Value::Null),
+            );
+            out.push(Value::Object(row));
+        }
+    }
+    out
 }
 
 /// A series label for the chart legend: the label VALUES, joined — a legend
@@ -477,9 +557,11 @@ pub fn series_of(rows: &[Value]) -> Vec<Value> {
     let mut by: HashMap<String, Vec<Value>> = HashMap::new();
     for r in rows {
         let Some(obj) = r.as_object() else { continue };
-        let (Some(t), Some(v)) = (obj.get("t"), obj.get("v").and_then(Value::as_f64)) else {
+        let Some(t) = obj.get("t") else { continue };
+        let v = obj.get("v").cloned().unwrap_or(Value::Null);
+        if !(v.is_number() || v.is_null()) {
             continue;
-        };
+        }
         let label = obj
             .get("__series")
             .and_then(Value::as_str)
@@ -596,6 +678,43 @@ mod tests {
             .as_str()
             .unwrap()
             .starts_with("2026-08-16T"));
+    }
+
+    #[test]
+    fn a_grid_fill_lines_series_up_and_spans_the_window() {
+        let rows = vec![
+            json!({"t": rfc3339(1000.0), "v": 1.0, "__series": "a", "role": "a"}),
+            json!({"t": rfc3339(1060.0), "v": 2.0, "__series": "a", "role": "a"}),
+            json!({"t": rfc3339(1120.0), "v": 5.0, "__series": "b", "role": "b"}),
+        ];
+        let out = fill_grid(rows, 940, 1120, 60);
+        assert_eq!(out.len(), 8, "two series × four slots");
+        let a: Vec<&Value> = out.iter().filter(|r| r["__series"] == "a").collect();
+        assert_eq!(a[0]["v"], Value::Null);
+        assert_eq!(a[1]["v"], json!(1.0));
+        assert_eq!(a[3]["v"], Value::Null);
+        assert_eq!(a[3]["role"], json!("a"));
+        let b: Vec<&Value> = out.iter().filter(|r| r["__series"] == "b").collect();
+        assert_eq!(b[3]["v"], json!(5.0));
+        let series = series_of(&out);
+        assert_eq!(series[0]["points"].as_array().unwrap().len(), 4);
+        assert_eq!(series[1]["points"][0]["v"], Value::Null);
+    }
+
+    #[test]
+    fn interval_tokens_follow_the_step() {
+        assert_eq!(
+            with_intervals("rate(x[$__rate_interval])", 18),
+            "rate(x[60s])"
+        );
+        assert_eq!(
+            with_intervals("rate(x[$__rate_interval])", 3024),
+            "rate(x[3039s])"
+        );
+        assert_eq!(
+            with_intervals("increase(x[$__interval])", 300),
+            "increase(x[300s])"
+        );
     }
 
     #[test]

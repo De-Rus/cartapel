@@ -302,10 +302,11 @@ pub async fn render_panel(
                                 .get("t")
                                 .cloned()
                                 .or_else(|| obj.values().next().cloned())?;
-                            let v = obj
-                                .get("v")
-                                .and_then(|v| v.as_f64())
-                                .or_else(|| obj.values().skip(1).find_map(|v| v.as_f64()))?;
+                            let v = match obj.get("v") {
+                                Some(Value::Null) => Value::Null,
+                                Some(v) if v.is_number() => v.clone(),
+                                _ => json!(obj.values().skip(1).find_map(|v| v.as_f64())?),
+                            };
                             Some(json!({ "t": t, "v": v }))
                         })
                         .collect();

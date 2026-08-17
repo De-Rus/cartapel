@@ -63,7 +63,7 @@ export function Chart({
     if (points.length === 0 || width < 60) return null
     const iw = width - PAD.l - PAD.r
     const ih = HEIGHT - PAD.t - PAD.b
-    const allVals = lines.flatMap((s) => s.points.map((p) => p.v))
+    const allVals = lines.flatMap((s) => s.points.map((p) => p.v).filter((v): v is number => v != null))
     const yMax = niceMax(Math.max(...allVals, 0))
     const y = (v: number) => PAD.t + ih - (v / yMax) * ih
     const n = points.length
@@ -89,14 +89,15 @@ export function Chart({
     )
   }
 
-  if (!multi && points.length === 1) {
+  const present = points.filter((p) => p.v != null)
+  if (!multi && present.length === 1) {
     return (
       <div className="flex h-[190px] flex-col items-center justify-center gap-1">
         <div className="text-[34px] font-semibold leading-none tabular-nums text-ink">
-          {fmtByFormat(points[0].v, format)}
+          {fmtByFormat(present[0].v ?? 0, format)}
         </div>
         <div className="text-xxs text-muted">
-          {isTime ? fmtDateTime(points[0].t) : points[0].t}
+          {isTime ? fmtDateTime(present[0].t) : present[0].t}
         </div>
       </div>
     )
@@ -104,10 +105,20 @@ export function Chart({
 
   const baseline = HEIGHT - PAD.b
 
-  const linePathFor = (s: ChartSeries) =>
-    model
-      ? s.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${model.x(i).toFixed(1)},${model.y(p.v).toFixed(1)}`).join(' ')
-      : ''
+  const linePathFor = (s: ChartSeries) => {
+    if (!model) return ''
+    let d = ''
+    let pen = false
+    s.points.forEach((p, i) => {
+      if (p.v == null) {
+        pen = false
+        return
+      }
+      d += `${pen ? 'L' : 'M'}${model.x(i).toFixed(1)},${model.y(p.v).toFixed(1)} `
+      pen = true
+    })
+    return d.trim()
+  }
 
   return (
     <div ref={wrapRef} className="relative">
@@ -183,6 +194,7 @@ export function Chart({
             ))}
           {kind === 'bar' &&
             points.map((p, i) => {
+              if (p.v == null) return null
               const bw = Math.min(MAX_BAR, Math.max(3, model.band - 8))
               const h = Math.max(0, baseline - model.y(p.v))
               return (
@@ -239,7 +251,7 @@ export function Chart({
           className="chart-tip card px-2.5 py-1.5 text-xs shadow-pop"
           style={{
             left: Math.min(Math.max(model.x(hover), 60), width - 60),
-            top: kind === 'bar' ? model.y(points[hover].v) : model.y(lines[0].points[hover]?.v ?? 0),
+            top: kind === 'bar' ? model.y(points[hover].v ?? 0) : model.y(lines[0].points[hover]?.v ?? 0),
           }}
         >
           {multi ? (
@@ -248,7 +260,7 @@ export function Chart({
                 <div key={si} className="flex items-center gap-1.5 tabular-nums text-ink">
                   <span className="h-2 w-2 rounded-full" style={{ background: `var(${RAMP[si % RAMP.length]})` }} />
                   <span className="text-muted">{s.label}</span>
-                  <span className="ml-auto font-medium">{fmtByFormat(s.points[hover]?.v ?? 0, format)}</span>
+                  <span className="ml-auto font-medium">{s.points[hover]?.v == null ? '—' : fmtByFormat(s.points[hover].v, format)}</span>
                 </div>
               ))}
               <div className="mt-0.5 tabular-nums text-muted">
@@ -257,7 +269,7 @@ export function Chart({
             </>
           ) : (
             <>
-              <div className="font-medium tabular-nums text-ink">{fmtByFormat(points[hover].v, format)}</div>
+              <div className="font-medium tabular-nums text-ink">{points[hover].v == null ? '—' : fmtByFormat(points[hover].v, format)}</div>
               <div className="tabular-nums text-muted">
                 {isTime ? fmtDateTime(points[hover].t) : points[hover].t}
               </div>

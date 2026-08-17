@@ -339,7 +339,8 @@ export interface StatWidget extends WidgetSpan {
 
 export interface ChartPoint {
   t: string
-  v: number
+  /** null = the series had no sample at this slot (a gap, not a zero). */
+  v: number | null
 }
 
 export interface ChartSeries {

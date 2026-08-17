@@ -348,6 +348,14 @@ draws one line per series over `range` at `step` (about 200 points unless
 you say otherwise, never finer than 15s); a Loki log query gives `t`, `line`,
 the stream labels, and `message` when the line is JSON carrying one; a Tempo
 search gives `trace_id`, `service`, `name`, `started_at`, `duration_ms`.
+A range query answers on the full window: every series is laid on the same
+`range`/`step` grid, a slot without a sample is a gap (not a zero), so a chart
+spans what was asked for even when the metric only existed for part of it, and
+its series line up point for point. Grafana's `$__interval` (the step) and
+`$__rate_interval` (a rate window that grows with the step) substitute inside
+`expr`, so `rate(x[$__rate_interval])` reads sensibly at 15 minutes and at 7
+days alike.
+
 `{{variable}}` substitutes inside `expr` — and inside `range` and `step` — like
 everywhere else, and `max` caps log lines and traces. That is how a page gets a
 Grafana-style time picker: declare a `window` variable with the ranges you want

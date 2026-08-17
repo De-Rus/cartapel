@@ -844,11 +844,13 @@ export function PageDashboard() {
   const meta = useMeta()
   const vq = useVarQuery()
   const known = meta.pages?.some((p) => p.id === id)
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isPlaceholderData } = useQuery({
     queryKey: ['page-widgets', id, vq],
     queryFn: () => api.pageWidgets(id, vq),
     enabled: known,
-    placeholderData: (prev) => prev,
+    // A variable change keeps the page in place while it re-queries; another
+    // page's data is never shown under this page's title.
+    placeholderData: (prev, prevQuery) => (prevQuery?.queryKey[1] === id ? prev : undefined),
     ...livePolling,
   })
 
@@ -862,7 +864,9 @@ export function PageDashboard() {
           <VarBar only={data?.variables} />
         </div>
       )}
-      <DashboardView widgets={data?.widgets ?? []} columns={data?.columns ?? DEFAULT_COLS} />
+      <div className={clsx('transition-opacity', isPlaceholderData && 'opacity-50')}>
+        <DashboardView widgets={data?.widgets ?? []} columns={data?.columns ?? DEFAULT_COLS} />
+      </div>
     </div>
   )
 }
