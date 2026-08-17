@@ -64,6 +64,12 @@ Panel-level `roles` filter individual panels; the page-level `roles` gates the
 whole page. Template variables work in panel SQL exactly as they do on the
 dashboard.
 
+Pages sit in the sidebar under their group's heading, groups in the order the
+`_group.hcl` `order` says, and within a group in the page's own `order` (lower
+first, ties by label; unset = 0, so an ordered page precedes the alphabetical
+rest only if you give it a negative number or give the others positive ones).
+That is how a group reads top-down — "is anything wrong?" before the detail.
+
 Each panel reads from one origin — inline `sql`, a named `query`, a configured
 `table`, or a `source` (an HTTP endpoint, a directory or a bucket). See
 [where a panel reads from](/configuration/dashboard#where-a-panel-reads-from).

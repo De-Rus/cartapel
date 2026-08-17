@@ -187,6 +187,11 @@ pub struct PageConfig {
     pub label: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// Position among the pages of its group (lower first; ties by label).
+    /// Without it pages sit alphabetically — fine for a list, wrong for a
+    /// "read this first" order.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub order: Option<i64>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub roles: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -242,6 +247,7 @@ pub struct LoadedPage {
     pub slug: String,
     pub group: Option<String>,
     pub label: String,
+    pub order: i64,
     pub columns: Option<u8>,
     pub refresh: Option<String>,
     pub widgets: Vec<PanelConfig>,
@@ -1795,6 +1801,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                     slug,
                     group,
                     label: p.label,
+                    order: p.order.unwrap_or(0),
                     columns: p.columns,
                     refresh: p.refresh,
                     widgets: p.widgets,
@@ -1848,6 +1855,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                         slug,
                         group,
                         label: p.label,
+                        order: p.order.unwrap_or(0),
                         columns: p.columns,
                         refresh: p.refresh,
                         widgets: p.widgets,
@@ -1930,6 +1938,20 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
     }
     cfg.groups
         .sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.label.cmp(&b.label)));
+    // Pages follow their group's `order`, then their own — the sidebar lists
+    // them in this sequence, so a group can say "read this first".
+    let group_rank: BTreeMap<String, (i64, String)> = cfg
+        .groups
+        .iter()
+        .map(|g| (g.slug.clone(), (g.order, g.label.clone())))
+        .collect();
+    cfg.pages.sort_by(|a, b| {
+        let ra = a.group.as_ref().and_then(|g| group_rank.get(g));
+        let rb = b.group.as_ref().and_then(|g| group_rank.get(g));
+        ra.cmp(&rb)
+            .then(a.order.cmp(&b.order))
+            .then_with(|| a.label.cmp(&b.label))
+    });
     // A table/query pinned to a source must name a real, postgres one — otherwise
     // resolution silently falls back to the primary and reads the wrong database.
     for (table, tc) in &cfg.tables {
@@ -2940,6 +2962,51 @@ panel {
 
     /// `page.hcl` slug = its folder name; group = the ENCLOSING folder iff that
     /// folder is a group (has `_group.hcl`), else the page is ungrouped.
+    #[test]
+    fn pages_follow_their_group_order_then_their_own() {
+        let root = std::env::temp_dir().join(format!("cartapel-page-order-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let page = |label: &str, order: Option<i64>| {
+            let o = order.map(|o| format!("order = {o}\n")).unwrap_or_default();
+            format!("label = \"{label}\"\n{o}panel {{\n  type = \"stat\"\n  label = \"X\"\n  sql = \"SELECT 1 AS v\"\n}}\n")
+        };
+        for (g, order) in [("zeta", 0), ("alpha", 1)] {
+            std::fs::create_dir_all(root.join(g)).unwrap();
+            std::fs::write(
+                root.join(g).join("_group.hcl"),
+                format!("label = \"{g}\"\norder = {order}\n"),
+            )
+            .unwrap();
+        }
+        std::fs::create_dir_all(root.join("zeta").join("b")).unwrap();
+        std::fs::write(
+            root.join("zeta").join("b").join("page.hcl"),
+            page("Second", Some(1)),
+        )
+        .unwrap();
+        std::fs::create_dir_all(root.join("zeta").join("c")).unwrap();
+        std::fs::write(
+            root.join("zeta").join("c").join("page.hcl"),
+            page("First", Some(0)),
+        )
+        .unwrap();
+        std::fs::create_dir_all(root.join("alpha").join("a")).unwrap();
+        std::fs::write(
+            root.join("alpha").join("a").join("page.hcl"),
+            page("Later group", None),
+        )
+        .unwrap();
+
+        let cfg = load(Some(&root)).expect("temp admin loads");
+        let labels: Vec<&str> = cfg.pages.iter().map(|p| p.label.as_str()).collect();
+        assert_eq!(
+            labels,
+            ["First", "Second", "Later group"],
+            "group order beats folder name, page order beats label"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[test]
     fn page_slug_and_group_are_folder_derived() {
         let root = std::env::temp_dir().join(format!("cartapel-page-test-{}", std::process::id()));

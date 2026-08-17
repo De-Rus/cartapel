@@ -882,6 +882,7 @@ mod nav_tests {
             slug: "fleet".into(),
             group: Some("overview".into()),
             label: "Fleet".into(),
+            order: 0,
             columns: Some(4),
             refresh: None,
             widgets: vec![],
