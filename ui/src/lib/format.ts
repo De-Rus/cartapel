@@ -52,6 +52,7 @@ export function isIdColumn(
 /** Axis ticks: short above a thousand, so a label never outgrows its gutter. */
 export function fmtTick(n: number): string {
   const abs = Math.abs(n)
+  if (abs > 0 && abs < 0.01) return n.toPrecision(2)
   if (abs < 1000) return nf2.format(n)
   if (abs >= 1e9) return nf1.format(n / 1e9) + 'B'
   if (abs >= 1e6) return nf1.format(n / 1e6) + 'M'
