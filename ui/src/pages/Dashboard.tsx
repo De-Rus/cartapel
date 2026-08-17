@@ -856,8 +856,12 @@ export function PageDashboard() {
   if (isLoading) return <LoadingGrid />
   return (
     <div className="space-y-4">
-      {data?.label && <h1 className="text-lg font-semibold text-ink">{data.label}</h1>}
-      <VarBar only={data?.variables} />
+      {(data?.label || (data?.variables?.length ?? 0) > 0) && (
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          {data?.label ? <h1 className="text-lg font-semibold text-ink">{data.label}</h1> : <span />}
+          <VarBar only={data?.variables} />
+        </div>
+      )}
       <DashboardView widgets={data?.widgets ?? []} columns={data?.columns ?? DEFAULT_COLS} />
     </div>
   )

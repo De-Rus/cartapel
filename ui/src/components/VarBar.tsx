@@ -33,7 +33,7 @@ export function VarBar({ only }: { only?: string[] }) {
     )
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center justify-end gap-3">
       {vars.map((d) => {
         const value = sp.get(`v_${d.name}`) ?? d.default ?? d.options[0]?.value ?? ''
         return (
