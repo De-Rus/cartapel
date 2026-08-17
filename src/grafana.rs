@@ -278,7 +278,8 @@ pub async fn rows(
 
 /// A series label for the chart legend: the label VALUES, joined — a legend
 /// reads `history · ok`, not `intent=history,result=ok` — falling back to the
-/// metric name, then to `value`.
+/// metric name, then to `other` (a legend only shows with several series, and
+/// the unlabelled one is whatever the grouping could not name).
 fn series_label(metric: &Map<String, Value>) -> String {
     let values: Vec<&str> = metric
         .iter()
@@ -292,7 +293,7 @@ fn series_label(metric: &Map<String, Value>) -> String {
         .get("__name__")
         .and_then(Value::as_str)
         .filter(|n| !n.is_empty())
-        .unwrap_or("value")
+        .unwrap_or("other")
         .to_string()
 }
 
@@ -605,6 +606,6 @@ mod tests {
         m.insert("intent".into(), json!("history"));
         m.insert("result".into(), json!("ok"));
         assert_eq!(series_label(&m), "history · ok");
-        assert_eq!(series_label(&Map::new()), "value");
+        assert_eq!(series_label(&Map::new()), "other");
     }
 }

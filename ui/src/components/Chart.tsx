@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ChartPoint, ChartSeries } from '../api/types'
-import { fmtByFormat, fmtCompact, fmtDateTime, onFormatLocale } from '../lib/format'
+import { fmtByFormat, fmtDateTime, fmtTick, onFormatLocale } from '../lib/format'
 import { useElementWidth } from '../lib/hooks'
 import { useT } from '../lib/i18n'
 import { EmptyState } from './EmptyState'
@@ -145,7 +145,7 @@ export function Chart({
                 fill="var(--muted)"
                 style={{ fontVariantNumeric: 'tabular-nums' }}
               >
-                {fmtCompact(v)}
+                {fmtTick(v)}
               </text>
             </g>
           ))}

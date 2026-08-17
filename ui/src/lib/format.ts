@@ -49,6 +49,15 @@ export function isIdColumn(
 // K/M/B are the dashboard vernacular in every locale; Intl's compact notation
 // spells them out in the instance language ("17,9 mil", "17,9 тыс.") which
 // reads as prose, not as a metric. The locale still owns the decimal separator.
+/** Axis ticks: short above a thousand, so a label never outgrows its gutter. */
+export function fmtTick(n: number): string {
+  const abs = Math.abs(n)
+  if (abs < 1000) return nf2.format(n)
+  if (abs >= 1e9) return nf1.format(n / 1e9) + 'B'
+  if (abs >= 1e6) return nf1.format(n / 1e6) + 'M'
+  return nf1.format(n / 1e3) + 'K'
+}
+
 export function fmtCompact(n: number): string {
   const abs = Math.abs(n)
   if (abs < 10000) return nf2.format(n)
