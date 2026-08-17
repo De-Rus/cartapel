@@ -198,6 +198,16 @@ function DeclaredCell({ col, value, frac }: { col: TableColumn; value: unknown; 
     )
   }
 
+  if (col.wrap) {
+    return (
+      <span
+        className="block whitespace-pre-wrap break-words leading-snug"
+        style={col.max ? { maxWidth: col.max } : undefined}
+      >
+        {text}
+      </span>
+    )
+  }
   if (col.max) {
     return (
       <span
@@ -210,6 +220,27 @@ function DeclaredCell({ col, value, frac }: { col: TableColumn; value: unknown; 
     )
   }
   return <>{text}</>
+}
+
+/** Every field of one row, in full — what the columns left out. */
+function ExpandedRow({ row, span }: { row: Row; span: number }) {
+  const entries = Object.entries(row).filter(([k]) => k !== '__series')
+  return (
+    <tr className="border-t bg-surface-2/40">
+      <td colSpan={span} className="px-3 py-2">
+        <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-[12.5px]">
+          {entries.map(([k, v]) => (
+            <div key={k} className="contents">
+              <dt className="text-xxs font-medium uppercase tracking-wide text-muted pt-0.5">{k}</dt>
+              <dd className="whitespace-pre-wrap break-all font-mono text-[12px] leading-snug">
+                {v == null ? '—' : typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </td>
+    </tr>
+  )
 }
 
 function DeclaredTable({ w }: { w: QueryTableWidget }) {
@@ -227,6 +258,7 @@ function DeclaredTable({ w }: { w: QueryTableWidget }) {
     return m
   }, [cols, w.rows])
 
+  const [open, setOpen] = useState<number | null>(null)
   const fracOf = (c: TableColumn, v: unknown): number | null => {
     const s = scales[c.key]
     if (!s) return null
@@ -262,8 +294,14 @@ function DeclaredTable({ w }: { w: QueryTableWidget }) {
           )}
           {paged.slice.map((row: Row, i) => {
             const href = rowHref(w, row)
-            return (
-              <tr key={i} className={clsx('border-t', href && 'cursor-pointer hover:bg-hover')}>
+            const expandable = !href && !!w.expand
+            const isOpen = expandable && open === i
+            return [
+              <tr
+                key={i}
+                className={clsx('border-t', (href || expandable) && 'cursor-pointer hover:bg-hover', isOpen && 'bg-hover')}
+                onClick={expandable ? () => setOpen(isOpen ? null : i) : undefined}
+              >
                 {cols.map((c) => {
                   const frac = c.display ? fracOf(c, row[c.key]) : null
                   const cell = <DeclaredCell col={c} value={row[c.key]} frac={frac} />
@@ -277,14 +315,15 @@ function DeclaredTable({ w }: { w: QueryTableWidget }) {
                   return (
                     <td
                       key={c.key}
-                      className={clsx('h-9 px-2', c.align === 'r' && 'text-right tabular-nums')}
+                      className={clsx('h-9 px-2', c.align === 'r' && 'text-right tabular-nums', c.wrap && 'py-1.5 align-top')}
                     >
                       {inner}
                     </td>
                   )
                 })}
-              </tr>
-            )
+              </tr>,
+              isOpen ? <ExpandedRow key={`${i}-x`} row={row} span={cols.length} /> : null,
+            ]
           })}
         </tbody>
       </table>

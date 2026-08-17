@@ -194,7 +194,8 @@ pub struct PageConfig {
     /// Re-run this page's panels on a clock, e.g. `refresh = "30s"`. Accepts
     /// `30s` / `5m` / a bare number of seconds; anything under the floor is
     /// raised to it, because a dashboard is not a tick feed and every poll
-    /// re-runs every panel's SQL.
+    /// re-runs every panel's SQL. May be a `{{variable}}` (`off` = no clock),
+    /// so the reader picks the cadence from the page's variable bar.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refresh: Option<String>,
     #[serde(
@@ -1336,6 +1337,11 @@ pub struct PanelConfig {
     /// Show a search box over the rows the panel carries.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub search: bool,
+    /// Clicking a row opens it: every field of the row, in full, beneath it —
+    /// the columns show what to scan, the row holds the rest (a raw log line,
+    /// a stack, an id). Table panels without a `link` only.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub expand: bool,
     /// Columns the panel offers as dropdown filters, e.g. `filter_by = ["source"]`.
     /// The choices are the values actually present in the rows, so no list is
     /// configured and none can go stale. Unlike a `variable`, the control belongs
@@ -1413,6 +1419,10 @@ pub struct PanelField {
     /// orange / blue / violet.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tone: Option<String>,
+    /// Let a long text wrap onto several lines instead of clipping it — a log
+    /// line or an error wants reading, not an ellipsis.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub wrap: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, serde::Serialize)]
@@ -1570,7 +1580,7 @@ pub(crate) fn validate_panel_fields(widgets: &[PanelConfig]) -> Result<(), Strin
             ));
         }
         for (what, val) in [("range", &w.range), ("step", &w.step)] {
-            if let Some(v) = val {
+            if let Some(v) = val.as_deref().filter(|v| !v.contains("{{")) {
                 crate::grafana::parse_duration(v)
                     .map_err(|e| format!("panel \"{}\": {what}: {e}", w.label))?;
             }
@@ -2696,6 +2706,30 @@ panel {
             .is_err(),
             "write_to without name_col (target filename column) is a load error"
         );
+    }
+
+    #[test]
+    fn a_table_can_wrap_a_field_and_expand_its_rows() {
+        let hcl = r#"
+panel {
+  type   = "table"
+  label  = "Lines"
+  source = "grafana"
+  ds     = "loki"
+  expr   = "{level=\"error\"}"
+  range  = "{{window}}"
+  expand = true
+  field {
+    key  = "message"
+    wrap = true
+  }
+}
+"#;
+        let dash: DashboardConfig = hcl::from_str(hcl).unwrap();
+        let w = &dash.widgets[0];
+        assert!(w.expand);
+        assert!(w.columns[0].wrap);
+        validate_panel_fields(&dash.widgets).expect("a templated range is not parsed at load");
     }
 
     #[test]

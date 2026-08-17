@@ -27,19 +27,31 @@ async fn read_only_rows_on(
 
 /// The variable names a set of panels actually reads. A control that changes
 /// nothing on the page you are looking at is worse than no control.
-fn referenced_vars(panels: &[crate::config::PanelConfig]) -> Vec<String> {
+fn referenced_vars(
+    panels: &[crate::config::PanelConfig],
+    page_refresh: Option<&str>,
+) -> Vec<String> {
     let mut out = std::collections::BTreeSet::new();
-    for w in panels {
-        let texts = w
-            .sql
+    let per_panel = panels.iter().map(|w| {
+        w.sql
             .iter()
             .chain(w.compare_sql.iter())
             .chain(w.spark.iter())
             .chain(w.expr.iter())
+            .chain(w.range.iter())
+            .chain(w.step.iter())
             .chain(w.filter.values())
             .cloned()
             .chain(w.query.clone())
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+    });
+    let page = std::iter::once(
+        page_refresh
+            .map(str::to_string)
+            .into_iter()
+            .collect::<Vec<_>>(),
+    );
+    for texts in per_panel.chain(page) {
         for t in texts {
             let mut rest = t.as_str();
             while let Some(open) = rest.find("{{") {
@@ -146,13 +158,13 @@ fn grafana_query(
     env: &crate::vars::Resolved,
 ) -> Result<crate::grafana::Query, String> {
     let range = match &w.range {
-        Some(r) => crate::grafana::parse_duration(r)?,
+        Some(r) => crate::grafana::parse_duration(&crate::interp::substitute(r, &env.values))?,
         None => crate::grafana::default_range(),
     };
     let step = w
         .step
         .as_deref()
-        .map(crate::grafana::parse_duration)
+        .map(|s| crate::grafana::parse_duration(&crate::interp::substitute(s, &env.values)))
         .transpose()?;
     Ok(crate::grafana::Query {
         ds: w.ds.clone().ok_or("grafana panel has no ds")?,
@@ -361,6 +373,7 @@ pub async fn render_panel(
                                     "align": c.align, "max": c.max,
                                     "badge": (!c.badge.is_empty()).then(|| c.badge.clone()),
                                     "display": c.display, "tone": c.tone,
+                                    "wrap": c.wrap,
                                 })
                             })
                             .collect::<Vec<_>>()
@@ -368,7 +381,7 @@ pub async fn render_panel(
                     json!({
                         "id": id, "type": "table", "label": w.label,
                         "link": w.link, "columns": columns, "cols": cols, "rows": rows, "pk": pk,
-                        "pp": w.pp, "search": w.search,
+                        "pp": w.pp, "search": w.search, "expand": w.expand,
                         "filter_by": (!w.filter_by.is_empty()).then(|| w.filter_by.clone()),
                         "total": truncated.then_some(total),
                     })
@@ -434,8 +447,8 @@ pub async fn dashboard_handler(
     Ok(Json(json!({
         "widgets": widgets,
         "columns": cfg.dashboard.columns,
-        "refresh_secs": crate::config::refresh_secs(cfg.dashboard.refresh.as_deref()),
-        "variables": referenced_vars(&cfg.dashboard.widgets),
+        "refresh_secs": crate::config::refresh_secs(cfg.dashboard.refresh.as_deref().map(|r| crate::interp::substitute(r, &env.values)).as_deref()),
+        "variables": referenced_vars(&cfg.dashboard.widgets, cfg.dashboard.refresh.as_deref()),
     })))
 }
 
@@ -458,8 +471,8 @@ pub async fn page_widgets_handler(
     let widgets = render_panels(&state, &page.widgets, &user, &env).await;
     Ok(Json(json!({
         "label": page.label, "widgets": widgets, "columns": page.columns,
-        "refresh_secs": crate::config::refresh_secs(page.refresh.as_deref()),
-        "variables": referenced_vars(&page.widgets),
+        "refresh_secs": crate::config::refresh_secs(page.refresh.as_deref().map(|r| crate::interp::substitute(r, &env.values)).as_deref()),
+        "variables": referenced_vars(&page.widgets, page.refresh.as_deref()),
     })))
 }
 

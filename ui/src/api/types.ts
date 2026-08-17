@@ -369,6 +369,8 @@ export interface TableColumn {
    *  visible rows. */
   display?: 'bar' | 'heat' | null
   tone?: 'accent' | 'green' | 'red' | 'orange' | 'blue' | 'violet' | null
+  /** Long text wraps onto several lines instead of clipping. */
+  wrap?: boolean | null
 }
 
 /** A table panel is either query-backed (it carries its rows) or screen-backed
@@ -386,6 +388,8 @@ export interface QueryTableWidget extends WidgetSpan {
   pp?: number | null
   /** Show a search box that filters the rows the panel carries. */
   search?: boolean | null
+  /** Clicking a row opens every field of it, in full, beneath the row. */
+  expand?: boolean | null
   /** Columns offered as dropdowns; the choices come from the rows themselves. */
   filter_by?: string[] | null
   /** Set when the panel shows only part of a larger result. */

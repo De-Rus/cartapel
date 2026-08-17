@@ -141,7 +141,8 @@ panel {
 `bytes`/`duration`/`date`/`datetime`/`rel`, plus the aliases `currency`/`pct`/
 `num`/`dur` — validated at load), `align`, `max`, `badge` (value → tone map),
 `display` (`bar` | `heat`), `tone` (hue for badge-less dataviz: `accent`
-default, or `green`/`red`/`orange`/`blue`/`violet`).
+default, or `green`/`red`/`orange`/`blue`/`violet`), `wrap` (`true` lets a long
+text run onto several lines instead of clipping — a log line, an error).
 
 ### `iframe` — an embedded view
 
@@ -310,9 +311,18 @@ panel {                                  # LogQL — log lines, newest first
   expr   = "{level=\"error\"}"
   range  = "1h"
   max    = 100
-  field { key = "t" label = "when" format = "datetime" }
-  field { key = "node" }
-  field { key = "message" }
+  field {
+    key    = "t"
+    label  = "when"
+    format = "datetime"
+  }
+  field {
+    key = "node"
+  }
+  field {
+    key  = "message"
+    wrap = true
+  }
 }
 
 panel {                                  # TraceQL — one row per trace
@@ -323,7 +333,12 @@ panel {                                  # TraceQL — one row per trace
   expr   = "{ name = \"backtest_job\" && duration > 5s }"
   range  = "24h"
   max    = 20
-  field { key = "duration_ms" format = "number" align = "r" display = "bar" }
+  field {
+    key     = "duration_ms"
+    format  = "number"
+    align   = "r"
+    display = "bar"
+  }
 }
 ```
 
@@ -333,8 +348,17 @@ draws one line per series over `range` at `step` (about 200 points unless
 you say otherwise, never finer than 15s); a Loki log query gives `t`, `line`,
 the stream labels, and `message` when the line is JSON carrying one; a Tempo
 search gives `trace_id`, `service`, `name`, `started_at`, `duration_ms`.
-`{{variable}}` substitutes inside `expr` like everywhere else, and `max` caps
-log lines and traces.
+`{{variable}}` substitutes inside `expr` — and inside `range` and `step` — like
+everywhere else, and `max` caps log lines and traces. That is how a page gets a
+Grafana-style time picker: declare a `window` variable with the ranges you want
+and write `range = "{{window}}"` on the panels; the variable bar shows the
+choices, the URL carries the pick. A page's `refresh` may be a variable too
+(`refresh = "{{refresh}}"`, with `off` among the options for "no clock").
+
+For log lines and anything else that wants reading rather than scanning, a
+`field { wrap = true }` lets the text run onto several lines, and `expand = true`
+on the panel opens a clicked row beneath itself with every field of it in full —
+the raw line, the labels the columns left out.
 
 ### Aggregating and filtering a listing
 
@@ -407,7 +431,9 @@ files and declare it as a database source instead.
 | `max` / `pp` | table | Rows carried, and rows per page inside the panel. |
 | `search` | table | Adds a search box that filters the rows the panel carries. |
 | `filter_by` | table | Columns offered as dropdowns on the panel; the options come from the rows themselves. |
+| `expand` | table | A clicked row opens beneath itself with every field of it in full (panels without `link`). |
 | `link` | table | Target table for row links. |
+| `source` / `ds` / `expr` / `range` / `step` | stat, chart, table | A Grafana datasource query — see [Metrics, logs and traces through Grafana](#metrics-logs-and-traces-through-grafana). |
 | `url` | iframe | The embedded URL. |
 
 ## Template variables
