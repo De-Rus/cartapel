@@ -208,7 +208,7 @@ save you from repeating yourself or reach data that is not in the database.
 | --- | --- |
 | `sql` | Inline read-only SQL. |
 | `query` | The name of a `query { }` block — it carries its own `source`, so one query can feed several panels. |
-| `source` | An `http` source alias: cartapel fetches it server-side (the secret never reaches the browser) and renders the JSON array it returns. Pair with `path` for a sub-path and `rows_at` for a dotted path to the array inside the payload. |
+| `source` | An `http` source alias: cartapel fetches it server-side (the secret never reaches the browser) and renders the JSON array it returns. Pair with `path` for a sub-path and `rows_at` for a dotted path to the array inside the payload. Or a `grafana` source alias — then the panel names a `ds` and an `expr` (below). |
 | `table` | A configured table slug: the panel renders **that screen's own list** — its columns, widgets, formats and permissions — instead of raw query rows. `sort` and `pp` tune it. |
 
 On a table panel, `max` is how many rows travel to the browser (50 by default,
@@ -261,6 +261,80 @@ panel {
 
 A `sql` panel may also carry `source` to run against a secondary database
 rather than the primary one.
+
+### Metrics, logs and traces through Grafana
+
+A `grafana` source turns any Grafana datasource — Prometheus, Loki, Tempo —
+into panel rows, so an operations page mixes database numbers with metrics and
+log lines and never opens Grafana's own UI. Cartapel asks through Grafana's
+datasource proxy with one service-account token; it never learns where the
+backends live, and the browser never sees the token.
+
+```hcl
+source "grafana" {
+  type      = "grafana"
+  url       = "http://grafana:3000"       # inside your network, or the public host
+  token_env = "GRAFANA_TOKEN"            # a service account token, Viewer is enough
+}
+```
+
+A panel then names the datasource (`ds`, by Grafana name or uid) and an `expr`
+in that datasource's language:
+
+```hcl
+panel {                                  # PromQL — a stat reads the value now
+  type      = "stat"
+  label     = "Bots active"
+  source    = "grafana"
+  ds        = "prometheus"
+  expr      = "sum(bots_active)"
+  spark     = "sum(bots_active)"          # a second expr, drawn over `range`
+  range     = "6h"
+}
+
+panel {                                  # PromQL over time — one line per series
+  type   = "chart"
+  label  = "Errors / 5m by container"
+  source = "grafana"
+  ds     = "loki"
+  expr   = "sum by (container) (count_over_time({level=\"error\"}[5m]))"
+  range  = "6h"
+  step   = "5m"
+}
+
+panel {                                  # LogQL — log lines, newest first
+  type   = "table"
+  label  = "Errors — last hour"
+  source = "grafana"
+  ds     = "loki"
+  expr   = "{level=\"error\"}"
+  range  = "1h"
+  max    = 100
+  field { key = "t" label = "when" format = "datetime" }
+  field { key = "node" }
+  field { key = "message" }
+}
+
+panel {                                  # TraceQL — one row per trace
+  type   = "table"
+  label  = "Slow backtests"
+  source = "grafana"
+  ds     = "tempo"
+  expr   = "{ name = \"backtest_job\" && duration > 5s }"
+  range  = "24h"
+  max    = 20
+  field { key = "duration_ms" format = "number" align = "r" display = "bar" }
+}
+```
+
+What comes back, by datasource: a Prometheus (or Loki metric) query gives
+`v` plus the series labels as columns — a stat takes the first value, a chart
+draws one line per series over `range` at `step` (about 200 points unless
+you say otherwise, never finer than 15s); a Loki log query gives `t`, `line`,
+the stream labels, and `message` when the line is JSON carrying one; a Tempo
+search gives `trace_id`, `service`, `name`, `started_at`, `duration_ms`.
+`{{variable}}` substitutes inside `expr` like everywhere else, and `max` caps
+log lines and traces.
 
 ### Aggregating and filtering a listing
 

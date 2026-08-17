@@ -9,6 +9,7 @@ mod dashboard;
 mod db;
 mod files;
 mod globaledit;
+mod grafana;
 mod groupsedit;
 mod images;
 mod interp;

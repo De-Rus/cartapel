@@ -330,7 +330,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "cartapel"
-version = "0.9.20"
+version = "0.9.21"
 dependencies = [
  "arc-swap",
  "argon2",
@@ -347,6 +347,7 @@ dependencies = [
  "image",
  "mime_guess",
  "notify",
+ "percent-encoding",
  "rand 0.8.7",
  "reqwest",
  "rusqlite",

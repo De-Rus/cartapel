@@ -410,6 +410,13 @@ pub struct VariablesFile {
 
 /// A named external data source.
 ///
+/// `type = "grafana"`: `url` is a Grafana instance and `token_env` names the
+/// env var holding a service-account token (Viewer is enough). A panel then
+/// names a Grafana datasource (`ds`, by name or uid) and an `expr` in that
+/// datasource's language — PromQL, LogQL or TraceQL — and cartapel asks
+/// through Grafana's datasource proxy, so one token reaches every backend and
+/// the browser never sees Grafana at all. See [`crate::grafana`].
+///
 /// `type = "http"`: cartapel proxies a server-side GET to `url` (optionally
 /// `url/<rest>`), attaching a secret read from `token_env` under `header`
 /// (default `x-admin-token`). The secret never reaches the browser.
@@ -487,6 +494,10 @@ impl NamedSource {
 
     pub fn is_s3(&self) -> bool {
         self.kind == "s3"
+    }
+
+    pub fn is_grafana(&self) -> bool {
+        self.kind == "grafana"
     }
 
     /// Sources that produce rows from a key pattern rather than from SQL.
@@ -1275,11 +1286,23 @@ pub struct PanelConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sql: Option<String>,
     /// A panel reads from exactly one origin: inline `sql`, a named `query`,
-    /// an http `source`, or a configured `table`.
+    /// an http/grafana `source`, or a configured `table`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub query: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
+    /// Grafana sources: the datasource (name or uid) and the query in its own
+    /// language (PromQL/LogQL/TraceQL). A stat asks for the value now; a chart
+    /// or table asks over `range` (default `1h`) at `step` (default ~200
+    /// points), and `spark` on a stat is a second expr drawn over `range`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ds: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expr: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step: Option<String>,
     /// Sub-path appended to the source's url, and where its rows live in the
     /// response (a dotted path; omit when the payload is the array itself).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1540,6 +1563,18 @@ fn validate_table_config(tc: &TableConfig) -> Result<(), String> {
 /// must be in the column-format vocab.
 pub(crate) fn validate_panel_fields(widgets: &[PanelConfig]) -> Result<(), String> {
     for w in widgets {
+        if w.expr.is_some() && (w.ds.is_none() || w.source.is_none()) {
+            return Err(format!(
+                "panel \"{}\": `expr` needs a grafana `source` and a `ds` (datasource name or uid)",
+                w.label
+            ));
+        }
+        for (what, val) in [("range", &w.range), ("step", &w.step)] {
+            if let Some(v) = val {
+                crate::grafana::parse_duration(v)
+                    .map_err(|e| format!("panel \"{}\": {what}: {e}", w.label))?;
+            }
+        }
         if let Some(fmt) = &w.format {
             if !PANEL_FORMAT_VOCAB.contains(&fmt.as_str()) {
                 return Err(format!(
@@ -2661,6 +2696,38 @@ panel {
             .is_err(),
             "write_to without name_col (target filename column) is a load error"
         );
+    }
+
+    #[test]
+    fn a_grafana_expr_needs_its_source_and_datasource() {
+        let hcl = r#"
+panel {
+  type  = "stat"
+  label = "Bots"
+  expr  = "sum(bots_active)"
+}
+"#;
+        let dash: DashboardConfig = hcl::from_str(hcl).unwrap();
+        let err = validate_panel_fields(&dash.widgets).unwrap_err();
+        assert!(
+            err.contains("`expr` needs a grafana `source` and a `ds`"),
+            "{err}"
+        );
+
+        let hcl = r#"
+panel {
+  type   = "chart"
+  label  = "Bots"
+  source = "grafana"
+  ds     = "prometheus"
+  expr   = "sum(bots_active)"
+  range  = "6 fortnights"
+}
+"#;
+        let dash: DashboardConfig = hcl::from_str(hcl).unwrap();
+        assert!(validate_panel_fields(&dash.widgets)
+            .unwrap_err()
+            .contains("range"));
     }
 
     #[test]

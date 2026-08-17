@@ -35,6 +35,7 @@ fn referenced_vars(panels: &[crate::config::PanelConfig]) -> Vec<String> {
             .iter()
             .chain(w.compare_sql.iter())
             .chain(w.spark.iter())
+            .chain(w.expr.iter())
             .chain(w.filter.values())
             .cloned()
             .chain(w.query.clone())
@@ -100,6 +101,18 @@ async fn panel_rows(
         return read_only_rows_on(state, source.as_deref(), &sql, cap, env).await;
     }
     if let Some(alias) = &w.source {
+        if is_grafana(state, alias) {
+            let q = grafana_query(
+                w,
+                w.expr.as_deref().ok_or("grafana panel has no expr")?,
+                w.kind == PanelKind::Stat,
+                cap,
+                env,
+            )?;
+            return crate::grafana::rows(state, user, alias, &q)
+                .await
+                .map_err(|e| e.1);
+        }
         let rows = crate::plugins::source_rows(
             state,
             user,
@@ -113,6 +126,42 @@ async fn panel_rows(
     }
     let sql = w.sql.as_ref().ok_or("panel has no sql, query or source")?;
     read_only_rows_on(state, w.source.as_deref(), sql, cap, env).await
+}
+
+fn is_grafana(state: &AppState, alias: &str) -> bool {
+    state
+        .cfg()
+        .sources
+        .get(alias)
+        .is_some_and(|s| s.is_grafana())
+}
+
+/// A grafana panel's query: `expr` with the page's variables substituted, over
+/// the panel's `range`/`step`; a stat reads the value now.
+fn grafana_query(
+    w: &crate::config::PanelConfig,
+    expr: &str,
+    instant: bool,
+    cap: i64,
+    env: &crate::vars::Resolved,
+) -> Result<crate::grafana::Query, String> {
+    let range = match &w.range {
+        Some(r) => crate::grafana::parse_duration(r)?,
+        None => crate::grafana::default_range(),
+    };
+    let step = w
+        .step
+        .as_deref()
+        .map(crate::grafana::parse_duration)
+        .transpose()?;
+    Ok(crate::grafana::Query {
+        ds: w.ds.clone().ok_or("grafana panel has no ds")?,
+        expr: crate::interp::substitute(expr, &env.values),
+        range,
+        step,
+        instant,
+        limit: cap.max(1) as usize,
+    })
 }
 
 fn first_number(row: &Value) -> Option<f64> {
@@ -184,9 +233,25 @@ pub async fn render_panel(
                     };
                     let spark = match &w.spark {
                         Some(sq) => {
-                            match read_only_rows_on(state, w.source.as_deref(), sq, SPARK_CAP, env)
-                                .await
-                            {
+                            let srows = match w.source.as_deref().filter(|a| is_grafana(state, a)) {
+                                Some(alias) => match grafana_query(w, sq, false, SPARK_CAP, env) {
+                                    Ok(q) => crate::grafana::rows(state, user, alias, &q)
+                                        .await
+                                        .map_err(|e| e.1),
+                                    Err(e) => Err(e),
+                                },
+                                None => {
+                                    read_only_rows_on(
+                                        state,
+                                        w.source.as_deref(),
+                                        sq,
+                                        SPARK_CAP,
+                                        env,
+                                    )
+                                    .await
+                                }
+                            };
+                            match srows {
                                 Ok(srows) => {
                                     let s = spark_series(&srows);
                                     (s.len() > 1).then_some(s)
@@ -232,10 +297,18 @@ pub async fn render_panel(
                             Some(json!({ "t": t, "v": v }))
                         })
                         .collect();
+                    let series = crate::grafana::series_of(&rows);
+                    let points = match series.first() {
+                        Some(first) if series.len() > 1 => {
+                            first["points"].as_array().cloned().unwrap_or(points)
+                        }
+                        _ => points,
+                    };
                     json!({
                         "id": id, "type": "chart", "label": w.label,
                         "kind": w.chart.clone().unwrap_or_else(|| "line".into()),
                         "points": points,
+                        "series": (series.len() > 1).then_some(series),
                         "format": w.format.clone().unwrap_or_else(|| "number".into()),
                     })
                 }
@@ -321,20 +394,31 @@ pub async fn render_panel(
     Some(widget)
 }
 
+/// Panels of one page render side by side (a few at a time — a page of thirty
+/// tiles must not open thirty connections at once), in declared order.
+const PANEL_CONCURRENCY: usize = 6;
+
 async fn render_panels(
     state: &AppState,
-    dc: &crate::config::DashboardConfig,
+    panels: &[crate::config::PanelConfig],
     user: &CurrentUser,
     env: &crate::vars::Resolved,
 ) -> Vec<Value> {
-    let mut widgets = Vec::new();
-    for (i, w) in dc.widgets.iter().enumerate() {
-        if !user.may(&w.roles, crate::state::Access::Everyone) {
-            continue;
-        }
-        if let Some(widget) = render_panel(state, user, w, &format!("w{i}"), env).await {
-            widgets.push(widget);
-        }
+    let allowed: Vec<(String, &crate::config::PanelConfig)> = panels
+        .iter()
+        .enumerate()
+        .filter(|(_, w)| user.may(&w.roles, crate::state::Access::Everyone))
+        .map(|(i, w)| (format!("w{i}"), w))
+        .collect();
+    let mut widgets = Vec::with_capacity(allowed.len());
+    for chunk in allowed.chunks(PANEL_CONCURRENCY) {
+        let rendered = futures::future::join_all(
+            chunk
+                .iter()
+                .map(|(id, w)| render_panel(state, user, w, id, env)),
+        )
+        .await;
+        widgets.extend(rendered.into_iter().flatten());
     }
     widgets
 }
@@ -346,7 +430,7 @@ pub async fn dashboard_handler(
 ) -> Result<Json<Value>, AppError> {
     let env = crate::vars::resolve(&state, &user, &params).await?;
     let cfg = state.cfg();
-    let widgets = render_panels(&state, &cfg.dashboard, &user, &env).await;
+    let widgets = render_panels(&state, &cfg.dashboard.widgets, &user, &env).await;
     Ok(Json(json!({
         "widgets": widgets,
         "columns": cfg.dashboard.columns,
@@ -371,15 +455,7 @@ pub async fn page_widgets_handler(
     if !user.may(&page.roles, crate::state::Access::Everyone) {
         return Err(AppError::forbidden("no access to this page"));
     }
-    let mut widgets = Vec::new();
-    for (i, w) in page.widgets.iter().enumerate() {
-        if !user.may(&w.roles, crate::state::Access::Everyone) {
-            continue;
-        }
-        if let Some(widget) = render_panel(&state, &user, w, &format!("w{i}"), &env).await {
-            widgets.push(widget);
-        }
-    }
+    let widgets = render_panels(&state, &page.widgets, &user, &env).await;
     Ok(Json(json!({
         "label": page.label, "widgets": widgets, "columns": page.columns,
         "refresh_secs": crate::config::refresh_secs(page.refresh.as_deref()),

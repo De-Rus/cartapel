@@ -141,11 +141,11 @@ import/export and audit all work the same way.
 
 | Key | Description |
 | --- | --- |
-| `type` | `"postgres"`, `"mysql"` (also accepts `"mariadb"`), `"clickhouse"` (read-only), `"http"` (a JSON endpoint cartapel proxies server-side), `"files"` (a directory listing) or `"s3"` (an object listing). |
+| `type` | `"postgres"`, `"mysql"` (also accepts `"mariadb"`), `"clickhouse"` (read-only), `"http"` (a JSON endpoint cartapel proxies server-side), `"grafana"` (a Grafana instance — its Prometheus/Loki/Tempo datasources as panel rows, see [dashboard](dashboard.md#metrics-logs-and-traces-through-grafana)), `"files"` (a directory listing) or `"s3"` (an object listing). |
 | `url` | Connection URL (`postgres://…`, `mysql://…`) or endpoint (http). Supports `env:NAME` / `${NAME}`. |
 | `schemas` | List of schemas to introspect (postgres). Defaults to `["public"]`. A MySQL source is scoped to the database in its URL. |
 | `primary` | Marks the source cartapel introspects and serves by default. With a single database source it is implied; declare it explicitly when you define several. |
-| `token_env` / `header` | For `http` sources: attach a secret from this env var under `header` (default `x-admin-token`). The secret never reaches the browser. |
+| `token_env` / `header` | For `http` sources: attach a secret from this env var under `header` (default `x-admin-token`). For `grafana` sources: the service-account token, sent as a bearer. The secret never reaches the browser. |
 | `roles` | Restrict a source to these roles (non-admins need an explicit match). |
 
 `--db postgres://…` / `CARTAPEL_DB` overrides the `primary` source's URL, so the
