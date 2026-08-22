@@ -222,14 +222,21 @@ export function KeyValueEditor({
           </button>
         </div>
       ))}
+      {/* The add control is a ROW like the ones above it, sharing their key
+          column width. Rendered bare it sat on its own, left-aligned against a
+          wide empty gutter, reading as a stray dropdown rather than as the next
+          line of the list it appends to. */}
       {availableKeys ? (
-        <ColumnPicker
-          columns={availableKeys}
-          value={undefined}
-          emptyLabel={keyPlaceholder}
-          ariaLabel={keyPlaceholder}
-          onChange={(v) => v && addKey(v)}
-        />
+        <div className="flex items-center gap-1.5">
+          <ColumnPicker
+            className="input-sm w-28 shrink-0"
+            columns={availableKeys}
+            value={undefined}
+            emptyLabel={keyPlaceholder}
+            ariaLabel={keyPlaceholder}
+            onChange={(v) => v && addKey(v)}
+          />
+        </div>
       ) : (
         <div className="flex items-center gap-1.5">
           <input
