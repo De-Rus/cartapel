@@ -18,3 +18,16 @@ source "main" {
   url     = "env:CARTAPEL_DB"
   primary = true
 }
+
+# The panels on the Platform pages come from here. No `token_env`: this Grafana
+# is on the private network only, with anonymous read, so the demo holds no
+# secret to leak. On a Grafana anyone can reach, set `token_env` and give the
+# service account the Viewer role.
+#
+# The browser never opens Grafana. cartapel asks the datasource proxy
+# server-side and renders rows, which is why there is no iframe on those pages
+# and no CORS, cookie or theme argument to have.
+source "grafana" {
+  type = "grafana"
+  url  = "env:CARTAPEL_GRAFANA_URL"
+}

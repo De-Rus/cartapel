@@ -31,5 +31,13 @@ services:
       CARTAPEL_ADMIN_EMAIL: demo
       CARTAPEL_ADMIN_PASSWORD: demo
       CARTAPEL_ADMIN_ROLE: demo
+      # The Platform pages ask this Grafana for their panels, server-side.
+      CARTAPEL_GRAFANA_URL: http://metrics:3000
     ports:
       - "8686:8686"
+
+  # Prometheus + Grafana in one container, the same image the public demo runs.
+  # No port published: cartapel reaches it over the compose network and the
+  # browser never opens Grafana, which is the whole point of the panels.
+  metrics:
+    build: ./demo/metrics

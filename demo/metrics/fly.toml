@@ -1,0 +1,31 @@
+# The demo's metrics backend: Prometheus + Grafana, private to the org network.
+#
+#   fly apps create cartapel-demo-metrics --org personal
+#   fly deploy -c demo/metrics/fly.toml --ha=false
+#
+# NO public IP on purpose. cartapel proxies every panel server-side, so the
+# browser never opens Grafana — giving this app an address on the internet
+# would hand out the one thing the design exists to avoid.
+#
+# It also never sleeps, and that is not an oversight: a stopped Prometheus
+# scrapes nothing, so a demo that scaled to zero would greet its first visitor
+# with empty charts.
+app = "cartapel-demo-metrics"
+primary_region = "cdg"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# No `[[services]]` at all: fly-proxy has no route to this app, so it is
+# reachable only over the org's private network, at
+# `cartapel-demo-metrics.internal:3000`. Releasing the public IP would have
+# been enough today and wrong tomorrow — the next `fly deploy` hands out a
+# fresh one for any app that declares a service.
+#
+# Nothing here sleeps either, and that is deliberate: a stopped Prometheus
+# scrapes nothing, so a demo that scaled to zero would greet its first visitor
+# with empty charts.
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

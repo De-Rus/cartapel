@@ -1,0 +1,21 @@
+# Six hours of retention on ephemeral disk: no volume, so nothing bills while
+# the machine sleeps and a restart costs the demo a few empty minutes rather
+# than a monthly charge.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # It scrapes itself and Grafana. Both export real, always-present series, so
+  # the demo shows a live system instead of a seeded dataset pretending to be
+  # one — and there is nothing extra to run.
+  - job_name: prometheus
+    static_configs:
+      - targets: ['127.0.0.1:9090']
+
+  - job_name: grafana
+    static_configs:
+      - targets: ['127.0.0.1:3000']
+
+  - job_name: machine
+    static_configs:
+      - targets: ['127.0.0.1:9100']
