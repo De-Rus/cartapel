@@ -2845,7 +2845,7 @@ panel {
             .iter()
             .filter(|p| p.file_stem().unwrap() == "_group")
             .count();
-        assert_eq!(groups, 4, "one _group.hcl per screens/ folder");
+        assert_eq!(groups, 5, "one _group.hcl per screens/ folder");
         for g in ["cartapel", "auth", "dashboard"] {
             assert!(
                 files.iter().any(|p| p.file_stem().unwrap() == g

@@ -935,12 +935,31 @@ mod nav_tests {
         let order: Vec<&str> = cfg.tables.keys().map(String::as_str).collect();
         let nav = derive_nav_groups(&cfg.groups, &cfg.table_sources, &order);
 
-        // (label, icon, member set), in `order =` order. Overview holds only a
-        // dashboard page, so with no tables it is absent from the nav.
+        // (label, icon, member set), in `order =` order. Overview and Platform
+        // hold only pages, so with no tables they are absent from the nav.
         let expected: &[(&str, &str, &[&str])] = &[
-            ("Customers", "users", &["customers", "subscriptions"]),
-            ("Catalog", "package", &["products"]),
-            ("Sales", "receipt", &["orders", "order_items"]),
+            (
+                "Customers",
+                "users",
+                &["customers", "addresses", "subscriptions"],
+            ),
+            (
+                "Catalog",
+                "package",
+                &["categories", "products", "variants", "reviews"],
+            ),
+            (
+                "Sales",
+                "receipt",
+                &[
+                    "orders",
+                    "order_items",
+                    "payments",
+                    "shipments",
+                    "refunds",
+                    "coupons",
+                ],
+            ),
         ];
 
         assert_eq!(nav.len(), expected.len(), "group count + order:\n{nav:#?}");
