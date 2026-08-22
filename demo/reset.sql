@@ -9,5 +9,6 @@
 --
 -- Run from the demo/ directory so the \i include resolves:
 --   psql "$CARTAPEL_DB" -v ON_ERROR_STOP=1 -f reset.sql
-DROP TABLE IF EXISTS order_items, orders, subscriptions, products, customers CASCADE;
+DROP TABLE IF EXISTS reviews, shipments, refunds, payments, order_items, orders,
+  subscriptions, coupons, addresses, variants, products, categories, customers CASCADE;
 \i seed.sql
