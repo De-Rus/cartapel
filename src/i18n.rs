@@ -186,6 +186,9 @@ pub fn author_strings(cfg: &ConfigDir, schema: Option<&crate::introspect::Schema
     }
     for w in panels {
         push(w.label.clone());
+        if let Some(c) = &w.category {
+            push(c.clone());
+        }
         if let Some(c) = &w.compare_label {
             push(c.clone());
         }

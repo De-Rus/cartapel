@@ -403,7 +403,7 @@ pub async fn render_panel(
             obj.insert("h".into(), json!(v));
         }
         if let Some(c) = &w.category {
-            obj.insert("category".into(), json!(c));
+            obj.insert("category".into(), json!(loc.t(c.clone())));
         }
     }
     Some(widget)
