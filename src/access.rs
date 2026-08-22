@@ -895,7 +895,7 @@ mod tests {
         def.tables.insert("locked".into(), "write".into());
         let u = make_config_role(&state, "writer2", &def);
 
-        let meta = crate::meta::table_meta(&state, &u, "bots", None)
+        let meta = crate::meta::table_meta(&state, &u, "bots", &crate::i18n::Loc::default())
             .await
             .unwrap();
 
@@ -961,7 +961,7 @@ mod tests {
         def.tables.insert("locked".into(), "read".into());
         let u = make_config_role(&state, "reader2", &def);
 
-        let meta = crate::meta::table_meta(&state, &u, "bots", None)
+        let meta = crate::meta::table_meta(&state, &u, "bots", &crate::i18n::Loc::default())
             .await
             .unwrap();
         let inline = meta["inlines"]
@@ -1637,7 +1637,7 @@ mod tests {
             &state,
             &user,
             "bots",
-            state.cfg().cartapel.locale.as_deref(),
+            &crate::i18n::Loc::instance(&state.cfg()),
         )
         .await
         .unwrap();

@@ -48,9 +48,43 @@ strings = {
 
 ## Your data labels
 
+Everything your config *names* — groups, tables, fields, filters, actions,
+detail sections, inlines, pages, panel titles, variables — is written once, in
+whatever language you write it. Two ways to translate it, cheapest first.
+
+### One dictionary per language
+
+`config/i18n/<locale>.hcl` maps the text as written to its translation. One
+file per language, keyed by the text itself, so nothing in `screens/` changes:
+
+```hcl
+# config/i18n/es.hcl
+labels = {
+  "Billing"        = "Facturación"
+  "Orders"         = "Pedidos"
+  "created at"     = "creado el"      # a column the panel humanized for you
+  "Signals 24h"    = "Señales 24h"    # a dashboard stat tile
+}
+```
+
+Let cartapel list what is left to translate — it prints the stub, in config
+order, with every string the locale has not covered yet (with `--db`, the
+column names the panel humanizes are included):
+
+```bash
+cartapel i18n extract --config ./admin --locale es --db postgres://…  > admin/config/i18n/es.hcl
+```
+
+Fill the right-hand sides; an empty value keeps the original text, so a
+half-filled file is always safe to ship. Re-run the command after a config
+change and merge the new lines in. The file hot-reloads like the rest.
+
+### Inline, on the block
+
 `label` / `label_plural` name things in one language. Add per-locale overrides
-with `labels` maps — the viewer's language picks the entry, `label` is the
-fallback:
+with `labels` maps when one block needs a translation the dictionary does not
+give — the viewer's language picks the entry, `label` is the fallback, and an
+inline entry wins over the dictionary:
 
 ```hcl
 # screens/customers/customers/screen.hcl
@@ -75,12 +109,12 @@ field "plan" {
 | Actions (`action "…" { }`) | `labels` — bulk-action buttons |
 | Pages (a folder's `screen.hcl` with panels) | `labels` — the sidebar entry and the page title |
 
-Resolution happens **server-side at one point** (the meta the frontend renders
-from): the browser sends the viewer's language in an `X-Cartapel-Locale`
-header and the server resolves every label in it, falling back to the instance
-`locale` when the header is absent. Config stays reviewable — the translation
-lives next to the thing it names — and a deployment pays nothing for languages
-nobody reads.
+Resolution happens **server-side**, where the label is emitted: the browser
+sends the viewer's language in an `X-Cartapel-Locale` header and the server
+resolves every label in it — inline `labels[locale]` first, then the locale's
+dictionary, then the text as written — falling back to the instance `locale`
+when the header is absent. Config stays reviewable, and a deployment pays
+nothing for languages nobody reads.
 
 ## Adding a language
 
@@ -92,7 +126,6 @@ raw key. Pull requests for new languages are welcome.
 
 ## Notes
 
-- **Dashboard/panel labels** are author content (plain strings in
-  `dashboard.hcl`) — write them in your team's language directly, or use
-  `labels` on the tables and fields they point at.
+- **Dashboard/panel labels** and page titles go through the dictionary like
+  everything else — `cartapel i18n extract` lists them.
 - **Error messages from the server** are English today.

@@ -1,4 +1,5 @@
 use crate::config::{InlineSpec, TableConfig};
+use crate::i18n::Loc;
 use crate::introspect::{DbColumn, DbTable, Kind};
 use crate::sqlval::ident;
 use crate::state::{AppError, AppState, CurrentUser};
@@ -26,40 +27,6 @@ static ENUM_OPTIONS_GATE: LazyLock<Semaphore> =
 /// config is hot-swappable; callers pass `&cfg` where a reference is needed.
 pub fn table_config(state: &AppState, table: &str) -> TableConfig {
     state.cfg().tables.get(table).cloned().unwrap_or_default()
-}
-
-/// Label resolution for one locale: `labels[locale]` wins, else the base label.
-/// Emission-time so the frontend needs no locale logic for data labels. The
-/// locale is the one the viewer asked for (`X-Cartapel-Locale`), falling back
-/// to the instance default — see [`request_locale`].
-pub fn localize(
-    locale: Option<&str>,
-    labels: &std::collections::BTreeMap<String, String>,
-    base: String,
-) -> String {
-    locale.and_then(|l| labels.get(l).cloned()).unwrap_or(base)
-}
-
-/// The viewer's pick from the `X-Cartapel-Locale` header, when it looks like a
-/// language tag. A header the frontend never sets means "instance default".
-pub fn header_locale(headers: &axum::http::HeaderMap) -> Option<String> {
-    headers
-        .get("x-cartapel-locale")
-        .and_then(|v| v.to_str().ok())
-        .map(str::trim)
-        .filter(|v| {
-            !v.is_empty()
-                && v.len() <= 16
-                && v.chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-        })
-        .map(str::to_owned)
-}
-
-/// The locale a response should be rendered in: the viewer's header, else the
-/// instance `locale`.
-pub fn request_locale(headers: &axum::http::HeaderMap, state: &AppState) -> Option<String> {
-    header_locale(headers).or_else(|| state.cfg().cartapel.locale.clone())
 }
 
 pub fn humanize(name: &str) -> String {
@@ -364,12 +331,12 @@ async fn filter_meta(
     key: &str,
     dbt: &DbTable,
     cfg: &TableConfig,
-    locale: Option<&str>,
+    loc: &Loc,
 ) -> Vec<Value> {
     let masked = state.masked_columns(user, key);
     let entry_futs = cfg.list.filters.iter().filter_map(|name| {
         if let Some(def) = cfg.list.filter_defs.get(name) {
-            let v = json!({ "name": name, "label": def.label, "type": "custom", "options": [] });
+            let v = json!({ "name": name, "label": loc.t(def.label.clone()), "type": "custom", "options": [] });
             return Some(Either::Left(std::future::ready(Some(v))));
         }
         if masked.contains(name) {
@@ -377,9 +344,7 @@ async fn filter_meta(
         }
         let col = dbt.column(name)?;
         let fc = cfg.fields.get(name);
-        let label = localize(
-            locale,
-            fc.map(|f| &f.labels).unwrap_or(&Default::default()),
+        let label = loc.pick(fc.map(|f| &f.labels).unwrap_or(&Default::default()),
             fc.and_then(|f| f.label.clone())
                 .unwrap_or_else(|| capitalize(&humanize(name))),
         );
@@ -408,7 +373,7 @@ async fn filter_meta(
 }
 
 /// Detail form sections. Empty when nothing is configured (frontend renders flat).
-fn detail_sections(dbt: &DbTable, cfg: &TableConfig) -> Vec<Value> {
+fn detail_sections(dbt: &DbTable, cfg: &TableConfig, loc: &Loc) -> Vec<Value> {
     let all: Vec<String> = dbt
         .columns
         .iter()
@@ -469,7 +434,7 @@ fn detail_sections(dbt: &DbTable, cfg: &TableConfig) -> Vec<Value> {
     }
     sections
         .into_iter()
-        .map(|s| json!({ "title": s.title, "fields": s.fields, "span": s.span, "collapsible": s.collapsible }))
+        .map(|s| json!({ "title": loc.t(s.title), "fields": s.fields, "span": s.span, "collapsible": s.collapsible }))
         .collect()
 }
 
@@ -479,7 +444,7 @@ fn column_meta(
     key: &str,
     dbt: &DbTable,
     cfg: &TableConfig,
-    locale: Option<&str>,
+    loc: &Loc,
 ) -> Vec<Value> {
     let masked = state.masked_columns(user, key);
     let mut out: Vec<Value> = dbt
@@ -507,9 +472,7 @@ fn column_meta(
             }
             let mut m = json!({
                 "name": c.name,
-                "label": localize(
-                    locale,
-                    fc.map(|f| &f.labels).unwrap_or(&Default::default()),
+                "label": loc.pick(fc.map(|f| &f.labels).unwrap_or(&Default::default()),
                     fc.and_then(|f| f.label.clone()).unwrap_or_else(|| humanize(&c.name)),
                 ),
                 "kind": c.kind,
@@ -535,9 +498,7 @@ fn column_meta(
         let is_masked = masked.contains(name);
         let mut m = json!({
             "name": name,
-            "label": localize(
-                locale,
-                fc.map(|f| &f.labels).unwrap_or(&Default::default()),
+            "label": loc.pick(fc.map(|f| &f.labels).unwrap_or(&Default::default()),
                 fc.and_then(|f| f.label.clone()).unwrap_or_else(|| humanize(name)),
             ),
             "kind": "text",
@@ -570,9 +531,7 @@ fn column_meta(
         params.insert("max_px".into(), json!(img.max_px));
         let mut m = json!({
             "name": name,
-            "label": localize(
-                locale,
-                fc.map(|f| &f.labels).unwrap_or(&Default::default()),
+            "label": loc.pick(fc.map(|f| &f.labels).unwrap_or(&Default::default()),
                 fc.and_then(|f| f.label.clone()).unwrap_or_else(|| humanize(name)),
             ),
             "kind": "text",
@@ -738,7 +697,7 @@ pub async fn table_meta(
     state: &AppState,
     user: &CurrentUser,
     table: &str,
-    locale: Option<&str>,
+    loc: &Loc,
 ) -> Option<Value> {
     let dbt = state.resolve_table(table)?;
     let cfg = table_config(state, table);
@@ -754,7 +713,7 @@ pub async fn table_meta(
         .filter(|(n, _)| actions_allowed.contains(n))
         .map(|(n, a)| {
             json!({
-                "name": n, "label": localize(locale, &a.labels, a.label.clone()),
+                "name": n, "label": loc.pick(&a.labels, a.label.clone()),
                 "danger": a.danger, "confirm": a.confirm, "kind": a.kind,
             })
         })
@@ -765,7 +724,7 @@ pub async fn table_meta(
             json!({
                 "table": i.child,
                 "fk_col": i.fk_col,
-                "label": i.label,
+                "label": loc.t(i.label),
                 "columns": i.columns,
                 "can_create": i.can_create,
                 "can_delete": i.can_delete,
@@ -773,23 +732,22 @@ pub async fn table_meta(
         })
         .collect();
     let read_only = dbt.is_view || dbt.pk.is_none();
-    let label = localize(
-        locale,
+    let label = loc.pick(
         &cfg.labels,
         cfg.label.clone().unwrap_or_else(|| humanize(table)),
     );
     Some(json!({
         "name": table,
         "label": label,
-        "label_plural": localize(locale, &cfg.labels_plural, cfg.label_plural.clone().unwrap_or_else(|| capitalize(&humanize(table)))),
-        "group": state.cfg().table_group_label_in(table, locale),
+        "label_plural": loc.pick(&cfg.labels_plural, cfg.label_plural.clone().unwrap_or_else(|| capitalize(&humanize(table)))),
+        "group": state.cfg().table_group_label_in(table, loc),
         "pk": dbt.pk,
         "read_only": read_only,
-        "columns": column_meta(state, user, table, dbt, cfg, locale),
+        "columns": column_meta(state, user, table, dbt, cfg, loc),
         "list": {
             "columns": list_columns(dbt, cfg),
             "search": search_columns(dbt, cfg),
-            "filters": filter_meta(state, user, table, dbt, cfg, locale).await,
+            "filters": filter_meta(state, user, table, dbt, cfg, loc).await,
             "default_sort": default_sort(dbt, cfg),
             "per_page": cfg.list.per_page.or(state.cfg().cartapel.per_page).unwrap_or(100),
         },
@@ -801,7 +759,7 @@ pub async fn table_meta(
             "stats": cfg.detail.stats,
             "sidebar": cfg.detail.sidebar.as_ref().map(|s| json!({ "fields": s.fields })),
         },
-        "sections": detail_sections(dbt, cfg),
+        "sections": detail_sections(dbt, cfg, loc),
         "inlines": inlines,
         "actions": actions,
         "perms": {
@@ -823,7 +781,7 @@ pub(crate) fn derive_nav_groups(
     groups: &[crate::config::LoadedGroup],
     sources: &std::collections::BTreeMap<String, crate::config::TableSource>,
     order: &[&str],
-    locale: Option<&str>,
+    loc: &Loc,
 ) -> Vec<Value> {
     let mut placed: std::collections::BTreeSet<&str> = Default::default();
     let mut out: Vec<Value> = Vec::new();
@@ -847,7 +805,7 @@ pub(crate) fn derive_nav_groups(
         for m in &members {
             placed.insert(m);
         }
-        out.push(json!({ "slug": g.slug, "label": localize(locale, &g.labels, g.label.clone()), "icon": g.icon, "nav": g.nav, "tables": members }));
+        out.push(json!({ "slug": g.slug, "label": loc.pick(&g.labels, g.label.clone()), "icon": g.icon, "nav": g.nav, "tables": members }));
     }
     let leftover: Vec<&str> = order
         .iter()
@@ -855,7 +813,7 @@ pub(crate) fn derive_nav_groups(
         .filter(|t| !placed.contains(*t))
         .collect();
     if !leftover.is_empty() {
-        out.push(json!({ "slug": Value::Null, "label": "Ungrouped", "icon": Value::Null, "nav": Value::Null, "tables": leftover }));
+        out.push(json!({ "slug": Value::Null, "label": loc.t("Ungrouped".into()), "icon": Value::Null, "nav": Value::Null, "tables": leftover }));
     }
     out
 }
@@ -865,7 +823,7 @@ pub(crate) fn derive_nav_groups(
 pub(crate) fn pages_meta(
     cfg: &crate::config::ConfigDir,
     user: &CurrentUser,
-    locale: Option<&str>,
+    loc: &Loc,
 ) -> Vec<Value> {
     cfg.pages
         .iter()
@@ -874,19 +832,19 @@ pub(crate) fn pages_meta(
             let group = p
                 .group
                 .as_deref()
-                .and_then(|slug| cfg.group_label_in(slug, locale));
+                .and_then(|slug| cfg.group_label_in(slug, loc));
             json!({
-                "id": p.id(), "slug": p.slug, "label": localize(locale, &p.labels, p.label.clone()),
+                "id": p.id(), "slug": p.slug, "label": loc.pick(&p.labels, p.label.clone()),
                 "group": group, "icon": p.icon, "roles": p.roles,
             })
         })
         .collect()
 }
 
-fn nav_groups(state: &AppState, tables: &[Value], locale: Option<&str>) -> Vec<Value> {
+fn nav_groups(state: &AppState, tables: &[Value], loc: &Loc) -> Vec<Value> {
     let order: Vec<&str> = tables.iter().filter_map(|t| t["name"].as_str()).collect();
     let cfg = state.cfg();
-    derive_nav_groups(&cfg.groups, &cfg.table_sources, &order, locale)
+    derive_nav_groups(&cfg.groups, &cfg.table_sources, &order, loc)
 }
 
 /// Unauthenticated branding for the login screen — only public identity
@@ -894,6 +852,7 @@ fn nav_groups(state: &AppState, tables: &[Value], locale: Option<&str>) -> Vec<V
 #[cfg(test)]
 mod nav_tests {
     use super::{derive_nav_groups, pages_meta};
+    use crate::i18n::Loc;
     use crate::state::CurrentUser;
 
     /// A page is emitted with a group-qualified id and the group's *label*; a
@@ -928,7 +887,7 @@ mod nav_tests {
             email: "o@x.io".into(),
             role: "ops".into(),
         };
-        let seen = pages_meta(&cfg, &ops, None);
+        let seen = pages_meta(&cfg, &ops, &Loc::default());
         assert_eq!(seen.len(), 1);
         assert_eq!(
             seen[0]["id"], "overview/fleet",
@@ -944,7 +903,7 @@ mod nav_tests {
             role: "viewer".into(),
         };
         assert!(
-            pages_meta(&cfg, &viewer, None).is_empty(),
+            pages_meta(&cfg, &viewer, &Loc::default()).is_empty(),
             "role-gated page hidden"
         );
 
@@ -953,7 +912,7 @@ mod nav_tests {
             role: "admin".into(),
         };
         assert_eq!(
-            pages_meta(&cfg, &admin, None).len(),
+            pages_meta(&cfg, &admin, &Loc::default()).len(),
             1,
             "admin sees role-gated page"
         );
@@ -967,7 +926,7 @@ mod nav_tests {
         let dir = std::path::Path::new("demo/admin");
         let cfg = crate::config::load(Some(dir)).expect("load demo admin");
         let order: Vec<&str> = cfg.tables.keys().map(String::as_str).collect();
-        let nav = derive_nav_groups(&cfg.groups, &cfg.table_sources, &order, None);
+        let nav = derive_nav_groups(&cfg.groups, &cfg.table_sources, &order, &Loc::default());
 
         // (label, icon, member set), in `order =` order. Overview and Platform
         // hold only pages, so with no tables they are absent from the nav.
@@ -1037,15 +996,15 @@ mod nav_tests {
         );
         let order = ["orders"];
         assert_eq!(
-            derive_nav_groups(&groups, &sources, &order, Some("es"))[0]["label"],
+            derive_nav_groups(&groups, &sources, &order, &Loc::only("es"))[0]["label"],
             "Ventas"
         );
         assert_eq!(
-            derive_nav_groups(&groups, &sources, &order, Some("de"))[0]["label"],
+            derive_nav_groups(&groups, &sources, &order, &Loc::only("de"))[0]["label"],
             "Sales"
         );
         assert_eq!(
-            derive_nav_groups(&groups, &sources, &order, None)[0]["label"],
+            derive_nav_groups(&groups, &sources, &order, &Loc::default())[0]["label"],
             "Sales"
         );
     }
@@ -1075,7 +1034,7 @@ mod nav_tests {
             );
         }
         let order = ["a", "b", "c"];
-        let nav = derive_nav_groups(&groups, &sources, &order, None);
+        let nav = derive_nav_groups(&groups, &sources, &order, &Loc::default());
 
         let members: Vec<&str> = nav[0]["tables"]
             .as_array()
@@ -1091,6 +1050,7 @@ mod nav_tests {
 mod relation_tests {
     use super::column_meta;
     use crate::config::{ConfigDir, RoleConfig, TableConfig};
+    use crate::i18n::Loc;
     use crate::introspect::{DbColumn, DbTable, Kind, Schema};
     use crate::state::{AppState, CurrentUser};
     use crate::store::Store;
@@ -1201,7 +1161,14 @@ mod relation_tests {
             role: "admin".into(),
         };
         let dbt = state.db.tables.get("orders").unwrap();
-        let cols = column_meta(&state, &admin, "orders", dbt, &TableConfig::default(), None);
+        let cols = column_meta(
+            &state,
+            &admin,
+            "orders",
+            dbt,
+            &TableConfig::default(),
+            &Loc::default(),
+        );
         assert_eq!(
             relation(&cols, "bot_id"),
             Some(("bots", "id")),
@@ -1217,7 +1184,14 @@ mod relation_tests {
             role: "admin".into(),
         };
         let dbt = state.db.tables.get("orders").unwrap();
-        let cols = column_meta(&state, &admin, "orders", dbt, &TableConfig::default(), None);
+        let cols = column_meta(
+            &state,
+            &admin,
+            "orders",
+            dbt,
+            &TableConfig::default(),
+            &Loc::default(),
+        );
         assert_eq!(
             relation(&cols, "hidden_id"),
             None,
@@ -1243,7 +1217,7 @@ mod relation_tests {
             "orders",
             dbt,
             &TableConfig::default(),
-            None,
+            &Loc::default(),
         );
         assert_eq!(
             relation(&cols, "bot_id"),
@@ -1264,7 +1238,7 @@ mod relation_tests {
         fc.params.insert("target".into(), serde_json::json!("bots"));
         tc.fields.insert("bot_id".into(), fc);
         let dbt = state.db.tables.get("orders").unwrap();
-        let cols = column_meta(&state, &admin, "orders", dbt, &tc, None);
+        let cols = column_meta(&state, &admin, "orders", dbt, &tc, &Loc::default());
         assert_eq!(
             relation(&cols, "bot_id"),
             Some(("bots", "id")),
@@ -1320,12 +1294,12 @@ pub async fn meta_handler(
     headers: axum::http::HeaderMap,
     user: CurrentUser,
 ) -> Result<Json<Value>, AppError> {
-    let locale = request_locale(&headers, &state);
+    let loc = Loc::for_request(&headers, &state);
     let table_futs = state.visible_tables(&user).into_iter().map(|t| {
         let state = state.clone();
         let user = user.clone();
-        let locale = locale.clone();
-        async move { table_meta(&state, &user, &t, locale.as_deref()).await }
+        let loc = loc.clone();
+        async move { table_meta(&state, &user, &t, &loc).await }
     });
     let tables: Vec<Value> = futures::future::join_all(table_futs)
         .await
@@ -1333,15 +1307,15 @@ pub async fn meta_handler(
         .flatten()
         .collect();
     let cfg = state.cfg();
-    let pages = pages_meta(&cfg, &user, locale.as_deref());
-    let nav = nav_groups(&state, &tables, locale.as_deref());
-    let variables = variables_meta(&state, &user).await;
+    let pages = pages_meta(&cfg, &user, &loc);
+    let nav = nav_groups(&state, &tables, &loc);
+    let variables = variables_meta(&state, &user, &loc).await;
     Ok(Json(json!({
         "brand": state.brand(),
         "brand_logo": cfg.cartapel.brand_logo,
         "theme": cfg.cartapel.theme,
         "locale": cfg.cartapel.locale,
-        "resolved_locale": locale,
+        "resolved_locale": loc.tag(),
         "strings": cfg.cartapel.strings,
         "base_path": state.base_path,
         "tables": tables,
@@ -1360,7 +1334,7 @@ pub async fn meta_handler(
 /// The in-scope template variables with their option sets resolved server-side,
 /// for the URL-backed var-bar. `query`-backed options are run read-only here so
 /// the browser only ever sees the value list, never the SQL.
-async fn variables_meta(state: &AppState, user: &CurrentUser) -> Vec<Value> {
+async fn variables_meta(state: &AppState, user: &CurrentUser, loc: &Loc) -> Vec<Value> {
     let vars: Vec<(String, crate::config::Variable)> = {
         let cfg = state.cfg();
         cfg.variables
@@ -1376,7 +1350,7 @@ async fn variables_meta(state: &AppState, user: &CurrentUser) -> Vec<Value> {
             .unwrap_or_default();
         out.push(json!({
             "name": name,
-            "label": var.label.clone().unwrap_or_else(|| name.clone()),
+            "label": loc.t(var.label.clone().unwrap_or_else(|| name.clone())),
             "type": var.var_type.clone().unwrap_or_else(|| "text".into()),
             "kind": var.kind.clone().unwrap_or_else(|| "single".into()),
             "default": var.default,
@@ -1399,44 +1373,8 @@ pub async fn warm_options_cache(state: &AppState) {
     let futs = state.visible_tables(&user).into_iter().map(|t| {
         let user = &user;
         async move {
-            table_meta(state, user, &t, None).await;
+            table_meta(state, user, &t, &Loc::default()).await;
         }
     });
     futures::future::join_all(futs).await;
-}
-
-#[cfg(test)]
-mod locale_tests {
-    use super::{header_locale, localize};
-    use axum::http::HeaderMap;
-    use std::collections::BTreeMap;
-
-    /// A language tag is taken as sent; anything else — missing, empty, or not
-    /// tag-shaped — is ignored, so the instance default applies.
-    #[test]
-    fn header_is_a_language_tag_or_nothing() {
-        let mut h = HeaderMap::new();
-        assert_eq!(header_locale(&h), None);
-        h.insert("x-cartapel-locale", "en".parse().unwrap());
-        assert_eq!(header_locale(&h).as_deref(), Some("en"));
-        h.insert("x-cartapel-locale", " pt-BR ".parse().unwrap());
-        assert_eq!(header_locale(&h).as_deref(), Some("pt-BR"));
-        h.insert("x-cartapel-locale", "en; drop table".parse().unwrap());
-        assert_eq!(header_locale(&h), None);
-        h.insert("x-cartapel-locale", "".parse().unwrap());
-        assert_eq!(header_locale(&h), None);
-        h.insert(
-            "x-cartapel-locale",
-            "a-very-long-tag-nobody-uses".parse().unwrap(),
-        );
-        assert_eq!(header_locale(&h), None);
-    }
-
-    #[test]
-    fn localize_picks_the_locale_or_the_base() {
-        let labels = BTreeMap::from([("es".to_string(), "Cliente".to_string())]);
-        assert_eq!(localize(Some("es"), &labels, "Customer".into()), "Cliente");
-        assert_eq!(localize(Some("fr"), &labels, "Customer".into()), "Customer");
-        assert_eq!(localize(None, &labels, "Customer".into()), "Customer");
-    }
 }

@@ -498,10 +498,10 @@ fn inline_offset(page: u32, cap: i64) -> i64 {
     (page.max(1) as i64 - 1) * cap
 }
 
-fn inline_json(ri: &ResolvedInline, rows: Vec<Value>, total: i64) -> Value {
+fn inline_json(ri: &ResolvedInline, rows: Vec<Value>, total: i64, loc: &crate::i18n::Loc) -> Value {
     json!({
         "table": ri.child,
-        "label": ri.label,
+        "label": loc.t(ri.label.clone()),
         "fk_col": ri.fk_col,
         "columns": ri.columns,
         "can_create": ri.can_create,
@@ -636,9 +636,11 @@ async fn attach_fk_labels(
 
 pub async fn detail_handler(
     State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     user: CurrentUser,
     Path((table, pk)): Path<(String, String)>,
 ) -> Result<Json<Value>, AppError> {
+    let loc = crate::i18n::Loc::for_request(&headers, &state);
     let dbt = table_of(&state, &user, &table)?;
     let mut row = fetch_one(&state, &user, &table, dbt, &pk).await?;
     attach_fk_labels(&state, &user, &table, dbt, &pk, &mut row).await?;
@@ -666,17 +668,19 @@ pub async fn detail_handler(
             1,
         )
         .await?;
-        inlines.push(inline_json(&ri, rows, total));
+        inlines.push(inline_json(&ri, rows, total, &loc));
     }
     Ok(Json(json!({ "row": row, "inlines": inlines })))
 }
 
 pub async fn inline_page_handler(
     State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     user: CurrentUser,
     Path((table, pk, child)): Path<(String, String, String)>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Json<Value>, AppError> {
+    let loc = crate::i18n::Loc::for_request(&headers, &state);
     let dbt = table_of(&state, &user, &table)?;
     let ri = resolve_configured_inline(&state, &user, &table, &child)?;
     fetch_one(&state, &user, &table, dbt, &pk).await?;
@@ -703,7 +707,7 @@ pub async fn inline_page_handler(
         page,
     )
     .await?;
-    let mut out = inline_json(&ri, rows, total);
+    let mut out = inline_json(&ri, rows, total, &loc);
     out.as_object_mut()
         .unwrap()
         .insert("page".into(), json!(page));
@@ -2221,7 +2225,7 @@ mod tests {
         let user = role_user(&state, "writer", writer);
         let ri = resolve_configured_inline(&state, &user, "bots", "bot_signals").unwrap();
 
-        let obj = inline_json(&ri, vec![], 0);
+        let obj = inline_json(&ri, vec![], 0, &Default::default());
         let m = obj.as_object().unwrap();
         assert_eq!(m["columns"], json!(["kind"]));
         assert_eq!(m["can_create"], json!(true));

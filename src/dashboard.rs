@@ -222,10 +222,11 @@ pub async fn render_panel(
     w: &crate::config::PanelConfig,
     id: &str,
     env: &crate::vars::Resolved,
+    loc: &crate::i18n::Loc,
 ) -> Option<Value> {
     let widget = match w.kind {
         PanelKind::Iframe => json!({
-            "id": id, "type": "iframe", "label": w.label, "url": w.url,
+            "id": id, "type": "iframe", "label": loc.t(w.label.clone()), "url": w.url,
         }),
         PanelKind::Stat => {
             if w.sql.is_none() && w.query.is_none() && w.source.is_none() {
@@ -237,7 +238,7 @@ pub async fn render_panel(
                     let compare = match &w.compare_sql {
                         Some(cs) => match read_only_rows_on(state, w.source.as_deref(), cs, 1, env).await {
                             Ok(crows) => scalar(&crows).map(|v| {
-                                json!({ "value": v, "label": w.compare_label.clone().unwrap_or_else(|| "prev".into()) })
+                                json!({ "value": v, "label": w.compare_label.clone().map(|l| loc.t(l)).unwrap_or_else(|| "prev".into()) })
                             }),
                             Err(_) => None,
                         },
@@ -274,7 +275,7 @@ pub async fn render_panel(
                         None => None,
                     };
                     json!({
-                        "id": id, "type": "stat", "label": w.label,
+                        "id": id, "type": "stat", "label": loc.t(w.label.clone()),
                         "value": value,
                         "format": w.format.clone().unwrap_or_else(|| "number".into()),
                         "compare": compare,
@@ -284,7 +285,7 @@ pub async fn render_panel(
                     })
                 }
                 Err(e) => {
-                    json!({ "id": id, "type": "stat", "label": w.label, "value": Value::Null, "error": e })
+                    json!({ "id": id, "type": "stat", "label": loc.t(w.label.clone()), "value": Value::Null, "error": e })
                 }
             }
         }
@@ -318,7 +319,7 @@ pub async fn render_panel(
                         _ => points,
                     };
                     json!({
-                        "id": id, "type": "chart", "label": w.label,
+                        "id": id, "type": "chart", "label": loc.t(w.label.clone()),
                         "kind": w.chart.clone().unwrap_or_else(|| "line".into()),
                         "points": points,
                         "series": (series.len() > 1).then_some(series),
@@ -326,7 +327,7 @@ pub async fn render_panel(
                     })
                 }
                 Err(e) => {
-                    json!({ "id": id, "type": "chart", "label": w.label, "points": [], "error": e })
+                    json!({ "id": id, "type": "chart", "label": loc.t(w.label.clone()), "points": [], "error": e })
                 }
             }
         }
@@ -334,7 +335,7 @@ pub async fn render_panel(
             let slug = w.table.clone().unwrap();
             state.readable_table(user, &slug).ok()?;
             json!({
-                "id": id, "type": "table", "label": w.label,
+                "id": id, "type": "table", "label": loc.t(w.label.clone()),
                 "table": slug, "sort": w.sort, "pp": w.pp,
             })
         }
@@ -370,7 +371,7 @@ pub async fn render_panel(
                             .iter()
                             .map(|c| {
                                 json!({
-                                    "key": c.key, "label": c.label, "format": c.format,
+                                    "key": c.key, "label": c.label.clone().map(|l| loc.t(l)), "format": c.format,
                                     "align": c.align, "max": c.max,
                                     "badge": (!c.badge.is_empty()).then(|| c.badge.clone()),
                                     "display": c.display, "tone": c.tone,
@@ -380,7 +381,7 @@ pub async fn render_panel(
                             .collect::<Vec<_>>()
                     });
                     json!({
-                        "id": id, "type": "table", "label": w.label,
+                        "id": id, "type": "table", "label": loc.t(w.label.clone()),
                         "link": w.link, "columns": columns, "cols": cols, "rows": rows, "pk": pk,
                         "pp": w.pp, "search": w.search, "expand": w.expand,
                         "filter_by": (!w.filter_by.is_empty()).then(|| w.filter_by.clone()),
@@ -388,7 +389,7 @@ pub async fn render_panel(
                     })
                 }
                 Err(e) => {
-                    json!({ "id": id, "type": "table", "label": w.label, "rows": [], "columns": [], "error": e })
+                    json!({ "id": id, "type": "table", "label": loc.t(w.label.clone()), "rows": [], "columns": [], "error": e })
                 }
             }
         }
@@ -417,6 +418,7 @@ async fn render_panels(
     panels: &[crate::config::PanelConfig],
     user: &CurrentUser,
     env: &crate::vars::Resolved,
+    loc: &crate::i18n::Loc,
 ) -> Vec<Value> {
     let allowed: Vec<(String, &crate::config::PanelConfig)> = panels
         .iter()
@@ -429,7 +431,7 @@ async fn render_panels(
         let rendered = futures::future::join_all(
             chunk
                 .iter()
-                .map(|(id, w)| render_panel(state, user, w, id, env)),
+                .map(|(id, w)| render_panel(state, user, w, id, env, loc)),
         )
         .await;
         widgets.extend(rendered.into_iter().flatten());
@@ -439,12 +441,14 @@ async fn render_panels(
 
 pub async fn dashboard_handler(
     State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     user: CurrentUser,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<Value>, AppError> {
     let env = crate::vars::resolve(&state, &user, &params).await?;
     let cfg = state.cfg();
-    let widgets = render_panels(&state, &cfg.dashboard.widgets, &user, &env).await;
+    let loc = crate::i18n::Loc::for_request(&headers, &state);
+    let widgets = render_panels(&state, &cfg.dashboard.widgets, &user, &env, &loc).await;
     Ok(Json(json!({
         "widgets": widgets,
         "columns": cfg.dashboard.columns,
@@ -455,12 +459,14 @@ pub async fn dashboard_handler(
 
 pub async fn page_widgets_handler(
     State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     axum::extract::Path(id): axum::extract::Path<String>,
     user: CurrentUser,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<Value>, AppError> {
     let env = crate::vars::resolve(&state, &user, &params).await?;
     let cfg = state.cfg();
+    let loc = crate::i18n::Loc::for_request(&headers, &state);
     let page = cfg
         .pages
         .iter()
@@ -469,9 +475,9 @@ pub async fn page_widgets_handler(
     if !user.may(&page.roles, crate::state::Access::Everyone) {
         return Err(AppError::forbidden("no access to this page"));
     }
-    let widgets = render_panels(&state, &page.widgets, &user, &env).await;
+    let widgets = render_panels(&state, &page.widgets, &user, &env, &loc).await;
     Ok(Json(json!({
-        "label": page.label, "widgets": widgets, "columns": page.columns,
+        "label": loc.pick(&page.labels, page.label.clone()), "widgets": widgets, "columns": page.columns,
         "refresh_secs": crate::config::refresh_secs(page.refresh.as_deref().map(|r| crate::interp::substitute(r, &env.values)).as_deref()),
         "variables": referenced_vars(&page.widgets, page.refresh.as_deref()),
     })))
@@ -496,9 +502,16 @@ mod tests {
             "type = \"iframe\"\nlabel = \"Docs\"\nurl = \"https://x.io\"\nw = 2\nh = 2\ncategory = \"Links\"\n",
         )
         .unwrap();
-        let rendered = render_panel(&state, &admin(), &w, "w0", &Default::default())
-            .await
-            .unwrap();
+        let rendered = render_panel(
+            &state,
+            &admin(),
+            &w,
+            "w0",
+            &Default::default(),
+            &Default::default(),
+        )
+        .await
+        .unwrap();
         assert_eq!(rendered["type"], json!("iframe"));
         assert_eq!(rendered["w"], json!(2));
         assert_eq!(rendered["h"], json!(2));
@@ -506,9 +519,16 @@ mod tests {
 
         let bare: crate::config::PanelConfig =
             hcl::from_str("type = \"iframe\"\nlabel = \"Docs\"\nurl = \"https://x.io\"\n").unwrap();
-        let rendered = render_panel(&state, &admin(), &bare, "w0", &Default::default())
-            .await
-            .unwrap();
+        let rendered = render_panel(
+            &state,
+            &admin(),
+            &bare,
+            "w0",
+            &Default::default(),
+            &Default::default(),
+        )
+        .await
+        .unwrap();
         assert!(rendered.get("w").is_none(), "absent span not emitted");
         assert!(
             rendered.get("category").is_none(),

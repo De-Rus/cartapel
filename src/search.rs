@@ -22,9 +22,11 @@ fn json_str(v: Option<&Value>) -> Option<String> {
 
 pub async fn search_handler(
     State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     user: CurrentUser,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Json<Value>, AppError> {
+    let loc = crate::i18n::Loc::for_request(&headers, &state);
     let q = params
         .get("q")
         .map(|s| s.trim().to_string())
@@ -86,7 +88,10 @@ pub async fn search_handler(
                 .map(|m| (json_str(m.get("pk")), json_str(m.get("title"))));
             if let Some((Some(pkv), titlev)) = hit {
                 if seen.insert((table.clone(), pkv.clone())) {
-                    let label = cfg.label.clone().unwrap_or_else(|| humanize(&table));
+                    let label = loc.pick(
+                        &cfg.labels,
+                        cfg.label.clone().unwrap_or_else(|| humanize(&table)),
+                    );
                     results.push(
                         json!({ "table": table, "label": label, "pk": pkv, "title": titlev }),
                     );
@@ -124,7 +129,10 @@ pub async fn search_handler(
                 })
                 .unwrap_or_default();
 
-        let label = cfg.label.clone().unwrap_or_else(|| humanize(&table));
+        let label = loc.pick(
+            &cfg.labels,
+            cfg.label.clone().unwrap_or_else(|| humanize(&table)),
+        );
         for (pkv, titlev) in hits {
             if results.len() >= TOTAL_CAP {
                 break;

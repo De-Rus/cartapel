@@ -1478,6 +1478,9 @@ pub struct ConfigDir {
     /// Per-table provenance: where each table config was loaded from and which
     /// folder/group it belongs to. Keyed by the same key as `tables`.
     pub table_sources: BTreeMap<String, TableSource>,
+    /// Author-text dictionaries from `config/i18n/<locale>.hcl`, keyed by
+    /// locale: base text → translation. See [`crate::i18n`].
+    pub i18n: BTreeMap<String, std::sync::Arc<BTreeMap<String, String>>>,
 }
 
 impl ConfigDir {
@@ -1485,30 +1488,29 @@ impl ConfigDir {
     /// instance locale.
     #[cfg(test)]
     pub fn group_label(&self, slug: &str) -> Option<String> {
-        self.group_label_in(slug, self.cartapel.locale.as_deref())
+        self.group_label_in(slug, &crate::i18n::Loc::instance(self))
     }
 
     /// The presentation label of a folder-group in one locale: `labels[locale]`
-    /// wins, else the base label.
-    pub fn group_label_in(&self, slug: &str, locale: Option<&str>) -> Option<String> {
-        self.groups.iter().find(|g| g.slug == slug).map(|g| {
-            locale
-                .and_then(|l| g.labels.get(l).cloned())
-                .unwrap_or_else(|| g.label.clone())
-        })
+    /// wins, else the base label through the locale's dictionary.
+    pub fn group_label_in(&self, slug: &str, loc: &crate::i18n::Loc) -> Option<String> {
+        self.groups
+            .iter()
+            .find(|g| g.slug == slug)
+            .map(|g| loc.pick(&g.labels, g.label.clone()))
     }
 
     /// The label of the folder-group a table belongs to, if any, in the
     /// instance locale.
     #[cfg(test)]
     pub fn table_group_label(&self, table: &str) -> Option<String> {
-        self.table_group_label_in(table, self.cartapel.locale.as_deref())
+        self.table_group_label_in(table, &crate::i18n::Loc::instance(self))
     }
 
     /// The label of the folder-group a table belongs to, in one locale.
-    pub fn table_group_label_in(&self, table: &str, locale: Option<&str>) -> Option<String> {
+    pub fn table_group_label_in(&self, table: &str, loc: &crate::i18n::Loc) -> Option<String> {
         let slug = self.table_sources.get(table)?.group.as_deref()?;
-        self.group_label_in(slug, locale)
+        self.group_label_in(slug, loc)
     }
 }
 
@@ -1703,6 +1705,16 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
             .and_then(|rel| rel.components().next())
             .is_some_and(|c| c.as_os_str() == RESERVED_DIR);
         let in_base = under_base && parent.file_name().is_some_and(|n| n == RESERVED_DIR);
+        let in_i18n = under_base
+            && parent.file_name().is_some_and(|n| n == "i18n")
+            && parent
+                .parent()
+                .is_some_and(|pp| pp == dir.join(RESERVED_DIR));
+        if in_i18n {
+            let dict = crate::i18n::parse_dictionary(&raw).map_err(ctx)?;
+            cfg.i18n.insert(stem, std::sync::Arc::new(dict));
+            continue;
+        }
         if under_base {
             match stem.as_str() {
                 "cartapel" if in_base => cfg.cartapel = hcl::from_str(&raw).map_err(ctx)?,
@@ -1715,7 +1727,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                 }
                 _ => {
                     return Err(format!(
-                        "misplaced config in reserved config folder: {} — config holds only cartapel.hcl, auth.hcl, dashboard.hcl and the widgets/ assets",
+                        "misplaced config in reserved config folder: {} — config holds only cartapel.hcl, auth.hcl, dashboard.hcl, the i18n/ dictionaries and the widgets/ assets",
                         path.display()
                     ));
                 }

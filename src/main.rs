@@ -11,6 +11,7 @@ mod files;
 mod globaledit;
 mod grafana;
 mod groupsedit;
+mod i18n;
 mod images;
 mod interp;
 mod introspect;
@@ -79,12 +80,36 @@ enum Command {
     },
     /// Validate a config directory (optionally cross-checked against a live
     /// database). Exit 0 = valid; exit 1 with the errors otherwise — CI-ready.
+    /// Translation tooling for author text (group, table, field, page and
+    /// panel names) — see `cartapel i18n extract`.
+    I18n {
+        #[command(subcommand)]
+        cmd: I18nCommand,
+    },
     Check {
         #[arg(long, env = "CARTAPEL_CONFIG")]
         config: PathBuf,
         /// When given, every configured table is verified to exist in the
         /// introspected schema(s), and list/search/filter/sort columns are
         /// verified to be real columns.
+        #[arg(long, env = "CARTAPEL_DB")]
+        db: Option<String>,
+        #[arg(long, env = "CARTAPEL_SCHEMA")]
+        schema: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum I18nCommand {
+    /// Print a `config/i18n/<locale>.hcl` stub with every author string the
+    /// locale has not translated yet, in config order. With --db, the column
+    /// names the panel humanizes are included too.
+    Extract {
+        #[arg(long, env = "CARTAPEL_CONFIG")]
+        config: PathBuf,
+        /// The locale to extract for, e.g. `es`.
+        #[arg(long)]
+        locale: String,
         #[arg(long, env = "CARTAPEL_DB")]
         db: Option<String>,
         #[arg(long, env = "CARTAPEL_SCHEMA")]
@@ -351,7 +376,83 @@ async fn main() {
         Command::Check { config, db, schema } => {
             std::process::exit(check(&config, db, schema).await);
         }
+        Command::I18n {
+            cmd:
+                I18nCommand::Extract {
+                    config,
+                    locale,
+                    db,
+                    schema,
+                },
+        } => {
+            std::process::exit(i18n_extract(&config, &locale, db, schema).await);
+        }
     }
+}
+
+/// `cartapel i18n extract`: the untranslated author strings for one locale, as
+/// an HCL stub ready to fill in. The live schema is optional; with it, column
+/// names the panel would humanize are listed too.
+async fn i18n_extract(
+    config: &std::path::Path,
+    locale: &str,
+    db: Option<String>,
+    schema: Option<String>,
+) -> i32 {
+    let cfg = match config::load(Some(config)) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("✗ config invalid:\n{e}");
+            return 1;
+        }
+    };
+    let db = db.or_else(|| {
+        cfg.primary_source()
+            .and_then(|(_, s)| config::resolve_env(&s.url))
+    });
+    let dbs = match db {
+        Some(db) if db.starts_with("postgres://") || db.starts_with("postgresql://") => {
+            let schemas: Vec<String> = match schema {
+                Some(s) => vec![s],
+                None => cfg
+                    .primary_source()
+                    .map(|(_, s)| s.schemas.clone())
+                    .filter(|v| !v.is_empty())
+                    .unwrap_or_else(|| vec!["public".into()]),
+            };
+            let pool = match sqlx::postgres::PgPoolOptions::new()
+                .max_connections(1)
+                .acquire_timeout(std::time::Duration::from_secs(10))
+                .connect(&db)
+                .await
+            {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("✗ cannot connect to --db: {e}");
+                    return 1;
+                }
+            };
+            match introspect::introspect(&pool, &schemas).await {
+                Ok(s) => Some(s),
+                Err(e) => {
+                    eprintln!("✗ introspection failed: {e}");
+                    return 1;
+                }
+            }
+        }
+        Some(_) => {
+            eprintln!("· non-postgres --db — column names are postgres-only, extracting from config alone");
+            None
+        }
+        None => {
+            eprintln!("· no --db / resolvable primary source url — extracting from config alone (column names not included)");
+            None
+        }
+    };
+    let (out, missing, all) = i18n::extract(&cfg, dbs.as_ref(), locale);
+    print!("{out}");
+    eprintln!("· {locale}: {missing} of {all} author strings untranslated");
+    0
 }
 
 /// `cartapel check`: parse + validate the bundle, then (with --db) cross-check

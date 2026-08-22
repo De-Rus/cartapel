@@ -85,6 +85,24 @@ cartapel check --config ./admin --db postgres://…  # + verify every configured
 Run it in CI next to your migrations: config drift against a schema change
 becomes a red build instead of a silently broken panel.
 
+## `cartapel i18n extract`
+
+Prints the `config/i18n/<locale>.hcl` stub for everything the locale has not
+translated yet — group, table, field, filter, action, section, page and panel
+names, in config order — ready to fill in. See [Localization](/localization).
+
+```bash
+cartapel i18n extract --config ./admin --locale es                  # from the config alone
+cartapel i18n extract --config ./admin --locale es --db postgres://… # + the column names the panel humanizes
+```
+
+| Flag | Env var | Default | Description |
+| --- | --- | --- | --- |
+| `--config` | `CARTAPEL_CONFIG` | — | The config directory. Required. |
+| `--locale` | — | — | The language to extract for, e.g. `es`. Required. |
+| `--db` | `CARTAPEL_DB` | primary source url | With a Postgres URL, introspected column names are included. |
+| `--schema` | `CARTAPEL_SCHEMA` | primary source's `schemas` | Narrows introspection to one schema. |
+
 ## Environment variables
 
 Beyond the per-flag variables above, cartapel reads:
