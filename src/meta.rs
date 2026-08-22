@@ -876,7 +876,7 @@ pub(crate) fn pages_meta(
                 .as_deref()
                 .and_then(|slug| cfg.group_label_in(slug, locale));
             json!({
-                "id": p.id(), "slug": p.slug, "label": p.label,
+                "id": p.id(), "slug": p.slug, "label": localize(locale, &p.labels, p.label.clone()),
                 "group": group, "icon": p.icon, "roles": p.roles,
             })
         })
@@ -915,6 +915,7 @@ mod nav_tests {
             slug: "fleet".into(),
             group: Some("overview".into()),
             label: "Fleet".into(),
+            labels: Default::default(),
             order: 0,
             columns: Some(4),
             refresh: None,

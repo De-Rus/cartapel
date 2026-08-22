@@ -196,6 +196,10 @@ pub struct TableSource {
 #[serde(deny_unknown_fields)]
 pub struct PageConfig {
     pub label: String,
+    /// Per-locale label overrides, e.g. `labels = { es = "Flota" }` — the
+    /// viewer's locale picks one, `label` is the fallback.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub labels: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
     /// Position among the pages of its group (lower first; ties by label).
@@ -258,6 +262,7 @@ pub struct LoadedPage {
     pub slug: String,
     pub group: Option<String>,
     pub label: String,
+    pub labels: BTreeMap<String, String>,
     pub order: i64,
     pub columns: Option<u8>,
     pub refresh: Option<String>,
@@ -1825,6 +1830,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                     slug,
                     group,
                     label: p.label,
+                    labels: p.labels,
                     order: p.order.unwrap_or(0),
                     columns: p.columns,
                     refresh: p.refresh,
@@ -1879,6 +1885,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                         slug,
                         group,
                         label: p.label,
+                        labels: p.labels,
                         order: p.order.unwrap_or(0),
                         columns: p.columns,
                         refresh: p.refresh,

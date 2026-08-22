@@ -73,6 +73,7 @@ field "plan" {
 | Fields (`field "…" { }`) | `labels` — column headers, detail labels **and filter chips** |
 | Groups (`_group.hcl`) | `labels` — the sidebar section name, and the group a page or table reports |
 | Actions (`action "…" { }`) | `labels` — bulk-action buttons |
+| Pages (a folder's `screen.hcl` with panels) | `labels` — the sidebar entry and the page title |
 
 Resolution happens **server-side at one point** (the meta the frontend renders
 from): the browser sends the viewer's language in an `X-Cartapel-Locale`
