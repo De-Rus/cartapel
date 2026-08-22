@@ -801,7 +801,7 @@ function ShellChrome({ meta }: { meta: Meta }) {
           </button>
         </header>
         <main
-          className="min-h-0 flex-1 overflow-auto p-4"
+          className="flex min-h-0 flex-1 flex-col overflow-auto p-4"
           aria-label={currentTable ?? undefined}
         >
           <Outlet />

@@ -343,7 +343,7 @@ export function DataTable({
   const colSpan = columns.length + (hasSelection ? 1 : 0) + (onPeek ? 1 : 0)
 
   return (
-    <div ref={scrollRef} className="card list-scroll overflow-auto">
+    <div ref={scrollRef} className="card min-h-0 flex-1 overflow-auto">
       <table className="w-full text-[length:var(--font-data)]" style={{ tableLayout: Object.keys(widths).length ? 'fixed' : 'auto' }}>
         <colgroup>
           {hasSelection && <col style={{ width: 36 }} />}

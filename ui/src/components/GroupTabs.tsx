@@ -10,7 +10,7 @@ export function GroupTabs({ table }: { table: string | undefined }) {
   if (!group || groupNavMode(group, meta.group_nav) !== 'page' || group.tables.length < 2) return null
   const byName = new Map(meta.tables.map((t) => [t.name, t]))
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-1 border-b pb-px">
+    <div className="mb-1 flex flex-wrap items-center gap-1 border-b pb-px">
       {group.tables.map((name) => {
         const tb = byName.get(name)
         if (!tb) return null

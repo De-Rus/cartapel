@@ -322,13 +322,6 @@ textarea {
   background: var(--accent);
 }
 
-.list-scroll {
-  height: calc(100dvh - var(--list-chrome, 176px));
-}
-:root[data-density='compact'] .list-scroll {
-  --list-chrome: 150px;
-}
-
 @keyframes sheet-in {
   from {
     transform: translateX(100%);

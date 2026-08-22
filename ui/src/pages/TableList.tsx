@@ -353,7 +353,7 @@ function ListInner({ table }: { table: TableMeta }) {
   const approx = data?.approx ?? false
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <GroupTabs table={table.name} />
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative">
