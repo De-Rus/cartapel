@@ -85,7 +85,7 @@ commit.
 | **Roles & permissions** | Per-table / per-column / row-level, in versioned config. Role inheritance (`extends`), multi-role union, a per-role `customize` grant, and a read-only **view-as** mode to verify what a role sees. |
 | **Audit & revert** | Every write logged with before/after diffs. Field edits revert in one click — and the revert is itself audited. |
 | **Pages & dashboards** | Stat tiles, charts and tables from SQL (`{{window}}` and friends), grids of panels in HCL — each from inline SQL, a named query, a table, or a source (HTTP, directory, bucket). Embed an existing Grafana panel in an `iframe` when you already have one. Read-only transactions, timeouts, no JavaScript. |
-| **Theming & i18n** | Presets (including a faithful Django look), your accent, per-mode design tokens, per-locale labels — one hot-reloaded HCL block. |
+| **Theming & i18n** | Presets (including a faithful Django look), your accent, per-mode design tokens — one hot-reloaded HCL block. Every viewer picks their language from the user menu (the browser's applies by default); your own labels carry per-locale translations next to the thing they name. |
 | **Several databases at once** | Postgres, MySQL and MariaDB are fully editable — the connection URL's scheme picks the engine. ClickHouse joins as a read-only source for browsing and SQL. Extra databases are `source` blocks; their tables share one sidebar. |
 | **Ops-friendly** | Single static binary or Docker image. Config hot-reloads from disk (a broken edit keeps the last good config). `cartapel check` validates the bundle in CI. Optional `public_role` for kiosk/demo access. |
 

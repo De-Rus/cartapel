@@ -5,7 +5,9 @@ import { useT } from '../lib/i18n'
 import { useMeta } from '../lib/meta'
 import { type Density, type ThemeMode } from '../lib/theme'
 import { setViewAsRole, viewAsRole } from '../lib/viewAs'
-import { IconEye, IconLogout, IconMonitor, IconMoon, IconRows, IconSun } from './Icons'
+import { localeName } from '../lib/locale'
+import { SUPPORTED_LOCALES } from '../locales'
+import { IconEye, IconGlobe, IconLogout, IconMonitor, IconMoon, IconRows, IconSun } from './Icons'
 
 function initials(email: string): string {
   return email.slice(0, 2).toUpperCase()
@@ -20,6 +22,8 @@ export function UserMenu({
   onCycleTheme,
   density,
   onToggleDensity,
+  locale,
+  onCycleLocale,
   onHelp,
   onLogout,
   collapsed,
@@ -32,6 +36,8 @@ export function UserMenu({
   onCycleTheme: () => void
   density: Density
   onToggleDensity: () => void
+  locale: string
+  onCycleLocale: () => void
   onHelp: () => void
   onLogout: () => void
   collapsed: boolean
@@ -80,6 +86,13 @@ export function UserMenu({
             <span className="flex-1">{t('menu_density')}</span>
             <span className="text-xxs capitalize text-muted">{t(density === 'compact' ? 'density_compact' : 'density_comfortable')}</span>
           </MenuRow>
+          {SUPPORTED_LOCALES.length > 1 && (
+            <MenuRow onClick={onCycleLocale}>
+              <IconGlobe size={14} className="text-muted" />
+              <span className="flex-1">{t('menu_language')}</span>
+              <span className="text-xxs text-muted">{localeName(locale)}</span>
+            </MenuRow>
+          )}
           <MenuRow onClick={onHelp}>
             <span className="kbd">?</span>
             <span className="flex-1">{t('menu_shortcuts')}</span>

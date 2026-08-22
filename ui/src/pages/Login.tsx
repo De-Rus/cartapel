@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { api, ApiError } from '../api/client'
 import { makeT } from '../lib/i18n'
+import { pickLocale } from '../lib/locale'
 import { pickBrandLogo } from '../lib/brand'
 import { useIsDark } from '../lib/theme'
 import { applyThemeConfig } from '../lib/themes'
@@ -25,7 +26,7 @@ export default function Login() {
     staleTime: Infinity,
   })
 
-  const t = useMemo(() => makeT(meta?.locale, meta?.strings), [meta?.locale, meta?.strings])
+  const t = useMemo(() => makeT(pickLocale(meta?.locale), meta?.strings), [meta?.locale, meta?.strings])
   const isDark = useIsDark(meta?.theme?.mode)
   const logo = pickBrandLogo(meta, isDark)
 

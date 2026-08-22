@@ -41,6 +41,14 @@ where
     deserializer.deserialize_any(V(PhantomData))
 }
 
+/// One entry of `strings`: a replacement for every locale, or a per-locale map.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(untagged)]
+pub enum StringOverride {
+    Every(String),
+    PerLocale(BTreeMap<String, String>),
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CartapelConfig {
@@ -50,8 +58,11 @@ pub struct CartapelConfig {
     pub brand_logo: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub locale: Option<String>,
+    /// Built-in UI string overrides. A flat entry (`new_record = "Add {label}"`)
+    /// applies in every locale; an entry keyed by a locale code holds that
+    /// locale's overrides (`es = { new_record = "Añadir {label}" }`).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub strings: BTreeMap<String, String>,
+    pub strings: BTreeMap<String, StringOverride>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub per_page: Option<u32>,
     /// Default sidebar mode for folder-groups: `page` (one entry → tabbed group)
@@ -1465,21 +1476,34 @@ pub struct ConfigDir {
 }
 
 impl ConfigDir {
-    /// The presentation label of a folder-group, by its folder slug.
+    /// The presentation label of a folder-group, by its folder slug, in the
+    /// instance locale.
+    #[cfg(test)]
     pub fn group_label(&self, slug: &str) -> Option<String> {
+        self.group_label_in(slug, self.cartapel.locale.as_deref())
+    }
+
+    /// The presentation label of a folder-group in one locale: `labels[locale]`
+    /// wins, else the base label.
+    pub fn group_label_in(&self, slug: &str, locale: Option<&str>) -> Option<String> {
         self.groups.iter().find(|g| g.slug == slug).map(|g| {
-            self.cartapel
-                .locale
-                .as_deref()
+            locale
                 .and_then(|l| g.labels.get(l).cloned())
                 .unwrap_or_else(|| g.label.clone())
         })
     }
 
-    /// The label of the folder-group a table belongs to, if any.
+    /// The label of the folder-group a table belongs to, if any, in the
+    /// instance locale.
+    #[cfg(test)]
     pub fn table_group_label(&self, table: &str) -> Option<String> {
+        self.table_group_label_in(table, self.cartapel.locale.as_deref())
+    }
+
+    /// The label of the folder-group a table belongs to, in one locale.
+    pub fn table_group_label_in(&self, table: &str, locale: Option<&str>) -> Option<String> {
         let slug = self.table_sources.get(table)?.group.as_deref()?;
-        self.group_label(slug)
+        self.group_label_in(slug, locale)
     }
 }
 
@@ -2435,6 +2459,39 @@ panel {
             serde_json::to_value(&dash.widgets).unwrap(),
             serde_json::to_value(&dash2.widgets).unwrap(),
             "widget order preserved",
+        );
+    }
+
+    /// `strings` takes a flat override (every locale) next to a locale-keyed map
+    /// (that locale only), and both survive a write-back unchanged.
+    #[test]
+    fn strings_flat_and_per_locale_round_trip() {
+        let sc: CartapelConfig = hcl::from_str(
+            r#"
+locale  = "en"
+strings = {
+  new_record = "Add {label}"
+  es = { new_record = "Añadir {label}", logout = "Chao" }
+}
+"#,
+        )
+        .expect("parse strings");
+        assert_eq!(
+            sc.strings.get("new_record"),
+            Some(&StringOverride::Every("Add {label}".into()))
+        );
+        assert_eq!(
+            sc.strings.get("es"),
+            Some(&StringOverride::PerLocale(BTreeMap::from([
+                ("new_record".to_string(), "Añadir {label}".to_string()),
+                ("logout".to_string(), "Chao".to_string()),
+            ])))
+        );
+        let out = hcl::to_string(&sc).unwrap();
+        let sc2: CartapelConfig = hcl::from_str(&out).unwrap();
+        assert_eq!(
+            serde_json::to_value(&sc).unwrap(),
+            serde_json::to_value(&sc2).unwrap()
         );
     }
 

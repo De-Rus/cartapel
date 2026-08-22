@@ -203,6 +203,13 @@ export const IconMenu = (p: IconProps) => (
   </Svg>
 )
 
+export const IconGlobe = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+  </Svg>
+)
+
 export const IconRows = (p: IconProps) => (
   <Svg {...p}>
     <rect x="3" y="4" width="18" height="7" rx="1" />

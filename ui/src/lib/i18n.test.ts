@@ -39,3 +39,50 @@ describe('the dictionaries', () => {
     expect(shared.length).toBeLessThan(Object.keys(DICTS.en).length / 3)
   })
 })
+
+/** `strings` from the config: a flat entry applies everywhere, a locale-keyed
+ *  map applies to that locale only and wins over the flat one. */
+describe('string overrides', () => {
+  it('apply a flat entry in every locale', () => {
+    const strings = { logout: 'Bye' }
+    expect(makeT('en', strings)('logout')).toBe('Bye')
+    expect(makeT('es', strings)('logout')).toBe('Bye')
+  })
+
+  it('scope a locale-keyed map to that locale', () => {
+    const strings = { es: { logout: 'Chao' } }
+    expect(makeT('es', strings)('logout')).toBe('Chao')
+    expect(makeT('en', strings)('logout')).toBe(DICTS.en.logout)
+  })
+
+  it('let the locale-keyed entry win over the flat one', () => {
+    const strings = { logout: 'Bye', es: { logout: 'Chao' } }
+    expect(makeT('es', strings)('logout')).toBe('Chao')
+    expect(makeT('en', strings)('logout')).toBe('Bye')
+  })
+
+  it('keep placeholders working through an override', () => {
+    expect(makeT('en', { search_placeholder: 'Find {label}' })('search_placeholder', { label: 'orders' })).toBe('Find orders')
+  })
+})
+
+describe('every shipped locale', () => {
+  it('names itself and covers every English key', async () => {
+    const { LOCALES } = await import('../locales')
+    const en = Object.keys(LOCALES.en.dict).sort()
+    for (const [tag, { name, dict }] of Object.entries(LOCALES)) {
+      expect(name, tag).not.toBe('')
+      expect(Object.keys(dict).sort(), tag).toEqual(en)
+    }
+  })
+
+  it('keeps the same placeholders per key', async () => {
+    const { LOCALES } = await import('../locales')
+    const holes = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort()
+    for (const [tag, { dict }] of Object.entries(LOCALES)) {
+      for (const key of Object.keys(LOCALES.en.dict)) {
+        expect(holes(dict[key]), `${tag}.${key}`).toEqual(holes(LOCALES.en.dict[key]))
+      }
+    }
+  })
+})

@@ -185,7 +185,8 @@ export interface Meta {
   group_nav?: string | null
   pages?: PageMeta[]
   locale?: string | null
-  strings?: Record<string, string> | null
+  resolved_locale?: string | null
+  strings?: Record<string, string | Record<string, string>> | null
   brand_logo?: string | null
   brand_accent?: string | null
   brand_accent_light?: string | null

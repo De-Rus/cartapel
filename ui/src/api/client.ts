@@ -37,6 +37,7 @@ import type {
 } from './types'
 import { BASE } from '../lib/base'
 import { viewAsRole } from '../lib/viewAs'
+import { requestLocale } from '../lib/locale'
 
 const API_BASE = `${BASE}/api`
 export const MOCK = !!import.meta.env.VITE_MOCK
@@ -136,6 +137,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (method !== 'GET') headers['X-Cartapel'] = '1'
   const asRole = viewAsRole()
   if (asRole && !path.startsWith('/auth/')) headers['X-Cartapel-As-Role'] = asRole
+  const locale = requestLocale()
+  if (locale) headers['X-Cartapel-Locale'] = locale
   const res = await fetch(API_BASE + path, {
     method,
     credentials: 'include',

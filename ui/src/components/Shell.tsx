@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { api } from '../api/client'
 import type { Meta, PageMeta, TableMeta } from '../api/types'
-import { fmtCompact, setFormatLocale } from '../lib/format'
+import { fmtCompact } from '../lib/format'
 import { MetaContext } from '../lib/meta'
 import { I18nProvider, makeT, TFn, useT } from '../lib/i18n'
 import { pickBrandLogo, resolveBrandLogo } from '../lib/brand'
@@ -14,6 +14,7 @@ import { useMediaQuery } from '../lib/hooks'
 import { useGlobalKeys } from '../lib/keys'
 import { useTablePrefetch } from '../lib/prefetch'
 import { applyBrandAccent, useDensity, useIsDark, useTheme } from '../lib/theme'
+import { requestLocale, useLocale } from '../lib/locale'
 import { applyThemeConfig } from '../lib/themes'
 import { Breadcrumbs } from './Breadcrumbs'
 import { CommandPalette, type PaletteMode } from './CommandPalette'
@@ -592,7 +593,15 @@ function MobileDrawer({
 
 const SIDEBAR_KEY = 'cartapel.sidebar'
 
-function ShellChrome({ meta }: { meta: Meta }) {
+function ShellChrome({
+  meta,
+  locale,
+  onCycleLocale,
+}: {
+  meta: Meta
+  locale: string
+  onCycleLocale: () => void
+}) {
   const navigate = useNavigate()
   const location = useLocation()
   const qc = useQueryClient()
@@ -749,6 +758,8 @@ function ShellChrome({ meta }: { meta: Meta }) {
             onCycleTheme={cycleTheme}
             density={density}
             onToggleDensity={toggleDensity}
+            locale={locale}
+            onCycleLocale={onCycleLocale}
             onHelp={() => {
               setUserMenuOpen(false)
               setHelpOpen(true)
@@ -826,10 +837,12 @@ function ShellChrome({ meta }: { meta: Meta }) {
 
 export default function Shell() {
   const { data: meta, isLoading, error } = useQuery({
-    queryKey: ['meta'],
+    queryKey: ['meta', requestLocale()],
     queryFn: api.meta,
     staleTime: Infinity,
+    placeholderData: keepPreviousData,
   })
+  const [locale, , cycleLocale] = useLocale(meta?.locale)
 
   useEffect(() => {
     applyThemeConfig(meta?.theme)
@@ -851,11 +864,10 @@ export default function Shell() {
     )
   }
 
-  setFormatLocale(meta.locale)
   return (
     <MetaContext.Provider value={meta}>
-      <I18nProvider locale={meta.locale} strings={meta.strings}>
-        <ShellChrome meta={meta} />
+      <I18nProvider locale={locale} strings={meta.strings}>
+        <ShellChrome meta={meta} locale={locale} onCycleLocale={cycleLocale} />
       </I18nProvider>
     </MetaContext.Provider>
   )

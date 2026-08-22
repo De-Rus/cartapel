@@ -108,8 +108,8 @@ Top-level `[cartapel]` keys:
 | --- | --- | --- |
 | `brand` | string | Panel name, shown in the header. Defaults to `cartapel`. |
 | `brand_logo` | string | Logo URL, data URL, or a bundle asset filename served under `/static/`. |
-| `locale` | string | The instance language — picks the UI dictionary, date/number formatting and per-locale `labels` overrides. See [Localization](/localization). |
-| `strings` | map | Override individual UI strings (`{ "key" = "value" }`). |
+| `locale` | string | The instance's default language. Each viewer can pick their own from the user menu (the browser's language applies first); `locale` is what a viewer gets when neither says otherwise. See [Localization](/localization). |
+| `strings` | map | Override individual UI strings: `{ key = "value" }` applies in every language, `{ es = { key = "valor" } }` in one. |
 | `per_page` | number | Default list page size — `100` when unset. A table's `list.per_page` overrides it. |
 | `group_nav` | string | Default sidebar mode for groups: `expanded` (default — every table is its own entry) or `page` (one entry per group; sibling tables become tabs). A group's own `nav` in `_group.hcl` overrides it. |
 | `secret_key` | string | Session-signing root. Supports `env:`/`${}`. Overridden by `CARTAPEL_SECRET_KEY`. **Required** somewhere. |

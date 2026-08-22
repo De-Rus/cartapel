@@ -1,7 +1,7 @@
 import { BASE } from './base'
 
-// Formatters follow the instance locale (meta.locale); Shell calls
-// setFormatLocale once the meta arrives, before anything renders rows.
+// Formatters follow the viewer's locale; `useLocale` calls setFormatLocale
+// whenever it changes, before anything renders rows.
 let nf = new Intl.NumberFormat('en')
 let nf2 = new Intl.NumberFormat('en', { maximumFractionDigits: 2 })
 let nf1 = new Intl.NumberFormat('en', { maximumFractionDigits: 1 })
