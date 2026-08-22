@@ -100,6 +100,7 @@ cartapel i18n extract --config ./admin --locale es --db postgres://… # + the c
 | --- | --- | --- | --- |
 | `--config` | `CARTAPEL_CONFIG` | — | The config directory. Required. |
 | `--locale` | — | — | The language to extract for, e.g. `es`. Required. |
+| `--format` | — | `hcl` | `hcl` (with comments) or `json` (a flat object for translation tools). Both load from `config/i18n/`. |
 | `--db` | `CARTAPEL_DB` | primary source url | With a Postgres URL, introspected column names are included. |
 | `--schema` | `CARTAPEL_SCHEMA` | primary source's `schemas` | Narrows introspection to one schema. |
 

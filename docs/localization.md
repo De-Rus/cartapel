@@ -79,6 +79,12 @@ Fill the right-hand sides; an empty value keeps the original text, so a
 half-filled file is always safe to ship. Re-run the command after a config
 change and merge the new lines in. The file hot-reloads like the rest.
 
+Prefer JSON — for a translation tool, a script, or a translator who does not
+write HCL? The same dictionary works as `config/i18n/<locale>.json`, one flat
+object (`{ "Billing": "Facturación" }`), and `extract --format json` prints the
+stub that way. HCL or JSON per locale, not both — two files for one language
+is a load error, never a silent merge.
+
 ### Inline, on the block
 
 `label` / `label_plural` name things in one language. Add per-locale overrides

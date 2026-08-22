@@ -110,6 +110,10 @@ enum I18nCommand {
         /// The locale to extract for, e.g. `es`.
         #[arg(long)]
         locale: String,
+        /// `hcl` (default, with comments) or `json` (a flat object, for
+        /// translation tools) — either lands in config/i18n/.
+        #[arg(long, default_value = "hcl")]
+        format: String,
         #[arg(long, env = "CARTAPEL_DB")]
         db: Option<String>,
         #[arg(long, env = "CARTAPEL_SCHEMA")]
@@ -381,11 +385,20 @@ async fn main() {
                 I18nCommand::Extract {
                     config,
                     locale,
+                    format,
                     db,
                     schema,
                 },
         } => {
-            std::process::exit(i18n_extract(&config, &locale, db, schema).await);
+            let format = match format.as_str() {
+                "hcl" => i18n::StubFormat::Hcl,
+                "json" => i18n::StubFormat::Json,
+                other => {
+                    eprintln!("✗ --format must be hcl or json, not {other}");
+                    std::process::exit(2);
+                }
+            };
+            std::process::exit(i18n_extract(&config, &locale, format, db, schema).await);
         }
     }
 }
@@ -396,6 +409,7 @@ async fn main() {
 async fn i18n_extract(
     config: &std::path::Path,
     locale: &str,
+    format: i18n::StubFormat,
     db: Option<String>,
     schema: Option<String>,
 ) -> i32 {
@@ -449,7 +463,7 @@ async fn i18n_extract(
             None
         }
     };
-    let (out, missing, all) = i18n::extract(&cfg, dbs.as_ref(), locale);
+    let (out, missing, all) = i18n::extract(&cfg, dbs.as_ref(), locale, format);
     print!("{out}");
     eprintln!("· {locale}: {missing} of {all} author strings untranslated");
     0

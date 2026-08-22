@@ -71,7 +71,7 @@ tables. It holds exactly three global files plus a `widgets/` asset folder:
 | `config/cartapel.hcl` | Brand, logo, locale, `per_page`, the secret key, `theme { }`, and the `source "…" { }` blocks. |
 | `config/auth.hcl` | `role "…" { }` blocks — the permission model. See [Roles & permissions](/roles-and-permissions). |
 | `config/dashboard.hcl` | The home dashboard's `panel { }` blocks. See [Dashboard](/configuration/dashboard). |
-| `config/i18n/<locale>.hcl` | One `labels = { "text" = "translation" }` dictionary per language for everything your config names. See [Localization](/localization). |
+| `config/i18n/<locale>.hcl` or `.json` | One dictionary per language for everything your config names — `labels = { "text" = "translation" }` in HCL, a flat object in JSON. See [Localization](/localization). |
 | `config/widgets/*.js` | Shared custom-widget web components, served at `/static/config/widgets/`. See [Pages & queries](/configuration/pages-and-queries). |
 
 Putting anything else in `config/` is a loud load error. Folders whose name

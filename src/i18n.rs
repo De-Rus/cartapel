@@ -115,6 +115,17 @@ pub fn parse_dictionary(raw: &str) -> Result<BTreeMap<String, String>, hcl::Erro
         .collect())
 }
 
+/// The same dictionary as JSON — `config/i18n/<locale>.json`, one flat object
+/// of base text to translation — for translation tools that speak JSON and not
+/// HCL. Empty values are stubs and are dropped like in the HCL form.
+pub fn parse_dictionary_json(raw: &str) -> Result<BTreeMap<String, String>, serde_json::Error> {
+    let map: BTreeMap<String, String> = serde_json::from_str(raw)?;
+    Ok(map
+        .into_iter()
+        .filter(|(_, v)| !v.trim().is_empty())
+        .collect())
+}
+
 /// Every piece of author text the panel can render, in config order, each
 /// once: what a translator has to cover. With a live schema, the column names
 /// the panel humanizes for tables that give them no `label` are included too.
@@ -222,12 +233,21 @@ fn hcl_quote(s: &str) -> String {
     q.replace("$${", "$").replace("${", "$${")
 }
 
-/// The `config/i18n/<locale>.hcl` stub for everything `locale` has not
-/// translated yet: one `"base" = ""` line per missing text, in config order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum StubFormat {
+    #[default]
+    Hcl,
+    Json,
+}
+
+/// The `config/i18n/<locale>.hcl` (or `.json`) stub for everything `locale`
+/// has not translated yet: one `"base" = ""` entry per missing text, in config
+/// order.
 pub fn extract(
     cfg: &ConfigDir,
     schema: Option<&crate::introspect::Schema>,
     locale: &str,
+    format: StubFormat,
 ) -> (String, usize, usize) {
     let have = cfg.i18n.get(locale);
     let all = author_strings(cfg, schema);
@@ -235,6 +255,16 @@ pub fn extract(
         .iter()
         .filter(|s| !have.is_some_and(|d| d.contains_key(*s)))
         .collect();
+    if format == StubFormat::Json {
+        let mut obj = serde_json::Map::new();
+        for s in &missing {
+            obj.insert((*s).clone(), serde_json::Value::String(String::new()));
+        }
+        let mut out = serde_json::to_string_pretty(&serde_json::Value::Object(obj))
+            .unwrap_or_else(|_| "{}".into());
+        out.push('\n');
+        return (out, missing.len(), all.len());
+    }
     let mut out = String::new();
     out.push_str(&format!(
         "# {locale}: {} of {} author strings still untranslated. Fill the right-hand\n# side; an empty value keeps the original text. Save as config/i18n/{locale}.hcl\n# (merge into the existing file's `labels` map if there is one).\nlabels = {{\n",
@@ -328,7 +358,7 @@ mod tests {
                 "Pedidos".to_string(),
             )])),
         );
-        let (out, missing, all) = extract(&cfg, None, "es");
+        let (out, missing, all) = extract(&cfg, None, "es", StubFormat::Hcl);
         assert_eq!((missing, all), (3, 4));
         let lines: Vec<&str> = out
             .lines()
@@ -348,6 +378,38 @@ mod tests {
             reparsed.is_empty(),
             "stubs are empty, so they translate nothing yet"
         );
+    }
+
+    #[test]
+    fn json_dictionary_parses_and_drops_stubs() {
+        let d = parse_dictionary_json("{\"Billing\": \"Facturación\", \"Orders\": \"\"}").unwrap();
+        assert_eq!(d.len(), 1);
+        assert_eq!(d["Billing"], "Facturación");
+        assert!(parse_dictionary_json("[1]").is_err());
+    }
+
+    #[test]
+    fn json_stub_keeps_config_order_and_round_trips() {
+        let mut cfg = ConfigDir::default();
+        cfg.groups.push(crate::config::LoadedGroup {
+            slug: "sales".into(),
+            label: "Sales".into(),
+            labels: Default::default(),
+            icon: None,
+            order: 0,
+            table_order: vec![],
+            nav: None,
+        });
+        let (out, missing, all) = extract(&cfg, None, "es", StubFormat::Json);
+        assert_eq!((missing, all), (2, 2));
+        let keys: Vec<String> =
+            serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&out)
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect();
+        assert_eq!(keys, vec!["Sales", "Ungrouped"]);
+        assert!(parse_dictionary_json(&out).unwrap().is_empty());
     }
 
     #[test]

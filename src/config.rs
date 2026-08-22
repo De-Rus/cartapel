@@ -1988,6 +1988,31 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
         .iter()
         .map(|g| (g.slug.clone(), (g.order, g.label.clone())))
         .collect();
+    let i18n_dir = dir.join(RESERVED_DIR).join("i18n");
+    if i18n_dir.is_dir() {
+        let mut jsons: Vec<_> = std::fs::read_dir(&i18n_dir)
+            .map_err(|e| format!("reading {}: {e}", i18n_dir.display()))?
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|x| x == "json"))
+            .collect();
+        jsons.sort();
+        for path in jsons {
+            let stem = path.file_stem().unwrap().to_string_lossy().to_string();
+            if cfg.i18n.contains_key(&stem) {
+                return Err(format!(
+                    "two dictionaries for locale \"{stem}\": {} and {}.hcl — keep one",
+                    path.display(),
+                    i18n_dir.join(&stem).display()
+                ));
+            }
+            let raw = std::fs::read_to_string(&path)
+                .map_err(|e| format!("reading {}: {e}", path.display()))?;
+            let dict = crate::i18n::parse_dictionary_json(&raw)
+                .map_err(|e| format!("{}: {e}", path.display()))?;
+            cfg.i18n.insert(stem, std::sync::Arc::new(dict));
+        }
+    }
     cfg.pages.sort_by(|a, b| {
         let ra = a.group.as_ref().and_then(|g| group_rank.get(g));
         let rb = b.group.as_ref().and_then(|g| group_rank.get(g));
@@ -3271,6 +3296,40 @@ panel {
     /// The reserved `config` folder loads the three globals by bare stem, and holds
     /// nothing else: a stray `.hcl` directly inside it is a loud misplaced error,
     /// never a silently-loaded bogus table.
+    /// `config/i18n/` takes one dictionary per locale, HCL or JSON — both parse
+    /// into the same map, and two files for one locale are refused rather than
+    /// merged.
+    #[test]
+    fn i18n_dictionaries_load_from_hcl_or_json_but_not_both() {
+        let root = fresh_root("i18n-dicts");
+        let dir = root.join("config").join("i18n");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("es.hcl"),
+            "labels = {\n  \"Billing\" = \"Facturación\"\n  \"Orders\" = \"\"\n}\n",
+        )
+        .unwrap();
+        std::fs::write(dir.join("de.json"), "{ \"Billing\": \"Abrechnung\" }\n").unwrap();
+
+        let cfg = load(Some(&root)).expect("dictionaries load");
+        assert_eq!(
+            cfg.i18n["es"].get("Billing").map(String::as_str),
+            Some("Facturación")
+        );
+        assert!(
+            !cfg.i18n["es"].contains_key("Orders"),
+            "empty value = untranslated"
+        );
+        assert_eq!(
+            cfg.i18n["de"].get("Billing").map(String::as_str),
+            Some("Abrechnung")
+        );
+
+        std::fs::write(dir.join("es.json"), "{}\n").unwrap();
+        let err = load(Some(&root)).expect_err("two files for one locale");
+        assert!(err.contains("two dictionaries for locale \"es\""), "{err}");
+    }
+
     #[test]
     fn base_folder_loads_globals_and_rejects_strays() {
         let root = fresh_root("base-folder");
