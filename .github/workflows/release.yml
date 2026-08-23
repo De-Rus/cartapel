@@ -47,7 +47,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # Notes from the commits since the previous tag: there are no pull
+      # requests here for GitHub's own generator to read, so it would print an
+      # empty body with a compare link.
+      - name: Notes from commits
+        run: |
+          prev=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          range=${prev:+$prev..}${GITHUB_REF_NAME}
+          git log --format='- %s' "$range" | grep -v 'chore(release)' \
+            | sed -E 's/^- (feat|fix|docs|test|chore|ci|refactor|perf)\(([^)]*)\): /- **\2** — /' > notes.md
+          [ -s notes.md ] || echo '- housekeeping' > notes.md
+          [ -n "$prev" ] && printf '\n**Full Changelog**: https://github.com/%s/compare/%s...%s\n' "$GITHUB_REPOSITORY" "$prev" "$GITHUB_REF_NAME" >> notes.md
       - uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: notes.md
