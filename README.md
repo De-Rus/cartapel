@@ -58,7 +58,11 @@ keys rendered as links carrying the related record's *name*, not a bare id.
 ## Try it
 
 ```bash
-# The bundled demo (Acme dataset + a worked config), nothing touches your machine:
+# One binary, via Homebrew (macOS and Linux):
+brew install de-rus/tap/cartapel
+CARTAPEL_DB=postgres://user:pass@host/db cartapel serve --config ./config
+
+# Or the bundled demo (Acme dataset + a worked config), nothing touches your machine:
 git clone https://github.com/De-Rus/cartapel && cd cartapel
 docker compose up            # → http://localhost:8686/admin
 
