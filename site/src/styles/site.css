@@ -204,3 +204,10 @@ a.card h3 { color: var(--ink); }
 
 .teaser-tags a { color: var(--sec); }
 .teaser-tags a:hover { color: var(--ink); text-decoration: none; border-color: rgba(255, 255, 255, 0.25); }
+
+.shot-section { margin-top: 48px; }
+.shot-section .frame { margin: 0; }
+.shot-caption {
+  margin: 14px auto 0; max-width: 680px; text-align: center;
+  font-size: 14.5px; color: var(--muted);
+}

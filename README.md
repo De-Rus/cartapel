@@ -13,7 +13,7 @@
 
   **[cartapel.com](https://cartapel.com)** · **[▶ Live demo](https://demo.cartapel.com)** (no login) · **[📖 Docs](https://docs.cartapel.com)** · **[🚀 Deploy to Render](https://render.com/deploy?repo=https://github.com/De-Rus/cartapel)**
 
-  <img src="site/public/shots/list.png" alt="cartapel — list view with filter chips, saved views and inline editing" width="820" />
+  <img src="site/public/shots/list-filters.webp" alt="cartapel — list view with filter chips, saved views and inline editing" width="820" />
 </div>
 
 ## Why

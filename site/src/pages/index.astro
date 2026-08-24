@@ -84,7 +84,13 @@ const faq = [
     </div>
     <p class="demo-creds">no login needed — click around, it resets daily</p>
     <div class="frame">
-      <img src="/shots/list.png" alt="cartapel list view: introspected table with filters, saved views and inline editing" loading="eager" />
+      <img
+        src="/shots/list-filters.webp"
+        width="2880"
+        height="1800"
+        alt="cartapel list view: an introspected orders table with two filter chips applied, saved views, search, export and inline editing"
+        loading="eager"
+      />
     </div>
   </header>
 
@@ -178,7 +184,50 @@ action "refund" {
 
   <section class="shot2">
     <div class="frame">
-      <img src="/shots/dashboard.png" alt="cartapel dashboard: SQL stat tiles, charts and a window selector" loading="lazy" />
+      <img
+        src="/shots/dashboard.webp"
+        width="2880"
+        height="1800"
+        alt="cartapel dashboard: SQL stat tiles, a revenue chart and a window selector"
+        loading="lazy"
+      />
+    </div>
+  </section>
+
+  <section class="split">
+    <div>
+      <h2>A GUI when you want one — a file either way</h2>
+      <p>
+        Every table has a <strong>Customize</strong> drawer: visible columns, field widgets,
+        the detail layout, per-role permissions and actions, edited by clicking. It is not a
+        second source of truth — publishing writes the same <code>screen.hcl</code> your repo
+        holds, and the <strong>HCL</strong> tab shows you the file before you save it.
+      </p>
+      <p style="margin-top: 14px;">
+        On a read-only deployment nothing is written: the panel hands you the HCL to commit.
+        Manual edits and comments in the file win over the editor.
+      </p>
+    </div>
+    <div class="frame" style="margin-top: 0;">
+      <img
+        src="/shots/customize-hcl.webp"
+        width="2880"
+        height="1800"
+        alt="The Customize drawer in cartapel showing the HCL tab: the list, display and detail blocks of the file the visual editor writes"
+        loading="lazy"
+      />
+    </div>
+  </section>
+
+  <section class="shot2">
+    <div class="frame">
+      <img
+        src="/shots/detail-customer.webp"
+        width="2880"
+        height="1800"
+        alt="cartapel detail page for a customer, with the related addresses, orders and reviews tables rendered from foreign keys"
+        loading="lazy"
+      />
     </div>
   </section>
 

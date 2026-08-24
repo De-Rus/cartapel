@@ -58,6 +58,15 @@ const url = `https://cartapel.com/compare/${alt.slug}/`
     {alt.intro.map((p, i) => <p class={i === 0 ? 'sub' : 'lede'} set:html={p} />)}
   </div>
 
+  {alt.shot && (
+    <section class="shot-section">
+      <figure class="frame">
+        <img src={alt.shot.src} width="2880" height="1800" alt={alt.shot.alt} loading="lazy" />
+      </figure>
+      <figcaption class="shot-caption">{alt.shot.caption}</figcaption>
+    </section>
+  )}
+
   <section>
     <h2>Side by side</h2>
     <div class="glance two-col">

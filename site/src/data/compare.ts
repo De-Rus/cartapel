@@ -37,6 +37,8 @@ export interface Alt {
   them: { head: string; items: string[] }
   /** Honest case for cartapel. */
   us: { head: string; items: string[] }
+  /** The screenshot that answers this tool's objection. */
+  shot?: { src: string; alt: string; caption: string }
   pairs?: CodePair[]
   /** Closing recommendation, one sentence each way. */
   verdict: { them: string; us: string }
@@ -67,6 +69,13 @@ export const alts: Alt[] = [
       'The comparison only gets interesting when the database was not born from Django. Then Django admin asks you to run <code>inspectdb</code>, hand-correct the generated models, and keep them in sync with every migration anyone else ships — forever. The ORM layer, not the database, becomes the source of truth, and it drifts.',
       'cartapel inverts that: the live schema <em>is</em> the model. It introspects Postgres, MySQL or MariaDB at boot, so a new column shows up without regenerating anything, and the panel runs as a single binary beside any stack — Rails, Go, Node, Elixir, or a database no application owns.',
     ],
+    shot: {
+      src: '/shots/customize-hcl.webp',
+      alt:
+        'The Customize drawer in cartapel with the HCL tab open, showing the screen.hcl the visual editor writes',
+      caption:
+        'No models, no admin.py: the file the panel reads is the file you review — and you can write it by clicking.',
+    },
     rows: [
       {
         label: 'What it needs to run',
@@ -261,6 +270,13 @@ class OrderAdmin(admin.ModelAdmin):
       'cartapel does one narrower job: a CRUD and dashboard panel over SQL databases you already run. If your internal tool spans three services and a payments API, Retool is the honest answer and this page will tell you so.',
       'The reason teams look for an alternative is usually not features. It is the model: proprietary and priced per user, a multi-container stack if you self-host, and apps authored in a GUI whose reviewable artifact is generated JSON. cartapel is the opposite trade — one MIT binary, no seats, and configuration that is a handful of HCL files a reviewer reads in a pull request.',
     ],
+    shot: {
+      src: '/shots/customize.webp',
+      alt:
+        'The Customize drawer in cartapel: visible columns, search columns and filters edited by clicking',
+      caption:
+        'Build it by clicking if you like — what gets published is HCL in your repo, not app JSON in a database you do not control.',
+    },
     rows: [
       {
         label: 'Scope',
@@ -362,6 +378,13 @@ class OrderAdmin(admin.ModelAdmin):
       'The same goes for Grafana, which many teams already run for metrics: cartapel sits beside it rather than replacing it, and a Grafana panel can be embedded straight into a cartapel dashboard as an <code>iframe</code> widget, next to the SQL tiles and the tables people edit.',
       'What Metabase is not is an admin panel. It is read-oriented by design: editing a row, running a bulk action, importing a CSV into a production table or granting write access to one column and not another are not jobs it takes on. That is the entire subject of cartapel.',
     ],
+    shot: {
+      src: '/shots/dashboard.webp',
+      alt:
+        'A cartapel dashboard: SQL stat tiles with thresholds, a revenue chart and a latest-orders table',
+      caption:
+        'The dashboards here are operational tiles you author in SQL — not a replacement for self-serve BI.',
+    },
     rows: [
       {
         label: 'Primary job',
@@ -449,6 +472,13 @@ class OrderAdmin(admin.ModelAdmin):
       'On top of that it does considerably more. It generates a full REST and GraphQL API over your data, has a flow and automation engine, digital asset management, and works as a headless CMS. If your admin layer must also be your API layer, Directus is the stronger platform and cartapel is not a candidate.',
       'The differences are footprint, authoring and licence. Directus is a Node application whose configuration — collections, fields, permissions, flows — lives in its own system tables inside your database; it is exportable as schema snapshots, but it is not primarily authored as files. And since version 10 it is licensed under BSL 1.1: free below a revenue threshold, not open source in the OSI sense. cartapel is deliberately smaller: one MIT binary, no API generation, no app platform, and the whole configuration is plain HCL in your repository.',
     ],
+    shot: {
+      src: '/shots/customize-permissions.webp',
+      alt:
+        'The Permissions tab of the Customize drawer in cartapel, with per-role and per-column rules',
+      caption:
+        'Permissions are part of the same file as the rest of the screen — not rows in a system table added to your database.',
+    },
     rows: [
       {
         label: 'Scope',
@@ -539,6 +569,13 @@ class OrderAdmin(admin.ModelAdmin):
       'The fit question is who owns the schema and where the configuration lives. NocoDB can connect to an existing Postgres or MySQL, but it layers its own metadata alongside and is happiest treated as the primary interface to the data. Views, fields and permissions are configured by clicking, so the state of your admin panel lives in its database rather than in files you can diff.',
       'cartapel takes the opposite bet on both counts: your schema stays exactly as your application defined it and is only read, and every customization is HCL in your repository that goes through review like any other change.',
     ],
+    shot: {
+      src: '/shots/detail-customer.webp',
+      alt:
+        'A cartapel detail page for a customer, with related addresses, orders and reviews from foreign keys',
+      caption:
+        'Relations come from the schema your application already defined — nothing to link up by hand.',
+    },
     rows: [
       {
         label: 'Feel',
@@ -625,6 +662,13 @@ class OrderAdmin(admin.ModelAdmin):
       'The distinction that matters here is ownership. Baserow is happiest creating and managing its own tables inside its own database — that is the product. Connecting it to a production schema owned by an application is going against the grain, where cartapel is designed for exactly that: introspect what exists, change nothing, and expose only what you register.',
       'The second distinction is where configuration lives. Baserow is configured by clicking, and that state sits in its database. In cartapel the panel is a directory of HCL files in your repository, reviewed in pull requests and deployed with your code.',
     ],
+    shot: {
+      src: '/shots/list-filters.webp',
+      alt:
+        'A cartapel list view over an existing orders table with two filter chips applied',
+      caption:
+        'This table was not created here. It is your production table, read as it is.',
+    },
     rows: [
       {
         label: 'Where the data lives',
@@ -705,6 +749,13 @@ class OrderAdmin(admin.ModelAdmin):
       'For database administration — query plans, vacuum and bloat, replication, extensions, role grants, ad-hoc SQL against anything — pgAdmin (or psql, or DBeaver) is the right tool and cartapel does not replace any of it. cartapel never issues DDL and has no server administration surface at all.',
       'What you should not do is hand pgAdmin to support staff. It exposes raw SQL over every table with no application-level roles, no column masking, no row filters and no trace of who changed what. One mistyped <code>UPDATE</code> without a <code>WHERE</code> is a bad afternoon, and nothing records it.',
     ],
+    shot: {
+      src: '/shots/roles.webp',
+      alt:
+        'The roles screen in cartapel, listing roles with their table and column permissions',
+      caption:
+        'Roles, column masking and an audit trail are the difference between a DBA tool and one you hand to support.',
+    },
     rows: [
       {
         label: 'Audience',

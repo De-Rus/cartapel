@@ -10,6 +10,9 @@ and action names, which come from your config). Both follow the language the
 *viewer* is reading in — one instance serves a Spanish-speaking support team
 and an English-speaking ops team at the same time.
 
+![The cartapel panel rendered in Spanish: sidebar, table controls and column headers translated](/shots/i18n-es.webp)
+
+
 ## Which language a viewer gets
 
 In order, the first that applies:

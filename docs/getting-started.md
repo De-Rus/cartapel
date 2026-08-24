@@ -109,6 +109,9 @@ creates or updates a user without the server running. See the
 [CLI reference](/cli).
 :::
 
+![A cartapel list view over an existing orders table: two filter chips applied, search, saved views, column picker, export and import](/shots/list-filters.webp)
+
+
 ## Register your first tables
 
 The panel is an **allowlist**: only tables with a config file are exposed. An

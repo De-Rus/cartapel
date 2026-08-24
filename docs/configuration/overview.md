@@ -12,6 +12,13 @@ portable, versionable folder you point `--config` at.
 There is an in-app visual builder that edits this same config, but it writes the
 identical HCL. The files are the source of truth.
 
+Every file below can also be written from the panel itself — each table has a
+**Customize** drawer whose **HCL** tab shows the file it is about to write. The
+editor and the file are the same configuration, not two sources of truth.
+
+![The Customize drawer in cartapel with the HCL tab open, showing the list, display and detail blocks of a screen.hcl](/shots/customize-hcl.webp)
+
+
 ## Layout: `config/` + `screens/`
 
 The layout of the config directory *is* the layout of the sidebar. Globals live

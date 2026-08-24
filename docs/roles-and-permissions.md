@@ -4,6 +4,8 @@ description: "Roles in config you review like code: table levels, granular capab
 
 # Roles & permissions
 
+![The roles screen in cartapel, listing each role with its table and column permissions](/shots/roles.webp)
+
 Access is governed by **roles**. Each user carries one or more roles
 (permissions union — see [Multiple roles per user](#multiple-roles-per-user));
 a role grants access to
