@@ -78,6 +78,12 @@ function ChangePills({ changes }: { changes: Record<string, AuditChange> | null 
 
 const REVERTABLE = new Set(['update', 'revert'])
 
+/** An entry with an empty diff has nothing to put back — the server rejects the
+ *  revert with 400 — and `{}` is truthy, so the emptiness has to be checked. */
+export function hasChanges(changes: AuditRow['changes']): boolean {
+  return !!changes && Object.keys(changes).length > 0
+}
+
 export default function Audit() {
   const meta = useMeta()
   const t = useT()
@@ -183,12 +189,12 @@ export default function Audit() {
                 <td className="px-2.5 py-2">
                   <span className="flex items-start justify-between gap-2">
                     <ChangePills changes={r.changes} />
-                    {REVERTABLE.has(r.action) && r.changes && r.table_name && r.pk && (
+                    {REVERTABLE.has(r.action) && hasChanges(r.changes) && r.table_name && r.pk && (
                       <button
                         type="button"
                         disabled={revert.isPending}
                         onClick={() => revert.mutate(r)}
-                        className="pointer-events-none text-xxs text-accent opacity-0 transition-opacity hover:underline focus-visible:pointer-events-auto focus-visible:opacity-100 disabled:opacity-50 group-hover:pointer-events-auto group-hover:opacity-100"
+                        className="text-xxs text-accent opacity-60 transition-opacity hover:underline focus-visible:opacity-100 disabled:opacity-50 group-hover:opacity-100"
                       >
                         {t('audit_revert')}
                       </button>

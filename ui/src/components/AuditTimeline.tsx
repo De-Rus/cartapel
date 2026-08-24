@@ -106,7 +106,7 @@ function Entry({ r, table, pk }: { r: AuditRow; table: string; pk: string }) {
               type="button"
               disabled={revert.isPending}
               onClick={() => revert.mutate(r.id)}
-              className="pointer-events-none text-xxs text-accent opacity-0 transition-opacity hover:underline focus-visible:pointer-events-auto focus-visible:opacity-100 disabled:opacity-50 group-hover:pointer-events-auto group-hover:opacity-100"
+              className="text-xxs text-accent opacity-60 transition-opacity hover:underline focus-visible:opacity-100 disabled:opacity-50 group-hover:opacity-100"
             >
               {t('audit_revert')}
             </button>
