@@ -133,8 +133,11 @@ const DF_OPTS: Intl.DateTimeFormatOptions = {
   month: 'short',
   year: 'numeric',
 }
-let dtf = new Intl.DateTimeFormat('es', DTF_OPTS)
-let df = new Intl.DateTimeFormat('es', DF_OPTS)
+// 'en' like the number formatters above: setFormatLocale early-returns when the
+// viewer's locale equals the current one, so an 'es' default here left every
+// English panel formatting dates in Spanish — the locale never "changed".
+let dtf = new Intl.DateTimeFormat('en', DTF_OPTS)
+let df = new Intl.DateTimeFormat('en', DF_OPTS)
 
 export function fmtDateTime(isoStr: string): string {
   const d = new Date(isoStr)

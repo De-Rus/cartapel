@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   applyFormat,
   fmtBytes,
@@ -39,6 +39,20 @@ describe('fmtNumber', () => {
     setFormatLocale(null)
 
     expect(fmtNumber(1202218)).toBe('1,202,218')
+  })
+
+  /** The date formatters used to start on 'es' while the number ones started on
+   *  'en'. setFormatLocale early-returns when the locale has not changed, so an
+   *  English panel — the default — never rebuilt them and showed "24 ago 2026".
+   *  A fresh import is the only way to assert the untouched initial state. */
+  it('formats dates in English before any locale is set', async () => {
+    vi.resetModules()
+    const fresh = await import('./format')
+
+    expect(fresh.fmtDateTime('2026-08-24T06:48:00Z')).toMatch(/Aug/)
+
+    fresh.setFormatLocale('en')
+    expect(fresh.fmtDateTime('2026-08-24T06:48:00Z')).toMatch(/Aug/)
   })
 })
 
