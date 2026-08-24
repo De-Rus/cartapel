@@ -61,7 +61,8 @@ header.hero .sub { max-width: 640px; margin: 22px auto 0; font-size: 18px; }
   margin: 44px auto 0; border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
 }
-.frame img { display: block; width: 100%; }
+/* height:auto or the width/height attributes (there for CLS) win and stretch. */
+.frame img { display: block; width: 100%; height: auto; }
 
 section { max-width: 1080px; margin: 96px auto 0; padding: 0 24px; }
 h2 { color: var(--ink); font-size: 30px; letter-spacing: -0.6px; margin-bottom: 14px; }
