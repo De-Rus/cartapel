@@ -97,7 +97,7 @@ code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; color: #e8e6da; }
 }
 .teaser p { font-size: 15.5px; max-width: 640px; }
 .teaser-tags { display: flex; flex-wrap: wrap; gap: 8px; }
-.teaser-tags span {
+.teaser-tags span, .teaser-tags a {
   font-size: 12.5px; color: var(--sec); border: 1px solid var(--border);
   border-radius: 999px; padding: 4px 10px;
 }
@@ -166,3 +166,41 @@ footer a:hover { color: var(--ink); }
 @media (max-width: 800px) {
   .split, .grid, .pair-cols { grid-template-columns: 1fr; }
 }
+
+.crumbs { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13.5px; color: var(--muted); margin-bottom: 14px; }
+.crumbs a { color: var(--muted); }
+.crumbs a:hover { color: var(--ink); }
+
+.page-head .lede { max-width: 680px; margin-top: 14px; font-size: 16px; }
+.page-head .lede code { font-size: 14px; color: var(--accent); }
+
+.glance.two-col table { min-width: 560px; }
+
+.two-cases { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: start; }
+.two-cases h2 { font-size: 22px; }
+.case ul { margin: 14px 0 0 18px; }
+.case li { margin-top: 12px; font-size: 15px; }
+.case strong { color: var(--ink); font-weight: 600; }
+.case code { font-size: 13.5px; color: var(--accent); }
+
+.verdict {
+  margin-top: 16px; max-width: 720px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px;
+}
+.verdict p { font-size: 15.5px; }
+.verdict p + p { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.verdict strong { color: var(--ink); font-weight: 600; }
+
+.other-grid { margin-top: 4px; }
+a.card { display: block; color: inherit; text-decoration: none; }
+a.card:hover { text-decoration: none; border-color: rgba(255, 255, 255, 0.25); }
+a.card h3 { color: var(--ink); }
+
+.glance th a { color: var(--ink); }
+
+@media (max-width: 800px) {
+  .two-cases { grid-template-columns: 1fr; gap: 28px; }
+}
+
+.teaser-tags a { color: var(--sec); }
+.teaser-tags a:hover { color: var(--ink); text-decoration: none; border-color: rgba(255, 255, 255, 0.25); }

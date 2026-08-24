@@ -17,6 +17,7 @@ const { title, description, path = '/', ogTitle = title } = Astro.props
 const canonicalPath = path.endsWith('/') ? path : `${path}/`
 const canonical = path === '/' ? `${SITE}/` : `${SITE}${canonicalPath}`
 const current = path === '/' ? '/' : canonicalPath.replace(/\/$/, '') || '/'
+const inCompare = current === '/compare' || current.startsWith('/compare/')
 ---
 
 <html lang="en">
@@ -42,7 +43,7 @@ const current = path === '/' ? '/' : canonicalPath.replace(/\/$/, '') || '/'
         <img src="/logo.png" width="200" height="168" alt="cartapel" />
       </a>
       <div class="links">
-        <a href="/compare/" aria-current={current === '/compare' ? 'page' : undefined}>Compare</a>
+        <a href="/compare/" aria-current={inCompare ? 'page' : undefined}>Compare</a>
         <a href={DOCS}>Docs</a>
         <a href={DEMO}>Live demo</a>
         <a href={GH}>GitHub</a>

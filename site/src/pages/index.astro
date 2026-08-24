@@ -21,7 +21,7 @@ const faq = [
   },
   {
     q: 'How is it different from Django admin or Retool?',
-    a: 'Django admin needs a Django app and ORM models kept in sync with your schema; cartapel reads the schema directly and runs beside any stack. Retool is a broader GUI app builder with per-user pricing; cartapel is a free single binary configured as HCL you review in pull requests. See the full compare page for Metabase, NocoDB, Directus and pgAdmin too.',
+    a: 'Django admin needs a Django app and ORM models kept in sync with your schema; cartapel reads the schema directly and runs beside any stack. Retool is a broader GUI app builder with per-user pricing; cartapel is a free single binary configured as HCL — written by hand or from the built-in visual editor, which shows you the diff and publishes the file — and reviewed in pull requests. There is a page per alternative — Django admin, Retool, Metabase, Directus, NocoDB, Baserow and pgAdmin — each saying where cartapel is the wrong choice.',
   },
   {
     q: 'Does it need Node?',
@@ -129,22 +129,22 @@ action "refund" {
       <div>
         <h2 style="margin-bottom: 10px;">Coming from Django, Retool, Metabase…?</h2>
         <p>
-          Side-by-side syntax with Django admin, plus an honest matrix against Retool, Metabase,
-          NocoDB, Baserow, Directus and pgAdmin — what each does better, and when cartapel is
-          the wrong tool.
+          One page per alternative — side-by-side syntax with Django admin, and an honest read on
+          Retool, Metabase, NocoDB, Baserow, Directus and pgAdmin: what each does better, and when
+          cartapel is the wrong tool.
         </p>
       </div>
       <div class="teaser-tags">
-        <span>Django admin</span>
-        <span>Retool</span>
-        <span>Metabase</span>
-        <span>NocoDB</span>
-        <span>Baserow</span>
-        <span>Directus</span>
-        <span>pgAdmin</span>
+        <a href="/compare/django-admin/">Django admin</a>
+        <a href="/compare/retool/">Retool</a>
+        <a href="/compare/metabase/">Metabase</a>
+        <a href="/compare/nocodb/">NocoDB</a>
+        <a href="/compare/baserow/">Baserow</a>
+        <a href="/compare/directus/">Directus</a>
+        <a href="/compare/pgadmin/">pgAdmin</a>
       </div>
       <div>
-        <a class="btn" href="/compare/">Open the compare page →</a>
+        <a class="btn" href="/compare/">See the full matrix →</a>
       </div>
     </div>
   </section>
@@ -211,7 +211,10 @@ action "refund" {
     </dl>
     <p class="faq-more">
       Weighing alternatives?
-      <a href="/compare/">Compare cartapel with Django admin, Retool, Metabase &amp; friends</a>.
+      <a href="/compare/django-admin/">vs Django admin</a>,
+      <a href="/compare/retool/">vs Retool</a>,
+      <a href="/compare/metabase/">vs Metabase</a>, or
+      <a href="/compare/">the full matrix</a>.
     </p>
   </section>
 </Base>

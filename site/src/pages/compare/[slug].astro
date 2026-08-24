@@ -1,0 +1,165 @@
+---
+import Base from '../../layouts/Base.astro'
+import { alts } from '../../data/compare'
+
+export function getStaticPaths() {
+  return alts.map((alt) => ({ params: { slug: alt.slug }, props: { alt } }))
+}
+
+const { alt } = Astro.props
+const others = alts.filter((a) => a.slug !== alt.slug)
+
+const DEMO = 'https://demo.cartapel.com'
+const DOCS = 'https://docs.cartapel.com'
+const GH = 'https://github.com/De-Rus/cartapel'
+const url = `https://cartapel.com/compare/${alt.slug}/`
+---
+
+<Base title={alt.title} description={alt.description} path={`/compare/${alt.slug}`} ogTitle={alt.h1}>
+  <script
+    slot="head"
+    type="application/ld+json"
+    set:html={JSON.stringify([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
+        name: alt.h1,
+        description: alt.description,
+        url,
+        isPartOf: { '@type': 'WebSite', name: 'cartapel', url: 'https://cartapel.com/' },
+        breadcrumb: {
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'cartapel', item: 'https://cartapel.com/' },
+            { '@type': 'ListItem', position: 2, name: 'Compare', item: 'https://cartapel.com/compare/' },
+            { '@type': 'ListItem', position: 3, name: alt.h1, item: url },
+          ],
+        },
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: alt.faq.map((f) => ({
+          '@type': 'Question',
+          name: f.q,
+          acceptedAnswer: { '@type': 'Answer', text: f.a },
+        })),
+      },
+    ])}
+  />
+
+  <div class="page-head">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a href="/">cartapel</a> <span aria-hidden="true">/</span>
+      <a href="/compare/">Compare</a> <span aria-hidden="true">/</span>
+      <span>{alt.name}</span>
+    </nav>
+    <h1>{alt.h1}</h1>
+    {alt.intro.map((p, i) => <p class={i === 0 ? 'sub' : 'lede'} set:html={p} />)}
+  </div>
+
+  <section>
+    <h2>Side by side</h2>
+    <div class="glance two-col">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>cartapel</th>
+            <th>{alt.name}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {alt.rows.map((r) => (
+            <tr>
+              <td>{r.label}</td>
+              <td class={r.cartapel.tone}>{r.cartapel.v}</td>
+              <td class={r.other.tone}>{r.other.v}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <p class="glance-note">Yellow cells are nuanced — the sections below say why.</p>
+  </section>
+
+  <section class="two-cases">
+    <article class="case">
+      <h2>{alt.them.head}</h2>
+      <ul>{alt.them.items.map((i) => <li set:html={i} />)}</ul>
+    </article>
+    <article class="case">
+      <h2>{alt.us.head}</h2>
+      <ul>{alt.us.items.map((i) => <li set:html={i} />)}</ul>
+    </article>
+  </section>
+
+  {alt.pairs && (
+    <section id="syntax">
+      <h2>The same jobs, side by side</h2>
+      <p class="sub" style="margin: 0 0 8px; max-width: 640px; font-size: 16px;">
+        Glance left → right. Everything on the right is the whole customization — no model,
+        no build step, no Python.
+      </p>
+      {alt.pairs.map((p) => (
+        <div class="pair">
+          <div class="pair-head">
+            <span>{p.what}</span>
+            {p.note && <span class="pair-note"><code>{p.note}</code></span>}
+          </div>
+          <div class="pair-cols">
+            <figure>
+              <figcaption>{p.left.label}</figcaption>
+              <pre><code>{p.left.code}</code></pre>
+            </figure>
+            <figure>
+              <figcaption>{p.right.label}</figcaption>
+              <pre><code>{p.right.code}</code></pre>
+            </figure>
+          </div>
+        </div>
+      ))}
+    </section>
+  )}
+
+  <section>
+    <h2>The short version</h2>
+    <div class="verdict">
+      <p><strong>Pick {alt.name}</strong> if {alt.verdict.them}</p>
+      <p><strong>Pick cartapel</strong> if {alt.verdict.us}</p>
+    </div>
+    <div class="cta" style="justify-content: flex-start; margin-top: 22px;">
+      <a class="btn primary" href={DEMO}>Try the live demo</a>
+      <a class="btn" href={`${DOCS}/getting-started`}>Get started</a>
+      <a class="btn ghost" href={GH}>GitHub</a>
+    </div>
+    <p class="demo-creds">No login. Click anything — the demo resets on a schedule.</p>
+  </section>
+
+  <section class="faq">
+    <h2>Questions people actually ask</h2>
+    <dl>
+      {alt.faq.map((f) => (
+        <div class="qa">
+          <dt>{f.q}</dt>
+          <dd>{f.a}</dd>
+        </div>
+      ))}
+    </dl>
+  </section>
+
+  <section>
+    <h2>Other comparisons</h2>
+    <div class="grid other-grid">
+      {others.map((o) => (
+        <a class="card" href={`/compare/${o.slug}/`}>
+          <h3>cartapel vs {o.name}</h3>
+          <p>{o.card}</p>
+        </a>
+      ))}
+    </div>
+    <p class="faq-more" style="margin-top: 22px;">
+      Everything on one page: <a href="/compare/">the full matrix against all seven</a>.
+    </p>
+  </section>
+</Base>

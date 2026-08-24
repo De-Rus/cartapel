@@ -19,6 +19,16 @@ export default defineConfig({
             lastmod: new Date().toISOString(),
           }
         }
+        // The per-alternative pages are the ones that rank for "cartapel vs X";
+        // the hub above only aggregates them.
+        if (path.startsWith('/compare/')) {
+          return {
+            ...item,
+            changefreq: 'monthly',
+            priority: 0.8,
+            lastmod: new Date().toISOString(),
+          }
+        }
         if (path === '/' || path === '') {
           return {
             ...item,

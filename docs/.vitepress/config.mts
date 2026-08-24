@@ -77,7 +77,9 @@ export default defineConfig({
 
   transformPageData(pageData) {
     const path = pageData.relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')
-    const canonical = SITE + path
+    // A page may point its canonical elsewhere — comparisons.md is a summary of
+    // the fuller comparison on cartapel.com and must not compete with it.
+    const canonical = (pageData.frontmatter.canonical as string | undefined) ?? SITE + path
     const title = pageData.frontmatter.layout === 'home' ? 'cartapel — database admin panel' : `${pageData.title} · cartapel`
     pageData.frontmatter.head ??= []
     pageData.frontmatter.head.push(
