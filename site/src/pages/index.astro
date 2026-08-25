@@ -182,52 +182,111 @@ action "refund" {
     </div>
   </section>
 
-  <section class="shot2">
-    <div class="frame">
-      <img
-        src="/shots/dashboard.webp"
-        width="2880"
-        height="1800"
-        alt="cartapel dashboard: SQL stat tiles, a revenue chart and a window selector"
-        loading="lazy"
-      />
-    </div>
-  </section>
-
   <section class="split">
     <div>
       <h2>A GUI when you want one — a file either way</h2>
       <p>
-        Every table has a <strong>Customize</strong> drawer: visible columns, field widgets,
-        the detail layout, per-role permissions and actions, edited by clicking. It is not a
-        second source of truth — publishing writes the same <code>screen.hcl</code> your repo
-        holds, and the <strong>HCL</strong> tab shows you the file before you save it.
+        Every table has a <strong>Customize</strong> drawer: visible columns, field widgets, the
+        detail layout, per-role permissions and actions, edited by clicking. It is not a second
+        source of truth — publishing writes the same <code>screen.hcl</code> your repo holds, and
+        the <strong>HCL</strong> tab shows you the file before you save it.
       </p>
       <p style="margin-top: 14px;">
         On a read-only deployment nothing is written: the panel hands you the HCL to commit.
         Manual edits and comments in the file win over the editor.
       </p>
     </div>
-    <div class="frame" style="margin-top: 0;">
-      <img
-        src="/shots/customize-hcl.webp"
-        width="2880"
-        height="1800"
-        alt="The Customize drawer in cartapel showing the HCL tab: the list, display and detail blocks of the file the visual editor writes"
-        loading="lazy"
-      />
-    </div>
+    <pre><code>{`# what the drawer just wrote
+list {
+  columns = ["id", "customer_id", "status", "total"]
+  filters = ["status", "channel", "currency"]
+  sort    = "-placed_at"
+}
+
+# a comment you added by hand — the
+# editor will not clobber it
+detail {
+  mode  = "drawer"
+  stats = ["status", "total", "channel"]
+}`}</code></pre>
   </section>
 
-  <section class="shot2">
-    <div class="frame">
-      <img
-        src="/shots/detail-customer.webp"
-        width="2880"
-        height="1800"
-        alt="cartapel detail page for a customer, with the related addresses, orders and reviews tables rendered from foreign keys"
-        loading="lazy"
-      />
+  <section class="tour">
+    <h2>The panel, screen by screen</h2>
+    <p class="sub" style="margin: 0 0 22px; max-width: 660px; font-size: 16px;">
+      Every one of these is the live demo, untouched. Pick a screen.
+    </p>
+
+    <div class="tour-box">
+      <input type="radio" name="tour" id="tour-walk" checked />
+      <input type="radio" name="tour" id="tour-detail" />
+      <input type="radio" name="tour" id="tour-customize" />
+      <input type="radio" name="tour" id="tour-dashboard" />
+      <input type="radio" name="tour" id="tour-roles" />
+      <input type="radio" name="tour" id="tour-audit" />
+      <input type="radio" name="tour" id="tour-i18n" />
+
+      <nav class="tour-tabs" aria-label="Screens">
+        <label for="tour-walk">▶ Walkthrough</label>
+        <label for="tour-detail">Detail &amp; relations</label>
+        <label for="tour-customize">Customize → HCL</label>
+        <label for="tour-dashboard">Dashboard</label>
+        <label for="tour-roles">Roles</label>
+        <label for="tour-audit">Audit log</label>
+        <label for="tour-i18n">Translated</label>
+      </nav>
+
+      <div class="tour-stage">
+        <figure class="tour-panel p-walk">
+          <div class="frame">
+            <img src="/shots/tour.webp" width="1000" height="625" loading="lazy"
+              alt="A recorded walkthrough of cartapel: filtering an orders list, opening a record in the quick-view dock, a detail page with its related tables, the Customize drawer and the HCL it writes, and the dashboard" />
+          </div>
+          <figcaption>Forty seconds of the live demo: filter, quick view, relations, Customize → HCL, dashboard.</figcaption>
+        </figure>
+        <figure class="tour-panel p-detail">
+          <div class="frame">
+            <img src="/shots/detail-customer.webp" width="2880" height="1800" loading="lazy"
+              alt="cartapel detail page for a customer, with related addresses, orders and reviews rendered from foreign keys" />
+          </div>
+          <figcaption>Foreign keys become links and child tables. No configuration at all.</figcaption>
+        </figure>
+        <figure class="tour-panel p-customize">
+          <div class="frame">
+            <img src="/shots/customize-hcl.webp" width="2880" height="1800" loading="lazy"
+              alt="The Customize drawer in cartapel with the HCL tab open, showing the screen.hcl the visual editor writes" />
+          </div>
+          <figcaption>Edit by clicking; the HCL tab shows the file it writes before you save.</figcaption>
+        </figure>
+        <figure class="tour-panel p-dashboard">
+          <div class="frame">
+            <img src="/shots/dashboard.webp" width="2880" height="1800" loading="lazy"
+              alt="cartapel dashboard: SQL stat tiles with thresholds, a revenue chart and a latest-orders table" />
+          </div>
+          <figcaption>Stat tiles, charts and tables straight from SQL, with template variables.</figcaption>
+        </figure>
+        <figure class="tour-panel p-roles">
+          <div class="frame">
+            <img src="/shots/roles.webp" width="2880" height="1800" loading="lazy"
+              alt="The roles screen in cartapel, listing roles with their table and column permissions" />
+          </div>
+          <figcaption>Roles with inheritance, per column and per row — the same file you review in a PR.</figcaption>
+        </figure>
+        <figure class="tour-panel p-audit">
+          <div class="frame">
+            <img src="/shots/audit.webp" width="2880" height="1800" loading="lazy"
+              alt="The cartapel audit log, listing who changed which row with the before and after values" />
+          </div>
+          <figcaption>Every write, with a before/after diff and a revert button on the entry.</figcaption>
+        </figure>
+        <figure class="tour-panel p-i18n">
+          <div class="frame">
+            <img src="/shots/i18n-es.webp" width="2880" height="1800" loading="lazy"
+              alt="The cartapel panel rendered in Spanish, with the sidebar, controls and column headers translated" />
+          </div>
+          <figcaption>Per-viewer language, one dictionary per locale — your data labels included.</figcaption>
+        </figure>
+      </div>
     </div>
   </section>
 
