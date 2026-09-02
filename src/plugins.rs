@@ -165,7 +165,13 @@ pub async fn fetch_source(
     if rest.contains("..") {
         return Err(AppError::bad("bad source path"));
     }
-    let base = src.url.trim_end_matches('/');
+    // `env:NAME` / `${NAME}`, like every other source's url. Without this an
+    // http source configured that way requests the LITERAL string, and the
+    // failure is silent in the worst way: the panel renders empty rather than
+    // erroring, so the endpoint looks broken while it answers 200 to curl.
+    // grafana.rs and the s3/files paths in this file already resolve theirs.
+    let resolved = crate::config::resolve_env(&src.url).unwrap_or_default();
+    let base = resolved.trim_end_matches('/');
     let url = if rest.is_empty() {
         base.to_string()
     } else {
@@ -353,6 +359,29 @@ async fn proxy_source(
 
 #[cfg(test)]
 mod tests {
+    /// An http source's url must accept `env:NAME` like every other source's.
+    /// It did not, and the symptom was the worst kind: the panel rendered EMPTY
+    /// rather than erroring, so the endpoint looked broken while it answered
+    /// 200 to curl from the same container.
+    #[test]
+    fn an_http_source_url_resolves_env_references() {
+        std::env::set_var("CARTAPEL_TEST_URL", "https://example.test/rows");
+        assert_eq!(
+            crate::config::resolve_env("env:CARTAPEL_TEST_URL").as_deref(),
+            Some("https://example.test/rows")
+        );
+        assert_eq!(
+            crate::config::resolve_env("${CARTAPEL_TEST_URL}").as_deref(),
+            Some("https://example.test/rows")
+        );
+        // A literal url must still pass through untouched.
+        assert_eq!(
+            crate::config::resolve_env("https://plain.test/x").as_deref(),
+            Some("https://plain.test/x")
+        );
+        std::env::remove_var("CARTAPEL_TEST_URL");
+    }
+
     use super::*;
     use axum::http::header::CONTENT_TYPE;
 
