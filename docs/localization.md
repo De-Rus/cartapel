@@ -27,7 +27,7 @@ In order, the first that applies:
 locale = "en"     # the default when neither the viewer nor the browser says otherwise
 ```
 
-The chrome ships fully translated in English and Spanish; a missing string —
+The chrome ships fully translated in English, Spanish and Italian; a missing string —
 or an unknown `locale` value — falls back to English. Dates, numbers and money
 follow the same language automatically (`Intl.NumberFormat` /
 `Intl.DateTimeFormat`), and so does `<html lang>`.

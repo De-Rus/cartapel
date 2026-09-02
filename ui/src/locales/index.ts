@@ -1,6 +1,7 @@
 import type { Dict } from './dict'
 import en from './en'
 import es from './es'
+import it from './it'
 
 export type { Dict }
 
@@ -10,6 +11,7 @@ export type { Dict }
 export const LOCALES: Record<string, { name: string; dict: Dict }> = {
   en: { name: 'English', dict: en },
   es: { name: 'Español', dict: es },
+  it: { name: 'Italiano', dict: it },
 }
 
 export const SUPPORTED_LOCALES: string[] = Object.keys(LOCALES)
