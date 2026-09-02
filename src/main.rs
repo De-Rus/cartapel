@@ -581,6 +581,20 @@ fn watch_config(state: Arc<AppState>) {
     let mut watcher =
         match notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
             if let Ok(ev) = res {
+                // ONLY writes. inotify also reports opens and reads, and
+                // `reload_config` reads these very files — so without this the
+                // watcher is fed by its own load: read, event, debounce, read,
+                // for ever. Measured on a production box 2026-09-02: 77 reloads
+                // in 30 seconds with not one file changed, burning half a core.
+                // The period gives it away — 300ms of debounce plus the load.
+                if !matches!(
+                    ev.kind,
+                    notify::EventKind::Modify(_)
+                        | notify::EventKind::Create(_)
+                        | notify::EventKind::Remove(_)
+                ) {
+                    return;
+                }
                 let relevant = ev.paths.iter().any(|p| {
                     p.extension().is_some_and(|e| e == "hcl")
                         || p.extension()
