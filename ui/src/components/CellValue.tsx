@@ -20,12 +20,25 @@ import {
 } from '../lib/format'
 import { colorClass, isCssColor } from '../lib/cellColor'
 import { customWidgetName } from '../lib/widgets'
+import { useLocale } from '../lib/i18n'
 import { CustomWidget } from './CustomWidget'
 import { IconCheck, IconCopy } from './Icons'
 import { ImageThumb } from './ImageField'
 import { JsonTree } from './JsonTree'
+import { RemoteGate } from './RemoteValue'
 
 export const NUMERIC_WIDGETS = new Set(['number', 'money', 'percent', 'duration', 'bytes', 'trend', 'heatcell'])
+
+/** A `table` widget column: a bare field name (label = the name), or an
+ *  object with an explicit `label` and/or per-locale `labels` overrides —
+ *  the same `label`/`labels` shape a `field { }` block uses. */
+type TableColumnParam = string | { field: string; label?: string; labels?: Record<string, string> }
+
+function resolveTableColumn(c: TableColumnParam, locale: string): { field: string; label: string } {
+  if (typeof c === 'string') return { field: c, label: c }
+  const label = c.labels?.[locale] ?? c.label ?? c.field
+  return { field: c.field, label }
+}
 
 const BADGE_VARS: Record<string, string> = {
   blue: 'var(--badge-blue)',
@@ -155,21 +168,39 @@ type CellParams = Record<string, unknown> & {
   min?: number
 }
 
-export function CellValue({
-  col,
-  value,
-  row,
-  mode,
-  pkName,
-  tableName,
-}: {
+type CellValueProps = {
   col: ColumnMeta
   value: unknown
   row: Row
   mode: 'list' | 'detail'
   pkName?: string
   tableName?: string
-}) {
+}
+
+/** A `remote` field has no value in the row payload — it has to be fetched
+ *  first. Gate on that here, once, and hand the fetched value to
+ *  `CellValueBody` so every widget (badge, money, date, plain text…) renders
+ *  it exactly like it would a normal column's value. */
+export function CellValue(props: CellValueProps) {
+  const { col, row, mode, pkName, tableName } = props
+  if (col.remote) {
+    if (!tableName || !pkName) return <Empty />
+    return (
+      <RemoteGate
+        table={tableName}
+        col={col.name}
+        pk={String(row[pkName] ?? '')}
+        auto={mode === 'detail' || !col.remote_lazy}
+      >
+        {(fetched) => <CellValueBody {...props} value={fetched} />}
+      </RemoteGate>
+    )
+  }
+  return <CellValueBody {...props} />
+}
+
+function CellValueBody({ col, value, row, mode, pkName, tableName }: CellValueProps) {
+  const locale = useLocale()
   if (col.widget === 'image') {
     if (!tableName || !pkName) return <Empty />
     return <ImageThumb table={tableName} col={col} pk={String(row[pkName] ?? '')} row={row} />
@@ -448,6 +479,41 @@ export function CellValue({
             {JSON.stringify(value).length > 40 ? '…' : ''}
           </span>
         )
+      case 'table': {
+        const rows = Array.isArray(value) ? (value as unknown[]) : []
+        if (!rows.length) return <Empty />
+        const declared = params.columns as TableColumnParam[] | undefined
+        const cols =
+          declared?.map((c) => resolveTableColumn(c, locale)) ??
+          (typeof rows[0] === 'object' && rows[0] !== null
+            ? Object.keys(rows[0] as object).map((f) => ({ field: f, label: f }))
+            : [])
+        if (!cols.length) return <Empty />
+        return (
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr>
+                {cols.map((c) => (
+                  <th key={c.field} className="pr-3 text-left font-medium text-muted">
+                    {c.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  {cols.map((c) => (
+                    <td key={c.field} className="pr-3 text-sec">
+                      {String((r as Record<string, unknown>)?.[c.field] ?? '—')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      }
       case 'code':
         if (mode === 'detail')
           return (

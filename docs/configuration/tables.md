@@ -105,6 +105,9 @@ default.
 
 ## `list { }` — the list view
 
+<details>
+<summary>Show</summary>
+
 ```hcl
 list {
   columns  = ["id", "name", "sku", "price", "active"]
@@ -146,7 +149,12 @@ list {
 }
 ```
 
+</details>
+
 ## `display { }` — the record title
+
+<details>
+<summary>Show</summary>
 
 ```hcl
 display {
@@ -158,7 +166,12 @@ display {
 record needs a human label (detail heading, breadcrumbs, inline row labels).
 Omit it and cartapel picks a name-ish text column (`name`, `title`, `email`, `username`, …) when one exists; otherwise the title is `Label #pk` ("Subscription #8"), never a bare id.
 
+</details>
+
 ## `edit { }` — read-only columns
+
+<details>
+<summary>Show</summary>
 
 ```hcl
 edit {
@@ -171,7 +184,12 @@ distinct from role-level `editable` whitelists (see
 [Roles & permissions](/roles-and-permissions)) — `edit.readonly` applies to
 everyone.
 
+</details>
+
 ## `permissions { }` — table-level gates
+
+<details>
+<summary>Show</summary>
 
 ```hcl
 permissions {
@@ -200,7 +218,12 @@ These are the **ceiling** for the whole table. A role can only ever narrow them
 further — never widen them. A structurally read-only table (a view, or a table
 with no primary key) is read-only regardless of what you set here.
 
+</details>
+
 ## `from { }` — serve from another source
+
+<details>
+<summary>Show</summary>
 
 ```hcl
 from {
@@ -215,7 +238,12 @@ unknown or non-postgres alias is a load error), `schema` and `table` point at
 the physical relation when they differ from the defaults (primary source,
 introspected schemas, folder name).
 
+</details>
+
 ## `detail { }` and `relations { }`
+
+<details>
+<summary>Show</summary>
 
 Detail layout (sections, sidebar, stats, tabs, mode) and inline child tables
 have their own page: [Detail views](/configuration/detail-views). Two things
@@ -227,7 +255,12 @@ worth knowing from here:
 - An `inlines` entry is a table name (`"order_items"`) or a full object
   (`{ table = "...", fk_col = "...", columns = [...], can_create = false, can_delete = false }`).
 
+</details>
+
 ## `field "col" { }` — per-column presentation
+
+<details>
+<summary>Show</summary>
 
 Each `field` block styles one column: its widget, formatting, color rules,
 computed SQL, and more. This is the heart of customization —
@@ -244,7 +277,12 @@ field "active" {
 }
 ```
 
+</details>
+
 ## `action "name" { }` — bulk actions
+
+<details>
+<summary>Show</summary>
 
 Actions apply to the rows a user selects in the list. Three kinds:
 
@@ -275,6 +313,30 @@ action "resync" {
 | `method` | string | For `webhook`: HTTP method (default `POST`). |
 | `confirm` | string | Confirmation prompt. `{count}` interpolates the selection size. |
 | `danger` | bool | Style the action as destructive (red). |
+| `when` | string | Show this action on a single row's **detail view** only when the condition holds: `"<column> = <value>"` or `"<column> != <value>"`. Ignored by the bulk action bar — a mixed multi-row selection has no one row to test. |
+
+```hcl
+action "mark_shipped" {
+  label   = "Mark shipped"
+  kind    = "update"
+  when    = "status != shipped"
+  confirm = "Mark {count} orders as shipped?"
+  set     = { status = "shipped" }
+}
+```
+
+`when` is a client-side visibility check only, not a security boundary — the
+real guard is server-side permissions (`config/auth.hcl`) and whatever the
+`update`/`webhook` itself does. A row that already satisfies the action still
+gets a normal, idempotent `UPDATE` if run some other way (the command
+palette, say); `when` just keeps the obviously-wrong button off the screen.
+
+::: warning `when` is hand-authored HCL only
+The Actions tab in the visual builder edits `confirm`/`danger`/`set` but has
+no `when` field yet — add it directly in `screen.hcl`. A `when` written by
+hand survives edits made through the visual builder (it round-trips, just
+isn't exposed there), and it works the same either way once written.
+:::
 
 - **`update`** runs a single parameterized `UPDATE … SET … WHERE pk IN (…)`.
 - **`delete`** deletes the selected rows.
@@ -286,3 +348,6 @@ action "resync" {
 
 Which roles may invoke an action is controlled in `config/auth.hcl` via the role's
 `actions` list, entries of the form `"<table>.<action>"`.
+
+</details>
+

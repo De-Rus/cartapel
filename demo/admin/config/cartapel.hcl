@@ -1,11 +1,13 @@
 brand      = "cartapel"
 # Compact mark for the collapsed rail; full lockups below for light/dark.
-brand_logo = "config/widgets/logo-mark.png"
+# public/ (not config/) because the login screen renders before there's a
+# session, and only public/ is served with no auth.
+brand_logo = "logo-mark.png"
 per_page = 50
 
 theme {
-  logo_light = "config/widgets/logo-light.png"
-  logo_dark  = "config/widgets/logo.png"
+  logo_light = "logo-light.png"
+  logo_dark  = "logo-dark.png"
 }
 
 # Public demo: the login is a full admin (so visitors see the real thing), but

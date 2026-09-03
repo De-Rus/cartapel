@@ -10,6 +10,9 @@ parameter, and reads that could leak data are gated by roles.
 
 ## Secret key
 
+<details>
+<summary>Show</summary>
+
 cartapel signs its session cookies with an app secret. **It is required** —
 cartapel refuses to start without one.
 
@@ -27,7 +30,12 @@ re-logs-in once).
 export CARTAPEL_SECRET_KEY="$(openssl rand -hex 32)"
 ```
 
+</details>
+
 ## Sessions & cookies
+
+<details>
+<summary>Show</summary>
 
 - The session cookie (`cartapel_session`) is `HttpOnly`, `SameSite=Lax` and (by
   default) `Secure`, with a 30-day lifetime. Sessions live in cartapel's SQLite
@@ -42,20 +50,35 @@ export CARTAPEL_SECRET_KEY="$(openssl rand -hex 32)"
 - Behind HTTPS, keep `--secure-cookies` on (the default). For local plain-HTTP
   development, pass `--secure-cookies=false`.
 
+</details>
+
 ## CSRF
+
+<details>
+<summary>Show</summary>
 
 Every mutating request (POST / PUT / PATCH / DELETE) must carry the
 `X-Cartapel: 1` header — a custom header a cross-site form cannot set. The
 bundled SPA sends it automatically; the `api` object injected into custom
 widgets and pages sends it for you too.
 
+</details>
+
 ## Authentication
+
+<details>
+<summary>Show</summary>
 
 - Passwords are hashed with **argon2id**.
 - Login is **rate-limited per IP**: 10 failed attempts in a 15-minute window,
   then 429 until the window expires.
 
+</details>
+
 ## Column masking
+
+<details>
+<summary>Show</summary>
 
 A column can be masked three ways, and all are protected end to end:
 
@@ -79,7 +102,12 @@ Whichever way a column is masked:
 Use it for tokens, wallets, secrets and PII you want visible to some roles but
 not others.
 
+</details>
+
 ## Row-level filters
+
+<details>
+<summary>Show</summary>
 
 A role's `row_filter` predicate is ANDed into the `WHERE` clause of every query
 that touches the table — list, count, search, and the `WHERE` of bulk updates and
@@ -89,7 +117,12 @@ several roles, per-role filters OR together — a view-granting role with no
 filter lifts the restriction for that table. See
 [Roles & permissions](/roles-and-permissions#multiple-roles-per-user).
 
+</details>
+
 ## SQL safety
+
+<details>
+<summary>Show</summary>
 
 - Every SQL **identifier** (table, column) is validated against the introspected
   schema. An unknown column is a 400; a masked column used where it may not be is
@@ -101,13 +134,23 @@ filter lifts the restriction for that table. See
 - Dashboard and named-query SQL run in **`READ ONLY` transactions with a
   statement timeout**, so a widget can never mutate data or run away.
 
+</details>
+
 ## The admin gate
+
+<details>
+<summary>Show</summary>
 
 Access management, config editing, config-version history, the discover flow and
 the audit log are **admin-only** — every one of those endpoints returns 403 for a
 non-admin caller.
 
+</details>
+
 ## Static-asset path confinement
+
+<details>
+<summary>Show</summary>
 
 Custom widget and page assets are served from the config bundle at `{base}/static/*`,
 but only safely:
@@ -124,7 +167,20 @@ but only safely:
 Config-write paths apply the same discipline: they reject `/`, `\`, `..` and the
 reserved stems (`config`, `_group`, `page`, `queries`).
 
+`{base}/static/*` requires a session, same as every other endpoint — it can
+reveal page-module source (query names, source aliases, role-scoped page
+logic), so it is never public. The one exception is `{base}/public/*`: it
+serves **only** the reserved `public/` folder (nothing else in the bundle),
+with no session required, so a brand logo can render on the login screen —
+see [The reserved `public/` folder](/configuration/overview#the-reserved-public-folder).
+Same traversal/symlink/extension checks apply to both routes.
+
+</details>
+
 ## Webhook actions
+
+<details>
+<summary>Show</summary>
 
 A `kind = "webhook"` action proxies the selected primary keys to a URL you
 configure — an escape hatch into your real backend rather than a direct DB write.
@@ -134,7 +190,12 @@ for your backend to verify. Webhooks
 can be disabled outright with `disable_webhooks` — see
 [Hardening toggles](#hardening-toggles).
 
+</details>
+
 ## Audit log
+
+<details>
+<summary>Show</summary>
 
 Every write — create, update, delete, bulk action, config change, user/role
 change — is recorded in cartapel's SQLite audit log with actor, timestamp and, for
@@ -157,7 +218,12 @@ in one click from the record's history or the audit log. Guardrails:
 - **A revert is itself audited** as a `revert` entry with its own diff — so it
   can be reverted in turn, and the UI offers an immediate undo toast.
 
+</details>
+
 ## Hardening toggles
+
+<details>
+<summary>Show</summary>
 
 Two opt-in switches in `config/cartapel.hcl` narrow the surface further:
 
@@ -168,3 +234,6 @@ Two opt-in switches in `config/cartapel.hcl` narrow the surface further:
 
 Both default to `false`. See the globals table in the
 [configuration overview](/configuration/overview).
+
+</details>
+

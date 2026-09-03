@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { api, ApiError } from '../api/client'
 import type { ActionMeta, ColumnMeta, InlineData, Row, RowResponse, TableMeta } from '../api/types'
+import { actionWhenPasses } from '../lib/actions'
 import { fmtInt, interpolate } from '../lib/format'
 import { isEditableTarget } from '../lib/keys'
 import { isEditable } from '../lib/perms'
@@ -613,7 +614,9 @@ export function DetailBody({
   }
 
   const fieldErrors = fieldErrorsFrom(saveMut.error, table.columns)
-  const actions = table.actions.filter((a) => table.perms.actions.includes(a.name))
+  const actions = table.actions.filter(
+    (a) => table.perms.actions.includes(a.name) && actionWhenPasses(a.when, row),
+  )
   const title = interpolate(table.display_title, row)
   const sidebarFields = layout.sidebarFields
     .map((name) => table.columns.find((c) => c.name === name))

@@ -16,6 +16,15 @@ export interface FileConfigData {
   max_bytes?: number
 }
 
+/** A read-only value fetched live from an `http` source, `{column}`-templated
+ *  per row — never stored, never part of the row SELECT. */
+export interface RemoteConfigData {
+  source: string
+  path: string
+  at?: string
+  lazy?: boolean
+}
+
 export interface FieldConfigData {
   label?: string
   widget?: string
@@ -25,6 +34,7 @@ export interface FieldConfigData {
   group?: string
   params?: Record<string, Json>
   file?: FileConfigData
+  remote?: RemoteConfigData
 }
 
 export interface CustomFilterData {
@@ -67,6 +77,10 @@ export interface ActionConfigData {
   confirm?: string
   danger?: boolean
   set?: Record<string, Json>
+  /** `"<column> = <value>"` / `"<column> != <value>"` — hand-authored only,
+   *  no visual builder editor yet; a round-trip through the Actions tab
+   *  preserves it (unlisted fields survive `prune`) but never edits it. */
+  when?: string
 }
 
 export interface PermissionsData {
@@ -124,6 +138,7 @@ export const WIDGETS = [
   'masked',
   'image',
   'file',
+  'table',
 ] as const
 
 export type Widget = (typeof WIDGETS)[number]
@@ -147,6 +162,7 @@ const PARAM_WIDGETS = new Set([
   'url',
   'avatar',
   'truncate',
+  'table',
 ])
 
 const STRUCTURED_EDITOR_WIDGETS = new Set(['badge', 'relative_time', 'money', 'code'])

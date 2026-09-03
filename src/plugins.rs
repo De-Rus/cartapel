@@ -79,6 +79,58 @@ pub async fn serve_static(
     }
 }
 
+/// Serve a file from the reserved `public/` folder — the one part of the config
+/// bundle meant to be public, no session required. Everything else under
+/// `serve_static` stays behind auth on purpose (page-module source, custom
+/// widget JS — all of that leaks logic); `public/` exists specifically for the
+/// handful of assets that must render before login, starting with the brand
+/// logo. Same traversal/symlink-escape and extension checks as `serve_static`,
+/// just scoped to `public/` and with no `CurrentUser` requirement.
+pub async fn serve_public(
+    State(state): State<Arc<AppState>>,
+    Path(path): Path<String>,
+) -> Response {
+    let Some(dir) = &state.config_dir else {
+        return (StatusCode::NOT_FOUND, "no config dir").into_response();
+    };
+    if path
+        .split('/')
+        .any(|seg| seg.is_empty() || seg == ".." || seg.starts_with('.') || seg.contains('\\'))
+    {
+        return (StatusCode::BAD_REQUEST, "bad asset path").into_response();
+    }
+    let ext = PathBuf::from(&path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .unwrap_or_default();
+    if FORBIDDEN_EXT.contains(&ext.as_str()) {
+        return (StatusCode::BAD_REQUEST, "forbidden asset type").into_response();
+    }
+    let Some(ct) = content_type(&ext) else {
+        return (StatusCode::BAD_REQUEST, "unsupported asset type").into_response();
+    };
+    let public_dir = dir.join("public");
+    let (real, base) = match (public_dir.join(&path).canonicalize(), public_dir.canonicalize()) {
+        (Ok(real), Ok(base)) => (real, base),
+        _ => return (StatusCode::NOT_FOUND, "asset not found").into_response(),
+    };
+    if !real.starts_with(&base) {
+        return (StatusCode::BAD_REQUEST, "asset path escapes public dir").into_response();
+    }
+    match tokio::fs::read(&real).await {
+        Ok(bytes) => (
+            [
+                (header::CONTENT_TYPE, ct.to_string()),
+                (header::CACHE_CONTROL, "public, max-age=300".to_string()),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(_) => (StatusCode::NOT_FOUND, "asset not found").into_response(),
+    }
+}
+
 pub async fn named_query(
     State(state): State<Arc<AppState>>,
     user: CurrentUser,
@@ -558,5 +610,60 @@ mod tests {
         );
         let _ = std::fs::remove_dir_all(&dir);
         let _ = std::fs::remove_dir_all(&outside);
+    }
+
+    fn public_bundle() -> PathBuf {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static SEQ: AtomicU32 = AtomicU32::new(0);
+        let n = SEQ.fetch_add(1, Ordering::SeqCst);
+        let root = std::env::temp_dir().join(format!("cartapel-public-{}-{n}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("public")).unwrap();
+        std::fs::create_dir_all(root.join("config")).unwrap();
+        std::fs::write(root.join("public").join("logo.svg"), "<svg></svg>").unwrap();
+        std::fs::write(root.join("config").join("auth.hcl"), "public_role = \"x\"").unwrap();
+        root
+    }
+
+    async fn get_public(dir: &std::path::Path, path: &str) -> Response {
+        serve_public(State(asset_state(dir.to_path_buf())), Path(path.to_string())).await
+    }
+
+    #[tokio::test]
+    async fn serve_public_needs_no_session() {
+        let dir = public_bundle();
+        // No CurrentUser passed at all — this must compile and succeed, which
+        // is the whole point: public/ renders before any session exists.
+        let r = get_public(&dir, "logo.svg").await;
+        assert_eq!(r.status(), StatusCode::OK);
+        assert_eq!(r.headers().get(CONTENT_TYPE).unwrap(), "image/svg+xml");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn serve_public_cannot_reach_outside_the_public_folder() {
+        let dir = public_bundle();
+        // The rest of the bundle (config/auth.hcl, sibling to public/) must
+        // stay unreachable through this route — public/ is the only public part.
+        assert_eq!(
+            get_public(&dir, "../config/auth.hcl").await.status(),
+            StatusCode::BAD_REQUEST,
+            ".. traversal rejected the same way serve_static rejects it"
+        );
+        assert_eq!(
+            get_public(&dir, "nonexistent.png").await.status(),
+            StatusCode::NOT_FOUND
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn serve_public_missing_public_folder_is_404_not_a_crash() {
+        let dir = bundle(); // has config/ and overview/, no public/
+        assert_eq!(
+            get_public(&dir, "logo.svg").await.status(),
+            StatusCode::NOT_FOUND
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

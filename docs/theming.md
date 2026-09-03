@@ -14,7 +14,7 @@ Pick a preset and an accent, and you're done:
 
 ```hcl
 brand      = "Acme Admin"
-brand_logo = "logo.svg"        # a bundle asset (served from /static), URL or data URL
+brand_logo = "logo.svg"        # a public/ asset (see below), URL or data URL
 
 theme {
   preset = "cartapel"           # "cartapel" (default) | "django"
@@ -30,6 +30,14 @@ theme {
 | `accent_btn` | Primary-button color when you want it different from `accent`. |
 | `mode` | Force `light` or `dark`, or follow the visitor's OS with `auto`. |
 | `logo_light` / `logo_dark` | Per-mode brand logo, overriding `brand_logo` for that mode. |
+
+`brand_logo`/`logo_light`/`logo_dark` resolve against the reserved **`public/`**
+folder at your config root — `logo.svg` means `public/logo.svg` — because the
+login screen needs to render it **before there's a session**. `public/` is the
+one part of the config bundle served with no auth (see
+[Configuration layout](/configuration/overview#the-reserved-public-folder));
+everything else stays behind login. An absolute `https://…` or `data:` URL
+skips `public/` entirely and is used as-is.
 
 ## Advanced: design tokens
 

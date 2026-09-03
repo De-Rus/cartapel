@@ -186,6 +186,8 @@ export const api = {
     request<Record<string, never>>('DELETE', `/t/${table}/r/${encodeURIComponent(pk)}`),
   options: (table: string, col: string, q: string) =>
     request<OptionItem[]>('GET', `/t/${table}/options/${col}?q=${encodeURIComponent(q)}`),
+  remote: (table: string, col: string, pk: string) =>
+    request<{ value: unknown }>('GET', `/t/${table}/remote/${col}/${encodeURIComponent(pk)}`),
   action: (table: string, name: string, pks: Array<string | number>) =>
     request<ActionResult>('POST', `/t/${table}/action/${name}`, { pks }),
   bulk: (table: string, pks: Array<string | number>, set: Row) =>

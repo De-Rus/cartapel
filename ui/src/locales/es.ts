@@ -154,6 +154,10 @@ const es: Dict = {
   fk_no_results: 'sin resultados',
   fk_search: 'Buscar…',
 
+  remote_load: 'Cargar',
+  remote_loading: 'Cargando…',
+  remote_error: 'error al cargar',
+
   picker_search: 'Buscar…',
   picker_no_results: 'sin resultados',
   picker_pick_icon: 'elegir icono…',

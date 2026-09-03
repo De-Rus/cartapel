@@ -594,6 +594,7 @@ mod tests {
                 method: None,
                 confirm: None,
                 danger: false,
+                when: None,
             },
         );
         cfg.tables.insert("bots".into(), bots_cfg);

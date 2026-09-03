@@ -11,12 +11,16 @@ Set `widget = "<name>"`. Widgets that take parameters read them from the field's
 
 ### Text & structured
 
+<details>
+<summary>Show</summary>
+
 | Widget | Renders | Notable `params` |
 | --- | --- | --- |
 | `text` | Plain text (the default). | — |
 | `textarea` | Multi-line text; wraps in detail, truncates in lists. | — |
 | `code` | Monospace code block; syntax-aware in detail. | `lang` (e.g. `python`, `sql`) |
 | `json` | Pretty JSON tree in detail, compact preview in lists. | — |
+| `table` | An array-of-objects value as a small inline table — see [Remote fields](/configuration/remote-fields#arrays-the-table-widget). | `columns` (which keys, in order; omit → the first row's own keys) |
 | `masked` | Renders the (already-masked) value in monospace. | — |
 | `truncate` | Truncates to N chars with a full-value tooltip. | `chars` (default 40) |
 | `copyable` | Value with a click-to-copy affordance. | — |
@@ -31,7 +35,12 @@ field "ref"      { widget = "copyable" }
 field "id"       { widget = "uuid" }
 ```
 
+</details>
+
 ### Numbers
+
+<details>
+<summary>Show</summary>
 
 | Widget | Renders | Notable `params` |
 | --- | --- | --- |
@@ -56,7 +65,12 @@ field "delta"  { widget = "trend" }
 field "score"  { widget = "heatcell"; params = { min = 0, max = 100 } }
 ```
 
+</details>
+
 ### Booleans & enums
+
+<details>
+<summary>Show</summary>
 
 | Widget | Renders | Notable `params` |
 | --- | --- | --- |
@@ -80,7 +94,12 @@ field "status" {
 }
 ```
 
+</details>
+
 ### Time
+
+<details>
+<summary>Show</summary>
 
 | Widget | Renders | Notable `params` |
 | --- | --- | --- |
@@ -94,7 +113,12 @@ field "renews_at" {
 }
 ```
 
+</details>
+
 ### Links, email, phone, URL
+
+<details>
+<summary>Show</summary>
 
 | Widget | Renders | Notable `params` |
 | --- | --- | --- |
@@ -109,7 +133,12 @@ field "homepage" {
 }
 ```
 
+</details>
+
 ### Media & identity
+
+<details>
+<summary>Show</summary>
 
 | Widget | Renders | Notable `params` |
 | --- | --- | --- |
@@ -125,7 +154,12 @@ field "brand_color" { widget = "color" }
 field "region"       { widget = "country" }
 ```
 
+</details>
+
 ### Relations & arrays
+
+<details>
+<summary>Show</summary>
 
 | Widget | Renders | Notable `params` |
 | --- | --- | --- |
@@ -145,6 +179,20 @@ targets you cannot view fall back to the raw value. The `fk` widget is the
 explicit form: set `params = { target = "..." }` to declare (or override) the
 drill-through target when no database FK exists — for example on a computed
 column — and `target_column` when the reference isn't the target's primary key.
+
+Editing one is lazy search, not a full dropdown — like Django's
+`autocomplete_fields`. Opening the field queries `GET
+/t/:table/options/:col?q=…` as you type (debounced, 20 results max, respects
+row filters), instead of loading every row up front. No config needed — this
+is how every FK column edits by default.
+
+</details>
+
+### Remote fields & the `table` widget
+
+A field can also be **fetched live from an `http` source** instead of read
+from the database — `remote { }`, paired with any widget (including `table`
+for an array response). Its own page: [Remote fields](/configuration/remote-fields).
 
 ## Custom widgets
 

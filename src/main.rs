@@ -17,6 +17,7 @@ mod interp;
 mod introspect;
 mod meta;
 mod plugins;
+mod remote;
 mod rows;
 mod s3;
 mod search;
@@ -903,6 +904,7 @@ async fn serve(
             "/t/:table/file/:col/:pk",
             get(filefield::get_file).post(filefield::put_file),
         )
+        .route("/t/:table/remote/:col/:pk", get(remote::get_remote))
         .route("/t/:table/action/:name", post(actions::action_handler))
         .route("/config/discover", get(configedit::discover))
         .route("/config/setup", post(configedit::apply_setup))
@@ -962,6 +964,10 @@ async fn serve(
         .route("/*path", get(plugins::serve_static))
         .with_state(state.clone());
 
+    let public_assets = Router::new()
+        .route("/*path", get(plugins::serve_public))
+        .with_state(state.clone());
+
     let spa = Router::new()
         .fallback(assets::spa_handler)
         .with_state(base_path.clone());
@@ -969,6 +975,7 @@ async fn serve(
     let mut app = Router::new()
         .nest(&format!("{base_path}/api"), api)
         .nest(&format!("{base_path}/static"), static_assets)
+        .nest(&format!("{base_path}/public"), public_assets)
         .merge(spa);
     if !base_path.is_empty() {
         let to = format!("{base_path}/");

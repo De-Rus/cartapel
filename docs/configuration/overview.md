@@ -31,8 +31,10 @@ admin/
 │   ├── cartapel.hcl            #   brand, theme, the `main` source, defaults
 │   ├── auth.hcl               #   roles & permissions
 │   ├── dashboard.hcl          #   dashboard widgets
-│   └── widgets/               #   shared custom-widget JS (served at /static)
+│   └── widgets/               #   shared custom-widget JS (served at /static, session required)
 │       └── sparkline.js
+├── public/                      # reserved — the ONLY public folder, no session required
+│   └── logo.svg                #   brand_logo / logo_light / logo_dark point here
 └── screens/                    # every table and page lives here
     ├── customers/              # a sidebar group (it has a _group.hcl)
     │   ├── _group.hcl         #   its label, icon, order, table order
@@ -70,6 +72,9 @@ sorted by path). The rules the diagram doesn't show:
 
 ## The reserved `config/` folder
 
+<details>
+<summary>Show</summary>
+
 `config/` is special: it is never a sidebar group and is never scanned for
 tables. It holds exactly three global files plus a `widgets/` asset folder:
 
@@ -84,7 +89,32 @@ tables. It holds exactly three global files plus a `widgets/` asset folder:
 Putting anything else in `config/` is a loud load error. Folders whose name
 starts with an underscore are never treated as sidebar groups.
 
+</details>
+
+## The reserved `public/` folder
+
+<details>
+<summary>Show</summary>
+
+`public/` is the one part of the config bundle served **with no session** — at
+`/public/<path>`, versus `/static/<path>` for everything else in `config/`,
+which stays behind login. It exists for exactly one reason: the login screen
+renders before there's a session to check, so a brand logo referenced from
+`config/` (session-gated) would never load there.
+
+Put `brand_logo`/`theme.logo_light`/`theme.logo_dark` targets here — see
+[Theming](/theming) — and nothing else; anything under `public/` is reachable
+by anyone who can reach the panel at all, config author's choice. It isn't
+scanned for `.hcl` files, so it never turns into a sidebar group or a table
+by accident. Same traversal/symlink-escape and extension checks as `/static`
+apply, just without the auth requirement.
+
+</details>
+
 ## `config/cartapel.hcl` — globals
+
+<details>
+<summary>Show</summary>
 
 ```hcl
 brand      = "Acme Admin"
@@ -175,7 +205,12 @@ A full worked example for every type — Postgres, MySQL & MariaDB, ClickHouse,
 Grafana, files, S3-compatible storage and HTTP — is on its own page:
 [Data sources](/configuration/sources).
 
+</details>
+
 ## Environment interpolation
+
+<details>
+<summary>Show</summary>
 
 `secret_key` and every `source`'s `url` accept `env:NAME` or `${NAME}`,
 replaced at load time with the environment variable `NAME`. (An `http` source's
@@ -192,7 +227,12 @@ source "main" {
 secret_key = "${CARTAPEL_SECRET_KEY}"
 ```
 
+</details>
+
 ## Validation & hot-reload
+
+<details>
+<summary>Show</summary>
 
 Config is validated as it loads, and again on every in-app edit:
 
@@ -215,6 +255,8 @@ The builder regenerates canonical HCL from the parsed model. If you keep
 comments or bespoke formatting in a file, edit it as raw HCL (in your repo or the
 raw editor), not through the visual form.
 :::
+
+</details>
 
 ## Next
 

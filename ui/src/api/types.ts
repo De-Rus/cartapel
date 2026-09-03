@@ -30,6 +30,8 @@ export interface ColumnMeta {
   ref_table?: string
   ref_column?: string
   computed?: boolean
+  remote?: boolean
+  remote_lazy?: boolean
   label?: string
   group?: string | null
   format?: string
@@ -85,12 +87,19 @@ export interface ListMeta {
   per_page: number
 }
 
+export interface ActionWhenMeta {
+  column: string
+  op: 'eq' | 'ne'
+  value: string
+}
+
 export interface ActionMeta {
   name: string
   label: string
   danger: boolean
   confirm: string
   kind: string
+  when?: ActionWhenMeta | null
 }
 
 export interface InlineMeta {

@@ -34,6 +34,7 @@ field "price" {
 | `group` | string | Detail-form section this field belongs to (an alternative to `detail { section { } }`). |
 | `params` | map | Widget-specific parameters (see each widget). |
 | `file` | block | Marks the field as uploadable (see [Uploads](#uploads)). `widget = "image"` decodes/resizes/re-encodes on upload; any other widget stores the bytes as uploaded. |
+| `remote` | block | Marks the field as a read-only value fetched live from an `http` source, `{column}`-templated per row — see [Remote fields](/configuration/remote-fields). |
 | `format` | string | A number/date formatter applied to the value. |
 | `prefix` / `suffix` | string | Text prepended / appended to the displayed value. |
 | `truncate` | number | Truncate the displayed string to N characters. |
@@ -51,6 +52,9 @@ field "customer_notes" {
 ```
 
 ## Computed columns (`sql`)
+
+<details>
+<summary>Show</summary>
 
 A field with a `sql` expression is a **virtual, read-only column** that doesn't
 exist in the table. cartapel selects it as `(<sql>) AS "<name>"`. The current row
@@ -98,7 +102,12 @@ A `sort_by` that names a column a role has **masked** is refused for that role (
 ordering can't leak a hidden value). An `sql` expression that references a masked
 column can still order by it — keep masked columns out of `sortable` expressions.
 
+</details>
+
 ## Formatting
+
+<details>
+<summary>Show</summary>
 
 `format` runs the value through a formatter. The vocabulary is fixed:
 
@@ -123,7 +132,12 @@ field "win_rate" {
 }
 ```
 
+</details>
+
 ## Interpolation: `display` and `href`
+
+<details>
+<summary>Show</summary>
 
 Both take a template with `{column}` placeholders filled from the row:
 
@@ -137,7 +151,12 @@ field "name" {
 `display` replaces the shown text; `href` makes the cell a link. (For an
 explicit link widget with a new-tab option, see [`link` / `url`](#links-email-phone-url).)
 
+</details>
+
 ## Conditional color
+
+<details>
+<summary>Show</summary>
 
 `color` tints a value based on its content. Two forms.
 
@@ -185,7 +204,12 @@ field "score" {
 `neutral`, `accent`, `muted`. Any other class or an unparseable condition is a
 load error.
 
+</details>
+
 ## Uploads
+
+<details>
+<summary>Show</summary>
 
 One block, `file { }`, turns a column into something uploadable, straight
 from the list or the record view, no edit-mode round-trip. The **widget**
@@ -231,3 +255,6 @@ builder's Fields tab to configure `dir`/`name_col`. But today only
 A plain `file` field falls back to whatever the default text rendering does;
 there's no download-link/icon widget in the panel yet.
 :::
+
+</details>
+

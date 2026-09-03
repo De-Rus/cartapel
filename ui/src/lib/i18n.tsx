@@ -45,6 +45,7 @@ export function makeT(locale?: string | null, overrides?: Strings | null): TFn {
 }
 
 const I18nContext = createContext<TFn>(makeT())
+const LocaleContext = createContext<string>(DEFAULT_LOCALE)
 
 export function I18nProvider({
   locale,
@@ -56,9 +57,22 @@ export function I18nProvider({
   children: React.ReactNode
 }) {
   const t = useMemo(() => makeT(locale, strings), [locale, strings])
-  return <I18nContext.Provider value={t}>{children}</I18nContext.Provider>
+  const resolved = locale && DICTS[locale] ? locale : DEFAULT_LOCALE
+  return (
+    <I18nContext.Provider value={t}>
+      <LocaleContext.Provider value={resolved}>{children}</LocaleContext.Provider>
+    </I18nContext.Provider>
+  )
 }
 
 export function useT(): TFn {
   return useContext(I18nContext)
+}
+
+/** The active locale code, e.g. for picking a `labels = { es = "…" }`
+ *  per-locale override out of config data client-side — most labels are
+ *  already resolved server-side, this is for the rare case (a widget's own
+ *  `params`) the backend passes through opaque. */
+export function useLocale(): string {
+  return useContext(LocaleContext)
 }

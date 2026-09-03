@@ -867,6 +867,10 @@ pub struct FieldConfig {
     /// the bytes as uploaded. See [`FileConfig`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file: Option<FileConfig>,
+    /// Marks the field as a read-only value fetched live from an `http`
+    /// source, `{column}`-templated per row. See [`RemoteConfig`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote: Option<RemoteConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1124,6 +1128,27 @@ pub struct FileConfig {
     pub max_bytes: Option<usize>,
 }
 
+/// A read-only field fetched from an already-declared `http` source at
+/// request time, not stored anywhere. `path` is `{column}`-templated from the
+/// current row (a masked column may never appear in it); `at` is a dotted
+/// path into the JSON response (omitted ⇒ the whole response body).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RemoteConfig {
+    pub source: String,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<String>,
+    /// Wait for a click in a list instead of fetching automatically. Default
+    /// `false`: even a list — where dozens of rows can be on screen at once —
+    /// fetches every visible row's value on its own. Set `true` for an
+    /// endpoint too slow or expensive to fire once per visible row for free.
+    /// The detail view (a single row) always fetches automatically regardless
+    /// of this flag.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub lazy: bool,
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EditConfig {
@@ -1245,6 +1270,13 @@ pub struct ActionConfig {
     pub danger: bool,
     #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
     pub set: serde_json::Map<String, serde_json::Value>,
+    /// Show this action on a single row only when the condition holds —
+    /// `"<column> = <value>"` or `"<column> != <value>"`. Irrelevant to the
+    /// bulk action bar (a mixed multi-row selection has no one row to test),
+    /// so it's ignored there; every row still gets its own real check
+    /// server-side when the action actually runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, serde::Serialize)]
@@ -1253,6 +1285,62 @@ pub enum ActionKind {
     Update,
     Delete,
     Webhook,
+}
+
+/// The pre-parsed form `meta` emits for `ActionConfig.when` — the frontend
+/// tests it against the row it already has, no re-parsing on that side.
+#[derive(Debug)]
+pub struct ActionWhen {
+    pub column: String,
+    pub op: ActionWhenOp,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ActionWhenOp {
+    Eq,
+    Ne,
+}
+
+impl ActionWhen {
+    pub fn normalized(&self) -> serde_json::Value {
+        let op = match self.op {
+            ActionWhenOp::Eq => "eq",
+            ActionWhenOp::Ne => "ne",
+        };
+        serde_json::json!({ "column": self.column, "op": op, "value": self.value })
+    }
+}
+
+/// `"<column> = <value>"` / `"<column> != <value>"` — deliberately just an
+/// equality check on one column, not a general expression language.
+pub fn parse_action_when(raw: &str) -> Result<ActionWhen, String> {
+    let s = raw.trim();
+    let mut parts = s.splitn(2, char::is_whitespace);
+    let column = parts.next().unwrap_or("").trim();
+    let rest = parts.next().unwrap_or("").trim();
+    if column.is_empty() || rest.is_empty() {
+        return Err(format!(
+            "action `when` `{raw}`: expected `<column> = <value>` or `<column> != <value>`"
+        ));
+    }
+    let (op, value) = if let Some(v) = rest.strip_prefix("!=") {
+        (ActionWhenOp::Ne, v.trim())
+    } else if let Some(v) = rest.strip_prefix('=') {
+        (ActionWhenOp::Eq, v.trim())
+    } else {
+        return Err(format!(
+            "action `when` `{raw}`: unknown operator (use `=` or `!=`)"
+        ));
+    };
+    if value.is_empty() {
+        return Err(format!("action `when` `{raw}`: missing value"));
+    }
+    Ok(ActionWhen {
+        column: column.to_string(),
+        op,
+        value: value.to_string(),
+    })
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -1692,6 +1780,42 @@ fn validate_storages(cfg: &ConfigDir) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_remote_fields(cfg: &ConfigDir) -> Result<(), String> {
+    for (table, tc) in &cfg.tables {
+        for (field, f) in &tc.fields {
+            let Some(remote) = f.remote.as_ref() else {
+                continue;
+            };
+            let Some(src) = cfg.sources.get(&remote.source) else {
+                return Err(format!(
+                    "table \"{table}\" field \"{field}\": source \"{}\" is not declared",
+                    remote.source
+                ));
+            };
+            if src.kind != "http" {
+                return Err(format!(
+                    "table \"{table}\" field \"{field}\": source \"{}\" is a {} source — remote fields only read http sources",
+                    remote.source, src.kind
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_actions(cfg: &ConfigDir) -> Result<(), String> {
+    for (table, tc) in &cfg.tables {
+        for (name, a) in &tc.actions {
+            let Some(when) = a.when.as_ref() else {
+                continue;
+            };
+            parse_action_when(when)
+                .map_err(|e| format!("table \"{table}\" action \"{name}\": {e}"))?;
+        }
+    }
+    Ok(())
+}
+
 /// Load-time validation of widgets: every declared table `column`'s `format`
 /// must be in the column-format vocab.
 pub(crate) fn validate_panel_fields(widgets: &[PanelConfig]) -> Result<(), String> {
@@ -2066,6 +2190,8 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
         cfg.sources.insert(name, s);
     }
     validate_storages(&cfg)?;
+    validate_remote_fields(&cfg)?;
+    validate_actions(&cfg)?;
     cfg.groups
         .sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.label.cmp(&b.label)));
     // Pages follow their group's `order`, then their own — the sidebar lists
@@ -2766,6 +2892,113 @@ storage "uploads" {
         tc.fields.insert("logo".into(), file_field(None));
         cfg.tables.insert("products".into(), tc);
         assert!(validate_storages(&cfg).is_ok());
+    }
+
+    fn remote_field(source: &str) -> FieldConfig {
+        FieldConfig {
+            remote: Some(RemoteConfig {
+                source: source.into(),
+                path: "/track/{tracking_number}".into(),
+                at: Some("status".into()),
+                lazy: false,
+            }),
+            ..FieldConfig::default()
+        }
+    }
+
+    fn http_source() -> NamedSource {
+        let mut s = NamedSource::from_url("https://carrier.example.com");
+        s.kind = "http".into();
+        s
+    }
+
+    #[test]
+    fn validate_remote_fields_accepts_a_declared_http_source() {
+        let mut cfg = ConfigDir::default();
+        cfg.sources.insert("carrier_api".into(), http_source());
+        let mut tc = TableConfig::default();
+        tc.fields
+            .insert("shipping_status".into(), remote_field("carrier_api"));
+        cfg.tables.insert("orders".into(), tc);
+        assert!(validate_remote_fields(&cfg).is_ok());
+    }
+
+    #[test]
+    fn validate_remote_fields_rejects_an_undeclared_source() {
+        let mut cfg = ConfigDir::default();
+        let mut tc = TableConfig::default();
+        tc.fields
+            .insert("shipping_status".into(), remote_field("carrier_api"));
+        cfg.tables.insert("orders".into(), tc);
+        let err = validate_remote_fields(&cfg).unwrap_err();
+        assert!(err.contains("carrier_api"), "{err}");
+        assert!(err.contains("not declared"), "{err}");
+    }
+
+    #[test]
+    fn validate_remote_fields_rejects_a_non_http_source() {
+        let mut cfg = ConfigDir::default();
+        cfg.sources
+            .insert("main".into(), NamedSource::from_url("postgres://x"));
+        let mut tc = TableConfig::default();
+        tc.fields.insert("shipping_status".into(), remote_field("main"));
+        cfg.tables.insert("orders".into(), tc);
+        let err = validate_remote_fields(&cfg).unwrap_err();
+        assert!(err.contains("postgres"), "{err}");
+    }
+
+    fn action_with_when(when: Option<&str>) -> ActionConfig {
+        ActionConfig {
+            labels: Default::default(),
+            label: "Mark shipped".into(),
+            kind: ActionKind::Update,
+            set: serde_json::Map::new(),
+            url: None,
+            method: None,
+            confirm: None,
+            danger: false,
+            when: when.map(String::from),
+        }
+    }
+
+    #[test]
+    fn parse_action_when_parses_eq_and_ne() {
+        let w = parse_action_when("status != shipped").unwrap();
+        assert_eq!(w.column, "status");
+        assert_eq!(w.op, ActionWhenOp::Ne);
+        assert_eq!(w.value, "shipped");
+
+        let w = parse_action_when("status = pending").unwrap();
+        assert_eq!(w.op, ActionWhenOp::Eq);
+        assert_eq!(w.value, "pending");
+    }
+
+    #[test]
+    fn parse_action_when_rejects_missing_operator() {
+        assert!(parse_action_when("status shipped").is_err());
+        assert!(parse_action_when("status").is_err());
+        assert!(parse_action_when("").is_err());
+    }
+
+    #[test]
+    fn validate_actions_accepts_a_well_formed_when() {
+        let mut cfg = ConfigDir::default();
+        let mut tc = TableConfig::default();
+        tc.actions
+            .insert("mark_shipped".into(), action_with_when(Some("status != shipped")));
+        cfg.tables.insert("orders".into(), tc);
+        assert!(validate_actions(&cfg).is_ok());
+    }
+
+    #[test]
+    fn validate_actions_rejects_an_unparseable_when() {
+        let mut cfg = ConfigDir::default();
+        let mut tc = TableConfig::default();
+        tc.actions
+            .insert("mark_shipped".into(), action_with_when(Some("status shipped")));
+        cfg.tables.insert("orders".into(), tc);
+        let err = validate_actions(&cfg).unwrap_err();
+        assert!(err.contains("mark_shipped"), "{err}");
     }
 
     /// A `page.hcl` file body parses into `PageConfig` and round-trips;

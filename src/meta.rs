@@ -155,7 +155,7 @@ fn is_listable_column(dbt: &DbTable, cfg: &TableConfig, name: &str) -> bool {
         || cfg
             .fields
             .get(name)
-            .is_some_and(|f| f.sql.is_some() || f.file.is_some())
+            .is_some_and(|f| f.sql.is_some() || f.file.is_some() || f.remote.is_some())
 }
 
 /// Config-only upload fields — a `file { }` block whose name isn't a real
@@ -165,6 +165,16 @@ pub fn virtual_file_fields<'a>(dbt: &DbTable, cfg: &'a TableConfig) -> Vec<&'a S
     cfg.fields
         .iter()
         .filter(|(name, f)| f.file.is_some() && f.sql.is_none() && dbt.column(name).is_none())
+        .map(|(name, _)| name)
+        .collect()
+}
+
+/// Config-only `remote { }` fields — always virtual (there's no DB column to
+/// attach to), fetched lazily by the frontend, never part of the row SELECT.
+pub fn virtual_remote_fields<'a>(dbt: &DbTable, cfg: &'a TableConfig) -> Vec<&'a String> {
+    cfg.fields
+        .iter()
+        .filter(|(name, f)| f.remote.is_some() && dbt.column(name).is_none())
         .map(|(name, _)| name)
         .collect()
 }
@@ -384,6 +394,7 @@ fn detail_sections(dbt: &DbTable, cfg: &TableConfig, loc: &Loc) -> Vec<Value> {
                 .map(|(n, _)| n.clone()),
         )
         .chain(virtual_file_fields(dbt, cfg).into_iter().cloned())
+        .chain(virtual_remote_fields(dbt, cfg).into_iter().cloned())
         .collect();
     let known = |f: &String| all.contains(f);
 
@@ -558,6 +569,38 @@ fn column_meta(
         apply_presentation(&mut m, fc);
         out.push(m);
     }
+    // Config-only remote columns — fetched lazily per row via
+    // `/t/:table/remote/:col/:pk`, never part of the row SELECT. Always
+    // read-only: there's no write-back to an external source.
+    for name in virtual_remote_fields(dbt, cfg) {
+        let fc = cfg.fields.get(name);
+        // Any widget can render a remote field's fetched value — `remote`
+        // only marks that the value has to be fetched first, it isn't a
+        // rendering choice of its own. Default to plain text, same as any
+        // other field with no widget set.
+        let widget = fc
+            .and_then(|f| f.widget.clone())
+            .unwrap_or_else(|| "text".into());
+        let mut m = json!({
+            "name": name,
+            "label": loc.pick(fc.map(|f| &f.labels).unwrap_or(&Default::default()),
+                fc.and_then(|f| f.label.clone()).unwrap_or_else(|| humanize(name)),
+            ),
+            "kind": "text",
+            "nullable": true,
+            "has_default": false,
+            "widget": widget,
+            "params": Value::Object(fc.map(|f| f.params.clone()).unwrap_or_default()),
+            "readonly": true,
+            "computed": true,
+            "masked": masked.contains(name),
+            "remote": true,
+            "remote_lazy": fc.and_then(|f| f.remote.as_ref()).is_some_and(|r| r.lazy),
+            "fk": Value::Null,
+        });
+        apply_presentation(&mut m, fc);
+        out.push(m);
+    }
     out
 }
 
@@ -723,9 +766,15 @@ pub async fn table_meta(
         .iter()
         .filter(|(n, _)| actions_allowed.contains(n))
         .map(|(n, a)| {
+            let when = a
+                .when
+                .as_deref()
+                .and_then(|w| crate::config::parse_action_when(w).ok())
+                .map(|w| w.normalized());
             json!({
                 "name": n, "label": loc.pick(&a.labels, a.label.clone()),
                 "danger": a.danger, "confirm": a.confirm, "kind": a.kind,
+                "when": when,
             })
         })
         .collect();
