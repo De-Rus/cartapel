@@ -138,6 +138,7 @@ export default defineConfig({
           { text: 'Detail views', link: '/configuration/detail-views' },
           { text: 'Groups & navigation', link: '/configuration/groups-and-nav' },
           { text: 'Dashboard', link: '/configuration/dashboard' },
+          { text: 'Grafana panels', link: '/configuration/grafana-panels' },
         ],
       },
       {
@@ -145,6 +146,7 @@ export default defineConfig({
         collapsed: false,
         items: [
           { text: 'Fields & widgets', link: '/configuration/fields-and-widgets' },
+          { text: 'Widgets', link: '/configuration/widgets' },
           { text: 'Pages & queries', link: '/configuration/pages-and-queries' },
           { text: 'Theming', link: '/theming' },
           { text: 'Localization', link: '/localization' },
@@ -161,7 +163,11 @@ export default defineConfig({
       },
     ],
 
-    outline: { level: [2, 3], label: 'On this page' },
+    // h3s used to all list in the right rail too — on a page with several
+    // widget-category subsections that made "On this page" longer than some
+    // pages' actual content. h2 only; h3s stay as in-page anchors, just not
+    // in the outline.
+    outline: { level: 2, label: 'On this page' },
 
     search: { provider: 'local' },
 

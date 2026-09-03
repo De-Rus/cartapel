@@ -50,3 +50,21 @@
 .vp-doc :not(pre) > code {
   color: var(--vp-c-brand-1);
 }
+
+/* The default theme only changes text color for both :hover and the current
+   page — nearly the same treatment, easy to miss at a glance. Give the
+   sidebar link a real background too, so "where am I" doesn't depend on
+   noticing a color shift. Negative margin cancels the added padding so nothing
+   in the layout shifts. */
+.VPSidebar .VPSidebarItem .item > .link {
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin: -2px -8px;
+  transition: background-color 0.15s;
+}
+.VPSidebar .VPSidebarItem .item > .link:hover {
+  background-color: var(--vp-c-default-soft);
+}
+.VPSidebar .VPSidebarItem.is-active > .item > .link {
+  background-color: var(--vp-c-brand-soft);
+}

@@ -42,6 +42,8 @@ uploaded, untouched — see [A generic file](#a-generic-file) below.
 | `write_defaults` | map | Extra columns set only when `write_to` INSERTs a fresh row. |
 | `max_bytes` | number | Upload size cap. Default 25MB, or 8MB when `widget = "image"`. |
 
+A field using every key at once:
+
 ```hcl
 field "manual" {
   file {

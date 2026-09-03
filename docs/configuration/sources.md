@@ -81,7 +81,7 @@ source "grafana" {
 ```
 
 Panels reference it by name with a `ds` (datasource) and an `expr` — full
-examples in [Dashboard → Grafana](/configuration/dashboard#metrics-logs-and-traces-through-grafana).
+examples in [Grafana panels](/configuration/grafana-panels).
 The token is attached server-side; the browser never sees Grafana directly.
 
 ## Files & S3 — a storage backend as rows
