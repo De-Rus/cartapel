@@ -7,12 +7,12 @@ mod config;
 mod configedit;
 mod dashboard;
 mod db;
+mod filefield;
 mod files;
 mod globaledit;
 mod grafana;
 mod groupsedit;
 mod i18n;
-mod images;
 mod interp;
 mod introspect;
 mod meta;
@@ -23,6 +23,7 @@ mod search;
 mod sqlval;
 mod state;
 mod store;
+mod uploads;
 mod vars;
 mod views;
 
@@ -538,7 +539,7 @@ async fn check(config: &std::path::Path, db: Option<String>, schema: Option<Stri
             let virtual_col = tc
                 .fields
                 .get(col)
-                .is_some_and(|f| f.sql.is_some() || f.image.is_some());
+                .is_some_and(|f| f.sql.is_some() || f.file.is_some());
             if dbt.column(col).is_none() && !virtual_col {
                 eprintln!("✗ {key}: {what} column '{col}' does not exist");
                 errors += 1;
@@ -899,8 +900,8 @@ async fn serve(
         )
         .route("/t/:table/options/:col", get(rows::options_handler))
         .route(
-            "/t/:table/image/:col/:pk",
-            get(images::get_image).post(images::put_image),
+            "/t/:table/file/:col/:pk",
+            get(filefield::get_file).post(filefield::put_file),
         )
         .route("/t/:table/action/:name", post(actions::action_handler))
         .route("/config/discover", get(configedit::discover))

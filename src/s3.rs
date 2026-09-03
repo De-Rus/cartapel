@@ -1,14 +1,18 @@
-//! `type = "s3"` sources: an object listing read as rows.
+//! S3-compatible object storage: a read-only `type = "s3"` *source* (list rows
+//! from object keys) and, since a `storage "…" { }` upload backend can name
+//! one, plain object `get`/`put`.
 //!
-//! The same `pattern` a `files` source uses applies here — an object key is a
-//! path, so `{source}/{symbol}/{tf}.parquet` shapes a bucket exactly as it
-//! shapes a directory. Listing only: cartapel signs a `ListObjectsV2` and reads
-//! names, sizes and mtimes, never object bodies.
+//! The `list` half: the same `pattern` a `files` source uses applies here — an
+//! object key is a path, so `{source}/{symbol}/{tf}.parquet` shapes a bucket
+//! exactly as it shapes a directory. Names, sizes and mtimes only.
+//!
+//! The `get_object`/`put_object` half backs `image { storage = "…" }` uploads
+//! (see `crate::images`) — a single object read or written whole, no listing.
 //!
 //! Requests are signed with SigV4 by hand rather than by pulling an SDK — the
-//! signing is ~60 lines against dependencies the binary already carries, and an
-//! AWS SDK is a large tree for one GET. Works against any S3-compatible
-//! endpoint (R2, MinIO, Backblaze); R2 wants `region = "auto"`.
+//! signing is ~80 lines against dependencies the binary already carries, and an
+//! AWS SDK is a large tree for a handful of calls. Works against any
+//! S3-compatible endpoint (R2, MinIO, Backblaze); R2 wants `region = "auto"`.
 
 use hmac::{Hmac, Mac};
 use serde_json::{json, Value};
@@ -47,13 +51,17 @@ fn uri_encode(s: &str) -> String {
     out
 }
 
-/// Sign a GET and return the headers it needs. `query` must already be sorted
-/// by key — SigV4 hashes the canonical form, not the one you send.
-fn sign_get(
+/// Sign a request and return the headers it needs. `query` must already be
+/// sorted by key — SigV4 hashes the canonical form, not the one you send.
+/// `payload_hash` is the sha256 of the body (empty-string hash for a GET).
+#[allow(clippy::too_many_arguments)]
+fn sign_request(
+    method: &str,
     creds: &Creds,
     host: &str,
     path: &str,
     query: &[(String, String)],
+    payload_hash: &str,
     now: &str,
 ) -> Vec<(String, String)> {
     let date = &now[..8];
@@ -62,12 +70,11 @@ fn sign_get(
         .map(|(k, v)| format!("{}={}", uri_encode(k), uri_encode(v)))
         .collect::<Vec<_>>()
         .join("&");
-    let payload_hash = sha256_hex(b"");
     let canonical_headers =
         format!("host:{host}\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{now}\n");
     let signed_headers = "host;x-amz-content-sha256;x-amz-date";
     let canonical_request = format!(
-        "GET\n{path}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
+        "{method}\n{path}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
     );
     let scope = format!("{date}/{}/s3/aws4_request", creds.region);
     let to_sign = format!(
@@ -87,9 +94,116 @@ fn sign_get(
                 creds.access_key
             ),
         ),
-        ("x-amz-content-sha256".into(), payload_hash),
+        ("x-amz-content-sha256".into(), payload_hash.to_string()),
         ("x-amz-date".into(), now.to_string()),
     ]
+}
+
+/// Sign a GET (empty-body payload hash) — the shape `list` and `get_object`
+/// both need.
+fn sign_get(
+    creds: &Creds,
+    host: &str,
+    path: &str,
+    query: &[(String, String)],
+    now: &str,
+) -> Vec<(String, String)> {
+    sign_request("GET", creds, host, path, query, &sha256_hex(b""), now)
+}
+
+/// `endpoint` + `/bucket/key`, and the bare `host[:port]` SigV4 signs against.
+fn object_url(endpoint: &str, bucket: &str, key: &str) -> Result<(reqwest::Url, String), String> {
+    let base = reqwest::Url::parse(endpoint).map_err(|e| format!("bad endpoint: {e}"))?;
+    let host = base
+        .host_str()
+        .ok_or_else(|| "endpoint has no host".to_string())?
+        .to_string();
+    let host = match base.port() {
+        Some(p) => format!("{host}:{p}"),
+        None => host,
+    };
+    let path = format!(
+        "/{}/{}",
+        bucket.trim_matches('/'),
+        key.trim_start_matches('/')
+    );
+    let url = format!("{}{path}", endpoint.trim_end_matches('/'));
+    let url = reqwest::Url::parse(&url).map_err(|e| format!("bad object url: {e}"))?;
+    Ok((url, host))
+}
+
+/// Fetch one object's bytes. Used by `image { storage = "…" }` reads — not the
+/// `files`/`s3` source listing, which never reads a body.
+pub async fn get_object(
+    http: &reqwest::Client,
+    endpoint: &str,
+    bucket: &str,
+    key: &str,
+    creds: &Creds,
+) -> Result<Vec<u8>, String> {
+    let (url, host) = object_url(endpoint, bucket, key)?;
+    let headers = sign_get(creds, &host, url.path(), &[], &amz_now());
+    let mut req = http.get(url).timeout(std::time::Duration::from_secs(15));
+    for (k, v) in headers {
+        req = req.header(k, v);
+    }
+    let resp = req.send().await.map_err(|e| format!("get failed: {e}"))?;
+    let status = resp.status();
+    if status == reqwest::StatusCode::NOT_FOUND {
+        return Err("not found".into());
+    }
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        let reason = tag(&body, "Message", 0)
+            .map(|(v, _)| v.to_string())
+            .unwrap_or_else(|| status.to_string());
+        return Err(format!("get failed: {reason}"));
+    }
+    resp.bytes()
+        .await
+        .map(|b| b.to_vec())
+        .map_err(|e| e.to_string())
+}
+
+/// Write one object whole. S3's PUT already replaces an object atomically —
+/// there is no half-written state a reader can observe, unlike the local-disk
+/// path which needs its own tmp-file-then-rename for that guarantee.
+pub async fn put_object(
+    http: &reqwest::Client,
+    endpoint: &str,
+    bucket: &str,
+    key: &str,
+    creds: &Creds,
+    body: &[u8],
+) -> Result<(), String> {
+    let (url, host) = object_url(endpoint, bucket, key)?;
+    let payload_hash = sha256_hex(body);
+    let headers = sign_request(
+        "PUT",
+        creds,
+        &host,
+        url.path(),
+        &[],
+        &payload_hash,
+        &amz_now(),
+    );
+    let mut req = http
+        .put(url)
+        .body(body.to_vec())
+        .timeout(std::time::Duration::from_secs(30));
+    for (k, v) in headers {
+        req = req.header(k, v);
+    }
+    let resp = req.send().await.map_err(|e| format!("put failed: {e}"))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        let reason = tag(&body, "Message", 0)
+            .map(|(v, _)| v.to_string())
+            .unwrap_or_else(|| status.to_string());
+        return Err(format!("put failed: {reason}"));
+    }
+    Ok(())
 }
 
 /// S3 reports `2026-07-27T21:12:08.313Z`; a files listing reports epoch millis.
@@ -310,5 +424,70 @@ mod tests {
             "20260728T000000Z",
         );
         assert_ne!(a[0].1, other[0].1, "a different date must resign");
+    }
+
+    /// A PUT signs the *body*, not an empty-payload hash — reusing `sign_get`
+    /// for an upload would silently authenticate the wrong bytes.
+    #[test]
+    fn put_signature_depends_on_the_body() {
+        let creds = Creds {
+            access_key: "AKIDEXAMPLE".into(),
+            secret_key: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY".into(),
+            region: "us-east-1".into(),
+        };
+        let now = "20260727T000000Z";
+        let a = sign_request(
+            "PUT",
+            &creds,
+            "s3.amazonaws.com",
+            "/bucket/products/1.png",
+            &[],
+            &sha256_hex(b"first upload"),
+            now,
+        );
+        let b = sign_request(
+            "PUT",
+            &creds,
+            "s3.amazonaws.com",
+            "/bucket/products/1.png",
+            &[],
+            &sha256_hex(b"different bytes"),
+            now,
+        );
+        assert_ne!(
+            a[0].1, b[0].1,
+            "different bodies must not share a signature"
+        );
+
+        let get = sign_get(
+            &creds,
+            "s3.amazonaws.com",
+            "/bucket/products/1.png",
+            &[],
+            now,
+        );
+        assert_ne!(
+            a[0].1, get[0].1,
+            "GET and PUT on the same path must not share a signature"
+        );
+    }
+
+    #[test]
+    fn object_url_joins_bucket_and_key_cleanly() {
+        let (url, host) =
+            object_url("https://s3.example.com", "my-bucket", "products/1.png").unwrap();
+        assert_eq!(
+            url.as_str(),
+            "https://s3.example.com/my-bucket/products/1.png"
+        );
+        assert_eq!(host, "s3.example.com");
+
+        // Leading/trailing slashes on bucket or key must not double up.
+        let (url2, _) =
+            object_url("https://s3.example.com/", "/my-bucket/", "/products/1.png").unwrap();
+        assert_eq!(
+            url2.as_str(),
+            "https://s3.example.com/my-bucket/products/1.png"
+        );
     }
 }

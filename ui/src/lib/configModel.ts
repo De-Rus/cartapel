@@ -2,11 +2,18 @@ import type { ConfigPut, RoleWrite, TableMeta } from '../api/types'
 
 export type Json = unknown
 
-export interface ImageConfigData {
+/** One upload block covers image and generic-file fields alike — `widget =
+ *  "image"` on the field is what makes it a photo (decoded/resized/re-encoded
+ *  to PNG, with `max_px`/`normalize` as widget `params`, not here). */
+export interface FileConfigData {
   dir: string
-  name_col: string
-  max_px?: number
-  normalize?: boolean
+  storage?: string
+  name_col?: string
+  name_sql?: string
+  write_to?: string
+  write_key?: Record<string, string>
+  write_defaults?: Record<string, string>
+  max_bytes?: number
 }
 
 export interface FieldConfigData {
@@ -17,7 +24,7 @@ export interface FieldConfigData {
   sql?: string
   group?: string
   params?: Record<string, Json>
-  image?: ImageConfigData
+  file?: FileConfigData
 }
 
 export interface CustomFilterData {
@@ -116,6 +123,7 @@ export const WIDGETS = [
   'array',
   'masked',
   'image',
+  'file',
 ] as const
 
 export type Widget = (typeof WIDGETS)[number]

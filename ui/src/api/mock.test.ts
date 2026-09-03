@@ -55,10 +55,12 @@ describe('mock API contract', () => {
   })
 
   it('builds image URLs per the contract (real mode)', () => {
+    // The route is /file/ — one upload endpoint for image and file fields
+    // alike; `imageUrl` is just the caller most widgets happen to use.
     expect(imageUrl('instruments', 'logo', '7', 'abc')).toBe(
-      '/admin/api/t/instruments/image/logo/7?v=abc',
+      '/admin/api/t/instruments/file/logo/7?v=abc',
     )
-    expect(imageUrl('bots', 'avatar', 'a b')).toBe('/admin/api/t/bots/image/avatar/a%20b')
+    expect(imageUrl('bots', 'avatar', 'a b')).toBe('/admin/api/t/bots/file/avatar/a%20b')
   })
 
   it('lists with search, filter, sort and pagination', async () => {

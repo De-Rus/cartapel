@@ -78,7 +78,7 @@ export function imageUrl(
 ): string {
   if (MOCK) return mockImageUrl(table, col, pk, label)
   const q = bust !== undefined && bust !== '' ? `?v=${encodeURIComponent(String(bust))}` : ''
-  return `${API_BASE}/t/${table}/image/${col}/${encodeURIComponent(pk)}${q}`
+  return `${API_BASE}/t/${table}/file/${col}/${encodeURIComponent(pk)}${q}`
 }
 
 export async function uploadImage(
@@ -94,7 +94,7 @@ export async function uploadImage(
   }
   const fd = new FormData()
   fd.append('file', file)
-  const res = await fetch(`${API_BASE}/t/${table}/image/${col}/${encodeURIComponent(pk)}`, {
+  const res = await fetch(`${API_BASE}/t/${table}/file/${col}/${encodeURIComponent(pk)}`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'X-Cartapel': '1' },

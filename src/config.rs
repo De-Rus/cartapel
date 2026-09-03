@@ -98,6 +98,47 @@ pub struct CartapelConfig {
     /// HTTP call — an SSRF surface). Set on a sensitive or public instance.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub disable_webhooks: bool,
+    /// Named upload backends an `image { storage = "…" }` field can write
+    /// through instead of local disk. Unlike `source`, these live only inline
+    /// in `cartapel.hcl` — a handful of storages per app, not a per-file
+    /// registry the way many database sources can be.
+    #[serde(
+        default,
+        rename = "storage",
+        skip_serializing_if = "BTreeMap::is_empty",
+        serialize_with = "hcl::ser::labeled_block"
+    )]
+    pub storages: BTreeMap<String, NamedStorage>,
+}
+
+/// A named upload storage backend for `image { }` fields (see
+/// [`crate::images`]). The unnamed default is always local disk under the
+/// field's own `dir`; naming a `storage` here opts one field into S3-compatible
+/// object storage instead — same `dir`, reinterpreted as a key prefix in the
+/// bucket rather than a filesystem path.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct NamedStorage {
+    #[serde(rename = "type")]
+    pub kind: String,
+    /// The S3-compatible endpoint. Supports `env:NAME` / `${NAME}`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bucket: Option<String>,
+    /// Defaults to `"auto"` (what Cloudflare R2 wants) when unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub access_key_env: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret_key_env: Option<String>,
+}
+
+impl NamedStorage {
+    pub fn is_s3(&self) -> bool {
+        self.kind == "s3"
+    }
 }
 
 /// Resolve `env:NAME` / `${NAME}` references in a config value to the env var.
@@ -821,8 +862,11 @@ pub struct FieldConfig {
     pub group: Option<String>,
     #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
     pub params: serde_json::Map<String, serde_json::Value>,
+    /// Marks the field as an uploadable file. `widget = "image"` decodes,
+    /// resizes and re-encodes it to PNG on upload; any other widget stores
+    /// the bytes as uploaded. See [`FileConfig`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub image: Option<ImageConfig>,
+    pub file: Option<FileConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1035,43 +1079,49 @@ where
     hcl::ser::labeled_block(&map, serializer)
 }
 
+/// An uploadable file field: where it lives (local disk, or a named
+/// `storage "…" { }` block — see [`NamedStorage`]), how the database learns
+/// its filename (`name_col`/`name_sql`, `write_to`), and a size cap.
+///
+/// One block covers every upload — `widget = "image"` is what makes it a
+/// photo (decoded, resized, re-encoded to PNG on upload; `max_px`/`normalize`
+/// as widget `params`, like any other widget's options). No widget, or any
+/// other widget, and the bytes are stored exactly as uploaded: a PDF, a CSV
+/// export, an arbitrary document. The storage and write-through mechanics
+/// don't know or care which.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct ImageConfig {
+pub struct FileConfig {
     pub dir: String,
+    /// Name of a `storage "…" { }` block (see [`NamedStorage`]) to read/write
+    /// this field's files through. Absent ⇒ local disk under `dir`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub storage: Option<String>,
     /// Real column holding the filename. Empty when `name_sql` supplies it.
     #[serde(default)]
     pub name_col: String,
     /// A scalar SQL expression (correlated to the row via the `t` alias) that
-    /// yields the filename — for an image joined from a related table. Exactly
+    /// yields the filename — for a file joined from a related table. Exactly
     /// one of name_col / name_sql must be set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name_sql: Option<String>,
-    /// Related table an upload writes to (upsert), so a `name_sql` image is
+    /// Related table an upload writes to (upsert), so a `name_sql` file is
     /// editable — the file belongs to that table, not this one. Absent ⇒ the
     /// join is read-only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub write_to: Option<String>,
     /// `target_col = parent_col` — how the upload locates/creates the target row
-    /// from this row's values. Also names the filename (`<vals joined by _>.png`).
+    /// from this row's values. Also names the file (`<vals joined by _>.<ext>`).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub write_key: BTreeMap<String, String>,
     /// Constant target columns set when the upload INSERTs a new target row
     /// (e.g. `status = "ok"`). Ignored on UPDATE.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub write_defaults: BTreeMap<String, String>,
-    #[serde(default = "default_max_px", skip_serializing_if = "is_default_max_px")]
-    pub max_px: u32,
-    #[serde(default = "default_true", skip_serializing_if = "is_true")]
-    pub normalize: bool,
-}
-
-fn default_max_px() -> u32 {
-    256
-}
-
-fn is_default_max_px(px: &u32) -> bool {
-    *px == default_max_px()
+    /// Per-field cap, overriding the default (25MB; 8MB when `widget = "image"`
+    /// — an image is always decoded into memory to resize, so it caps lower).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_bytes: Option<usize>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -1577,18 +1627,17 @@ fn collect_hcl(dir: &Path, out: &mut Vec<std::path::PathBuf>) -> Result<(), Stri
 /// field's `color` (named strategy or the rule DSL) must be well-formed.
 fn validate_table_config(tc: &TableConfig) -> Result<(), String> {
     for (name, f) in &tc.fields {
-        if let Some(img) = &f.image {
-            if img.write_to.is_some() {
-                // Related-table image: name_sql reads, name_col names the
-                // filename column IN the target, write_key locates the row.
-                if img.name_sql.is_none() || img.name_col.is_empty() || img.write_key.is_empty() {
+        if let Some(file) = &f.file {
+            if file.write_to.is_some() {
+                if file.name_sql.is_none() || file.name_col.is_empty() || file.write_key.is_empty()
+                {
                     return Err(format!(
-                        "field \"{name}\": image `write_to` needs `name_sql`, `name_col` (the target's filename column) and a non-empty `write_key`"
+                        "field \"{name}\": file `write_to` needs `name_sql`, `name_col` (the target's filename column) and a non-empty `write_key`"
                     ));
                 }
-            } else if img.name_col.is_empty() == img.name_sql.is_none() {
+            } else if file.name_col.is_empty() == file.name_sql.is_none() {
                 return Err(format!(
-                    "field \"{name}\": image needs exactly one of `name_col` or `name_sql`"
+                    "field \"{name}\": file needs exactly one of `name_col` or `name_sql`"
                 ));
             }
         }
@@ -1601,6 +1650,43 @@ fn validate_table_config(tc: &TableConfig) -> Result<(), String> {
             color
                 .validate()
                 .map_err(|e| format!("field \"{name}\": {e}"))?;
+        }
+    }
+    Ok(())
+}
+
+/// Every declared `storage "…" { }` block is well-formed, and every
+/// `image { storage = "…" }` across every table names one that exists —
+/// checked once at load time rather than surfacing as a 500 on first upload.
+fn validate_storages(cfg: &ConfigDir) -> Result<(), String> {
+    for (name, storage) in &cfg.cartapel.storages {
+        if !storage.is_s3() {
+            return Err(format!(
+                "storage \"{name}\": unknown type \"{}\" — only \"s3\" is supported",
+                storage.kind
+            ));
+        }
+        for (field, val) in [
+            ("endpoint", &storage.endpoint),
+            ("bucket", &storage.bucket),
+            ("access_key_env", &storage.access_key_env),
+            ("secret_key_env", &storage.secret_key_env),
+        ] {
+            if val.is_none() {
+                return Err(format!("storage \"{name}\": missing `{field}`"));
+            }
+        }
+    }
+    for (table, tc) in &cfg.tables {
+        for (field, f) in &tc.fields {
+            let Some(storage) = f.file.as_ref().and_then(|u| u.storage.as_ref()) else {
+                continue;
+            };
+            if !cfg.cartapel.storages.contains_key(storage) {
+                return Err(format!(
+                    "table \"{table}\" field \"{field}\": storage \"{storage}\" is not declared"
+                ));
+            }
         }
     }
     Ok(())
@@ -1979,6 +2065,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
         }
         cfg.sources.insert(name, s);
     }
+    validate_storages(&cfg)?;
     cfg.groups
         .sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.label.cmp(&b.label)));
     // Pages follow their group's `order`, then their own — the sidebar lists
@@ -2572,6 +2659,115 @@ source "main" {
         );
     }
 
+    /// `storage "…" { }` uses the same labeled-block mechanism `source` does —
+    /// same file, same round-trip guarantee the visual builder depends on.
+    #[test]
+    fn storage_block_round_trips() {
+        let sc: CartapelConfig = hcl::from_str(
+            r#"
+storage "uploads" {
+  type           = "s3"
+  endpoint       = "env:S3_ENDPOINT"
+  bucket         = "product-images"
+  region         = "auto"
+  access_key_env = "S3_ACCESS_KEY_ID"
+  secret_key_env = "S3_SECRET_ACCESS_KEY"
+}
+"#,
+        )
+        .expect("parse storage block");
+        let st = sc.storages.get("uploads").expect("uploads storage");
+        assert!(st.is_s3());
+        assert_eq!(st.bucket.as_deref(), Some("product-images"));
+        let out = hcl::to_string(&sc).unwrap();
+        let sc2: CartapelConfig = hcl::from_str(&out).unwrap();
+        assert_eq!(
+            serde_json::to_value(&sc).unwrap(),
+            serde_json::to_value(&sc2).unwrap(),
+            "storage block round-trips",
+        );
+    }
+
+    fn file_field(storage: Option<&str>) -> FieldConfig {
+        FieldConfig {
+            file: Some(FileConfig {
+                dir: "attachments".into(),
+                storage: storage.map(String::from),
+                name_col: "attachment_path".into(),
+                name_sql: None,
+                write_to: None,
+                write_key: BTreeMap::new(),
+                write_defaults: BTreeMap::new(),
+                max_bytes: None,
+            }),
+            ..FieldConfig::default()
+        }
+    }
+
+    fn s3_storage() -> NamedStorage {
+        NamedStorage {
+            kind: "s3".into(),
+            endpoint: Some("https://s3.example.com".into()),
+            bucket: Some("bucket".into()),
+            region: None,
+            access_key_env: Some("S3_ACCESS_KEY_ID".into()),
+            secret_key_env: Some("S3_SECRET_ACCESS_KEY".into()),
+        }
+    }
+
+    #[test]
+    fn validate_storages_accepts_a_well_formed_reference() {
+        let mut cfg = ConfigDir::default();
+        cfg.cartapel.storages.insert("uploads".into(), s3_storage());
+        let mut tc = TableConfig::default();
+        tc.fields.insert("logo".into(), file_field(Some("uploads")));
+        cfg.tables.insert("products".into(), tc);
+        assert!(validate_storages(&cfg).is_ok());
+    }
+
+    #[test]
+    fn validate_storages_rejects_an_undeclared_reference() {
+        let mut cfg = ConfigDir::default();
+        let mut tc = TableConfig::default();
+        // No "uploads" storage declared anywhere.
+        tc.fields.insert("logo".into(), file_field(Some("uploads")));
+        cfg.tables.insert("products".into(), tc);
+        let err = validate_storages(&cfg).unwrap_err();
+        assert!(err.contains("uploads"), "{err}");
+        assert!(err.contains("not declared"), "{err}");
+    }
+
+    #[test]
+    fn validate_storages_rejects_an_unknown_type() {
+        let mut cfg = ConfigDir::default();
+        let mut bad = s3_storage();
+        bad.kind = "gcs".into();
+        cfg.cartapel.storages.insert("uploads".into(), bad);
+        let err = validate_storages(&cfg).unwrap_err();
+        assert!(err.contains("unknown type"), "{err}");
+    }
+
+    #[test]
+    fn validate_storages_rejects_a_missing_required_field() {
+        let mut cfg = ConfigDir::default();
+        let mut incomplete = s3_storage();
+        incomplete.bucket = None;
+        cfg.cartapel.storages.insert("uploads".into(), incomplete);
+        let err = validate_storages(&cfg).unwrap_err();
+        assert!(err.contains("bucket"), "{err}");
+    }
+
+    /// A field with no `storage` at all — the overwhelming common case — must
+    /// never be affected by any of this.
+    #[test]
+    fn validate_storages_ignores_local_only_fields() {
+        let mut cfg = ConfigDir::default();
+        let mut tc = TableConfig::default();
+        tc.fields.insert("logo".into(), file_field(None));
+        cfg.tables.insert("products".into(), tc);
+        assert!(validate_storages(&cfg).is_ok());
+    }
+
     /// A `page.hcl` file body parses into `PageConfig` and round-trips;
     /// `slug`/`group`/`id` are folder-derived so they never appear in the file and
     /// `deny_unknown_fields` rejects a stray one.
@@ -2763,71 +2959,42 @@ panel {
     }
 
     #[test]
-    fn image_field_needs_exactly_one_name_source() {
-        let with_image = |img: ImageConfig| -> Result<(), String> {
+    fn file_field_needs_exactly_one_name_source() {
+        let with_file = |file: FileConfig| -> Result<(), String> {
             let mut tc = TableConfig::default();
             tc.fields.insert(
-                "logo".into(),
+                "attachment".into(),
                 FieldConfig {
-                    image: Some(img),
+                    file: Some(file),
                     ..Default::default()
                 },
             );
             validate_table_config(&tc)
         };
-        let base = || ImageConfig {
+        let base = || FileConfig {
             dir: "/d".into(),
+            storage: None,
             name_col: String::new(),
             name_sql: None,
             write_to: None,
             write_key: Default::default(),
             write_defaults: Default::default(),
-            max_px: 128,
-            normalize: true,
+            max_bytes: None,
         };
-        assert!(with_image(ImageConfig {
-            name_col: "file".into(),
+        assert!(with_file(FileConfig {
+            name_col: "path".into(),
             ..base()
         })
         .is_ok());
-        assert!(with_image(ImageConfig {
-            name_sql: Some("(SELECT f FROM l)".into()),
-            ..base()
-        })
-        .is_ok());
-        assert!(with_image(base()).is_err(), "neither is a load error");
+        assert!(with_file(base()).is_err(), "neither is a load error");
         assert!(
-            with_image(ImageConfig {
-                name_col: "file".into(),
+            with_file(FileConfig {
+                name_col: "path".into(),
                 name_sql: Some("(SELECT 1)".into()),
                 ..base()
             })
             .is_err(),
             "both is a load error"
-        );
-        // Write-through: needs name_sql + name_col (target's filename col) + write_key.
-        let mut key = BTreeMap::new();
-        key.insert("symbol".to_string(), "symbol".to_string());
-        assert!(
-            with_image(ImageConfig {
-                name_sql: Some("(SELECT f FROM l)".into()),
-                name_col: "filename".into(),
-                write_to: Some("logos".into()),
-                write_key: key.clone(),
-                ..base()
-            })
-            .is_ok(),
-            "complete write-through is valid"
-        );
-        assert!(
-            with_image(ImageConfig {
-                name_sql: Some("(SELECT f FROM l)".into()),
-                write_to: Some("logos".into()),
-                write_key: key,
-                ..base()
-            })
-            .is_err(),
-            "write_to without name_col (target filename column) is a load error"
         );
     }
 

@@ -155,16 +155,16 @@ fn is_listable_column(dbt: &DbTable, cfg: &TableConfig, name: &str) -> bool {
         || cfg
             .fields
             .get(name)
-            .is_some_and(|f| f.sql.is_some() || f.image.is_some())
+            .is_some_and(|f| f.sql.is_some() || f.file.is_some())
 }
 
-/// Config-only image fields — an `image` widget whose name isn't a real column
-/// (its filename comes from `name_sql`). Served/uploaded by pk, so they render
-/// as virtual columns like `sql` computed fields do.
-pub fn virtual_image_fields<'a>(dbt: &DbTable, cfg: &'a TableConfig) -> Vec<&'a String> {
+/// Config-only upload fields — a `file { }` block whose name isn't a real
+/// column (its filename comes from `name_sql`). Served/uploaded by pk, so
+/// they render as virtual columns like `sql` computed fields do.
+pub fn virtual_file_fields<'a>(dbt: &DbTable, cfg: &'a TableConfig) -> Vec<&'a String> {
     cfg.fields
         .iter()
-        .filter(|(name, f)| f.image.is_some() && f.sql.is_none() && dbt.column(name).is_none())
+        .filter(|(name, f)| f.file.is_some() && f.sql.is_none() && dbt.column(name).is_none())
         .map(|(name, _)| name)
         .collect()
 }
@@ -383,7 +383,7 @@ fn detail_sections(dbt: &DbTable, cfg: &TableConfig, loc: &Loc) -> Vec<Value> {
                 .into_iter()
                 .map(|(n, _)| n.clone()),
         )
-        .chain(virtual_image_fields(dbt, cfg).into_iter().cloned())
+        .chain(virtual_file_fields(dbt, cfg).into_iter().cloned())
         .collect();
     let known = |f: &String| all.contains(f);
 
@@ -453,9 +453,17 @@ fn column_meta(
         .map(|c| {
             let fc = cfg.fields.get(&c.name);
             let is_masked = masked.contains(&c.name);
-            let widget = fc
-                .and_then(|f| f.widget.clone())
-                .unwrap_or_else(|| default_widget(c).to_string());
+            // A `file { }` block on a real column defaults its widget to
+            // "file" the same way a virtual upload field does — otherwise a
+            // column whose name happens to match a real table column would
+            // silently lose its upload widget just for being named that way.
+            let widget = fc.and_then(|f| f.widget.clone()).unwrap_or_else(|| {
+                if fc.is_some_and(|f| f.file.is_some()) {
+                    "file".into()
+                } else {
+                    default_widget(c).to_string()
+                }
+            });
             let readonly = Some(&c.name) == dbt.pk.as_ref()
                 || is_masked
                 || fc.map(|f| f.readonly).unwrap_or(false)
@@ -466,9 +474,8 @@ fn column_meta(
                 Some(json!({ "table": ft, "label_col": fk_label_col(child) }))
             });
             let mut params = fc.map(|f| f.params.clone()).unwrap_or_default();
-            if let Some(img) = fc.and_then(|f| f.image.as_ref()) {
+            if fc.is_some_and(|f| f.file.is_some()) {
                 params.insert("uploadable".into(), json!(!readonly));
-                params.insert("max_px".into(), json!(img.max_px));
             }
             let mut m = json!({
                 "name": c.name,
@@ -519,16 +526,20 @@ fn column_meta(
         }
         out.push(m);
     }
-    // Config-only image columns — served/uploaded by pk. Uploadable only when
-    // the field names a write target (else it's a read-only join).
-    for name in virtual_image_fields(dbt, cfg) {
+    // Config-only upload columns — served/uploaded by pk. Uploadable only when
+    // the field names a write target (else it's a read-only join). Widget
+    // resolves the same way it does for a real column — `field.widget`, else
+    // `"file"` — nothing hardcodes it to `"image"` here.
+    for name in virtual_file_fields(dbt, cfg) {
         let fc = cfg.fields.get(name);
-        let Some(img) = fc.and_then(|f| f.image.as_ref()) else {
+        let Some(file) = fc.and_then(|f| f.file.as_ref()) else {
             continue;
         };
         let mut params = fc.map(|f| f.params.clone()).unwrap_or_default();
-        params.insert("uploadable".into(), json!(img.write_to.is_some()));
-        params.insert("max_px".into(), json!(img.max_px));
+        params.insert("uploadable".into(), json!(file.write_to.is_some()));
+        let widget = fc
+            .and_then(|f| f.widget.clone())
+            .unwrap_or_else(|| "file".into());
         let mut m = json!({
             "name": name,
             "label": loc.pick(fc.map(|f| &f.labels).unwrap_or(&Default::default()),
@@ -537,9 +548,9 @@ fn column_meta(
             "kind": "text",
             "nullable": true,
             "has_default": false,
-            "widget": "image",
+            "widget": widget,
             "params": Value::Object(params),
-            "readonly": img.write_to.is_none(),
+            "readonly": file.write_to.is_none(),
             "computed": true,
             "masked": masked.contains(name),
             "fk": Value::Null,

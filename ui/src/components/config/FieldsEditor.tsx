@@ -93,42 +93,51 @@ function ParamsEditor({
       </Labeled>
     )
   }
-  if (widget === 'image') {
-    const img = field.image ?? { dir: '', name_col: '' }
-    const setImg = (patch: Partial<typeof img>) => {
-      const next = { ...img, ...patch }
-      onField({ ...field, image: next.dir || next.name_col ? next : undefined })
+  if (widget === 'image' || widget === 'file') {
+    // One block backs both: `widget = "image"` is what makes it a photo
+    // (decode/resize/re-encode to PNG) — that behaviour lives in `params`,
+    // like any other widget's options, not in the upload block itself.
+    const file = field.file ?? { dir: '' }
+    const setFile = (patch: Partial<typeof file>) => {
+      const next = { ...file, ...patch }
+      onField({ ...field, file: next.dir || next.name_col ? next : undefined })
     }
+    const params = field.params
+    const setParam = (key: string, value: Json) => onField({ ...field, params: withParam(params, key, value) })
     return (
       <div className="grid grid-cols-2 gap-2">
         <Labeled label={t('cfg_image_dir')}>
-          <input className="input-sm w-full" value={img.dir} onChange={(e) => setImg({ dir: e.target.value })} />
+          <input className="input-sm w-full" value={file.dir} onChange={(e) => setFile({ dir: e.target.value })} />
         </Labeled>
         <Labeled label={t('cfg_image_name_col')}>
           <ColumnPicker
             className="w-full"
             columns={columns}
-            value={img.name_col || undefined}
+            value={file.name_col || undefined}
             emptyLabel={t('cfg_field_default')}
             ariaLabel={t('cfg_image_name_col')}
-            onChange={(v) => setImg({ name_col: v ?? '' })}
+            onChange={(v) => setFile({ name_col: v ?? undefined })}
           />
         </Labeled>
-        <Labeled label={t('cfg_image_max_px')}>
-          <input
-            type="number"
-            className="input-sm w-full"
-            value={img.max_px ?? ''}
-            onChange={(e) => setImg({ max_px: e.target.value ? Number(e.target.value) : undefined })}
-          />
-        </Labeled>
-        <div className="flex items-end">
-          <Toggle
-            checked={img.normalize ?? true}
-            onChange={(v) => setImg({ normalize: v })}
-            label={t('cfg_image_normalize')}
-          />
-        </div>
+        {widget === 'image' && (
+          <>
+            <Labeled label={t('cfg_image_max_px')}>
+              <input
+                type="number"
+                className="input-sm w-full"
+                value={numParam(params, 'max_px') ?? ''}
+                onChange={(e) => setParam('max_px', e.target.value ? Number(e.target.value) : undefined)}
+              />
+            </Labeled>
+            <div className="flex items-end">
+              <Toggle
+                checked={params?.normalize !== false}
+                onChange={(v) => setParam('normalize', v)}
+                label={t('cfg_image_normalize')}
+              />
+            </div>
+          </>
+        )}
       </div>
     )
   }
@@ -275,7 +284,7 @@ function FieldRow({
             />
           </div>
 
-          {widgetHasStructuredEditor(widget) || widget === 'image' ? (
+          {widgetHasStructuredEditor(widget) || widget === 'image' || widget === 'file' ? (
             <ParamsEditor widget={widget} field={field} columns={columns} onField={(f) => onField(f)} t={t} />
           ) : (
             <AdvancedParams field={field} onField={(f) => onField(f)} t={t} />
