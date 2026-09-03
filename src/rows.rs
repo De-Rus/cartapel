@@ -100,9 +100,13 @@ fn build_list_query(
                 continue;
             }
         }
-        // Any real column filters (Notion-style); the configured list only
-        // curates which are featured. Masked columns are gated below.
-        if !cfg.list.filters.contains(&name.to_string()) && dbt.column(name).is_none() {
+        // Any real column is filterable by default. Declaring `filters` at
+        // all switches it from a feature-order hint to an allowlist: only
+        // the named columns (plus any filter_def, handled above) pass.
+        if dbt.column(name).is_none() {
+            return Err(AppError::bad(format!("unknown filter {name}")));
+        }
+        if !cfg.list.filters.is_empty() && !cfg.list.filters.contains(&name.to_string()) {
             return Err(AppError::bad(format!("unknown filter {name}")));
         }
         if masked.contains(&name.to_string()) {

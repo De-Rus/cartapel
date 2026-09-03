@@ -17,12 +17,14 @@ export function filterOps(f: FilterMeta) {
   return opsForKind(f.kind)
 }
 
-// Configured filters come first (curated: enum options, filter_defs); every
-// remaining real column is filterable too — the server accepts any column.
+// No `filters` declared → every real column is a candidate too. Declared →
+// that list (plus any custom `filter` blocks) is the whole allowlist.
 export function candidates(table: TableMeta): FilterMeta[] {
-  const declared = new Set(table.list.filters.map((f) => f.name))
+  // No `filters` declared → every real column is a candidate. Declared →
+  // that list is the whole allowlist, enforced server-side too.
+  if (table.list.filters.length > 0) return table.list.filters
   const rest = table.columns
-    .filter((c) => !declared.has(c.name) && !['json', 'binary'].includes(c.kind))
+    .filter((c) => !['json', 'binary'].includes(c.kind))
     .map((c) => ({
       name: c.name,
       label: c.label ?? c.name,
@@ -30,7 +32,7 @@ export function candidates(table: TableMeta): FilterMeta[] {
       options: [],
       kind: c.kind,
     }))
-  return [...table.list.filters, ...rest]
+  return rest
 }
 
 function ValueInput({
@@ -246,7 +248,7 @@ export function FilterBar({
   if (applied.length === 0 && !draft) return null
 
   const fm = (col: string) => filters.find((f) => f.name === col)
-  // A raw-SQL filter_def is an on/off toggle — no operator, no value editor.
+  // A raw-SQL filter is an on/off toggle — no operator, no value editor.
   const isToggle = (f: FilterMeta | undefined) => f?.type === 'custom' && !f.kind
   const chipValue = (c: Condition) =>
     !needsValue(c.op) ? '' : c.value === '__null__' ? t('filter_empty') : c.value

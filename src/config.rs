@@ -734,7 +734,7 @@ pub struct ListConfig {
     pub per_page: Option<u32>,
     #[serde(
         default,
-        rename = "filter_def",
+        rename = "filter",
         skip_serializing_if = "BTreeMap::is_empty",
         serialize_with = "hcl::ser::labeled_block"
     )]
@@ -2282,7 +2282,7 @@ list {
   search  = ["name"]
   filters = ["mode"]
   sort    = "-created_at"
-  filter_def "needs_attention" {
+  filter "needs_attention" {
     label = "Needs attention"
     sql   = "t.mode <> 'off'"
   }
@@ -3078,7 +3078,7 @@ panel {
         )
         .is_err());
         assert!(reject_duplicate_labels(
-            "list {\n  filter_def \"a\" { label = \"A\" sql = \"1\" }\n  filter_def \"a\" { label = \"B\" sql = \"2\" }\n}\n"
+            "list {\n  filter \"a\" { label = \"A\" sql = \"1\" }\n  filter \"a\" { label = \"B\" sql = \"2\" }\n}\n"
         )
         .is_err());
     }

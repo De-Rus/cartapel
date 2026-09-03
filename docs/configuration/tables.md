@@ -29,7 +29,7 @@ list {
   filters  = ["status"]
   sort     = "-placed_at"
 
-  filter_def "needs_attention" {
+  filter "needs_attention" {
     label = "Needs attention"
     sql   = "t.status = 'pending' AND t.placed_at < now() - interval '2 days'"
   }
@@ -119,24 +119,32 @@ list {
 | --- | --- | --- |
 | `columns` | list | Columns shown in the list, in order. Omit → the primary key plus the first few introspected columns (six total, JSON and binary columns skipped). |
 | `search` | list | Columns the search box matches against. Omit → the first four text columns. |
-| `filters` | list | Featured filters. **Every real column is always filterable** — the "+ Filter" picker lists declared names first (with value options preloaded), then every remaining column. Declaring a name here features it and, for enum-ish columns, populates its value dropdown; a name matching a `filter_def` surfaces that custom filter. Masked columns can never be filtered, for anyone. |
+| `filters` | list | Which filters are available. **Omit it → every real column is filterable**, the "+ Filter" picker lists them all. **Set it → it's the whole allowlist**: only the named filters exist, on the picker *and* on the API — anything else is rejected, even a real unmasked column. A name matching a `filter "name" { }` block surfaces that custom filter instead of a column. Masked columns can never be filtered, for anyone, regardless of `filters`. |
 | `sort` | string | Default sort column. Prefix with `-` for descending (`"-created_at"`). Omit → the primary key, descending (pk-less tables: the first column, ascending). |
 | `per_page` | number | Page size for this table (overrides the global `per_page`; `100` when neither is set). |
-| `filter_def "name" { }` | block | A custom filter: a `label` plus a raw `sql` predicate. |
+| `filter "name" { }` | block | A custom filter: a `label` plus a raw `sql` predicate. |
 
 ### Custom filters
 
-A `filter_def` is a named boolean predicate. The `sql` is a trusted fragment
+A `filter` block is a named boolean predicate. The `sql` is a trusted fragment
 from your config (never user input) and can reference the current table as `t`:
 
 ```hcl
-filter_def "needs_attention" {
+filter "needs_attention" {
   label = "Needs attention"
   sql   = "t.status = 'past_due' OR (t.renews_at IS NOT NULL AND t.renews_at < now() + interval '7 days')"
 }
 ```
 
-List `"needs_attention"` in `filters` to surface it in the list's "+ Filter" picker; adding it applies the predicate as an on/off filter chip.
+List `"needs_attention"` in `filters` to surface it as an on/off chip in the "+ Filter" picker. Every active filter — real column or custom — combines with the others using **AND**.
+
+Locking a table down to just a couple of filters (real or custom) is one line:
+
+```hcl
+list {
+  filters = ["status", "needs_attention"]   # only these two are filterable at all
+}
+```
 
 ## `display { }` — the record title
 

@@ -67,12 +67,12 @@ describe('visual model ↔ API JSON round-trip', () => {
     expect(back.actions?.ping).toMatchObject({ kind: 'webhook', url: 'https://x.io/hook', method: 'POST' })
   })
 
-  it('bridges the Rust HCL block names field/action/filter_def to the visual plural forms', () => {
+  it('bridges the Rust HCL block names field/action/filter to the visual plural forms', () => {
     const apiJson = {
       label: 'bot',
       field: { status: { widget: 'badge' }, name: { label: 'Name' } },
       action: { halt: { label: 'Halt', kind: 'update', set: { status: 'halted' } } },
-      list: { columns: ['name'], filter_def: { live: { label: 'Live', sql: "status='live'" } } },
+      list: { columns: ['name'], filter: { live: { label: 'Live', sql: "status='live'" } } },
     }
     const m = modelFromApi(apiJson)
     expect(m.fields?.status?.widget).toBe('badge')
@@ -82,14 +82,14 @@ describe('visual model ↔ API JSON round-trip', () => {
     // no leaked Rust keys on the visual model
     expect((m as Record<string, unknown>).field).toBeUndefined()
     expect((m as Record<string, unknown>).action).toBeUndefined()
-    expect((m.list as Record<string, unknown>).filter_def).toBeUndefined()
+    expect((m.list as Record<string, unknown>).filter).toBeUndefined()
 
     // …and modelToApi emits the Rust names back
     const out = modelToApi(m) as Record<string, unknown>
     expect(out.field).toBeDefined()
     expect(out.action).toBeDefined()
     expect(out.fields).toBeUndefined()
-    expect((out.list as Record<string, unknown>).filter_def).toBeDefined()
+    expect((out.list as Record<string, unknown>).filter).toBeDefined()
   })
 
   it('modelToApi strips empty leaves so it mirrors skip_serializing_if', () => {

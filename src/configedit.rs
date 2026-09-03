@@ -1213,7 +1213,7 @@ label = "bot"
 list {
   columns = ["name", "mode"]
   sort    = "-created_at"
-  filter_def "needs_attention" {
+  filter "needs_attention" {
     label = "Needs attention"
     sql   = "t.mode <> 'off'"
   }
@@ -1423,7 +1423,7 @@ action "pause" {
         // The model path wrote pretty labeled-block HCL to disk.
         let on_disk = std::fs::read_to_string(dir.join("bots.hcl")).unwrap();
         assert!(
-            on_disk.contains("filter_def \"active\""),
+            on_disk.contains("filter \"active\""),
             "labeled block emitted:\n{on_disk}"
         );
         assert_eq!(

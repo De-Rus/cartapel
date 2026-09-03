@@ -224,7 +224,7 @@ export function modelFromApi(model: unknown): TableConfigData {
   if (!model || typeof model !== 'object' || Array.isArray(model)) return {}
   const src = model as Record<string, unknown>
   const m = { ...(model as TableConfigData) } as TableConfigData & Record<string, unknown>
-  // The backend serializes with HCL block names (`field`/`action`/`filter_def`,
+  // The backend serializes with HCL block names (`field`/`action`/`filter`,
   // and `detail.section`); the visual model uses the plural/`*s` forms.
   if (src.field && !m.fields) m.fields = src.field as TableConfigData['fields']
   if (src.action && !m.actions) m.actions = src.action as TableConfigData['actions']
@@ -232,8 +232,8 @@ export function modelFromApi(model: unknown): TableConfigData {
   delete m.action
   if (m.list) {
     const l = m.list as ListConfigData & Record<string, unknown>
-    if (l.filter_def && !l.filter_defs) l.filter_defs = l.filter_def as ListConfigData['filter_defs']
-    delete l.filter_def
+    if (l.filter && !l.filter_defs) l.filter_defs = l.filter as ListConfigData['filter_defs']
+    delete l.filter
   }
   const d = src.detail
   if (d && typeof d === 'object' && !Array.isArray(d)) {
@@ -264,8 +264,8 @@ export function modelToApi(data: TableConfigData): TableConfigData {
   if (pruned.list) {
     const l = pruned.list as ListConfigData & Record<string, unknown>
     if (l.filter_defs) {
-      l.filter_def = l.filter_defs
-      delete l.filter_defs
+      l.filter = l.filter_defs
+      delete l.filters
     }
   }
   if (pruned.detail && typeof pruned.detail === 'object' && 'sections' in (pruned.detail as object)) {

@@ -23,7 +23,7 @@ as soon as practical, crediting reporters who wish to be named.
 - cartapel keeps its **own** state (users, sessions, audit log) in a local SQLite
   file and only writes to your Postgres when a panel user edits a row, runs a
   bulk action, or imports data.
-- Raw-SQL fragments in the config bundle (`filter_def`, dashboard `panel` SQL,
+- Raw-SQL fragments in the config bundle (`filter` blocks, dashboard `panel` SQL,
   named queries) are **trusted, code-reviewed input from your repo** — they are
   not user input. Treat your config directory like source code.
 - The signing secret (`CARTAPEL_SECRET_KEY`) and database URL are required and

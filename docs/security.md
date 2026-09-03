@@ -95,7 +95,7 @@ filter lifts the restriction for that table. See
   schema. An unknown column is a 400; a masked column used where it may not be is
   a 403. No request string is ever interpolated as an identifier.
 - Every **value** is a bound parameter cast to the column's real Postgres type.
-- Raw-SQL fragments (`filter_def` predicates, computed-column `sql`, `row_filter`,
+- Raw-SQL fragments (`filter` predicates, computed-column `sql`, `row_filter`,
   dashboard and named-query SQL) exist only in your config files — which live in
   your repo and are trusted like code, not accepted from the browser.
 - Dashboard and named-query SQL run in **`READ ONLY` transactions with a
