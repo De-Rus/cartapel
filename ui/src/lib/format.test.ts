@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  ageSeconds,
   applyFormat,
   fmtBytes,
   fmtDuration,
@@ -130,5 +131,26 @@ describe('interpolateHref', () => {
   it('blocks protocol-relative and bare hosts', () => {
     expect(interpolateHref('//evil.io', {})).toBe('#')
     expect(interpolateHref('evil.io/path', {})).toBe('#')
+  })
+})
+
+describe('zone-less timestamps are UTC', () => {
+  // ClickHouse renders a DateTime as "2026-09-03 19:10:00" with no zone and no
+  // `T`. Both `new Date` and `Date.parse` read that as LOCAL, so a value one
+  // minute old rendered as the viewer's UTC offset instead — two hours in
+  // Madrid, sitting next to a server-computed lag of 1 in the same row.
+  it('reads a space-separated stamp as UTC, not local', () => {
+    const now = Date.UTC(2026, 8, 3, 19, 11, 0)
+    vi.setSystemTime(now)
+    expect(ageSeconds('2026-09-03 19:10:00')).toBeCloseTo(60, 0)
+    vi.useRealTimers()
+  })
+
+  it('leaves an unambiguous stamp alone', () => {
+    const now = Date.UTC(2026, 8, 3, 19, 11, 0)
+    vi.setSystemTime(now)
+    expect(ageSeconds('2026-09-03T19:10:00Z')).toBeCloseTo(60, 0)
+    expect(ageSeconds('2026-09-03T21:10:00+02:00')).toBeCloseTo(60, 0)
+    vi.useRealTimers()
   })
 })

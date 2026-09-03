@@ -139,20 +139,35 @@ const DF_OPTS: Intl.DateTimeFormatOptions = {
 let dtf = new Intl.DateTimeFormat('en', DTF_OPTS)
 let df = new Intl.DateTimeFormat('en', DF_OPTS)
 
+/// A timestamp with no zone is UTC, because that is what every backend here
+/// sends. ClickHouse's JSON renders a DateTime as "2026-09-03 19:10:00" — no
+/// `T`, no offset — and both `new Date` and `Date.parse` read exactly that shape
+/// as LOCAL time. The result is off by the viewer's offset and looks completely
+/// plausible: a bar one minute old rendered "2 h ago" in Madrid, beside a
+/// server-computed lag of 1 in the same row.
+///
+/// Normalising here rather than at every call site, and only for the ambiguous
+/// shape: anything already carrying `Z`, an offset, or a `T` is left alone.
+function asUtc(isoStr: string): string {
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(isoStr)
+    ? `${isoStr.replace(' ', 'T')}Z`
+    : isoStr
+}
+
 export function fmtDateTime(isoStr: string): string {
-  const d = new Date(isoStr)
+  const d = new Date(asUtc(isoStr))
   if (Number.isNaN(d.getTime())) return isoStr
   return dtf.format(d).replace(',', '')
 }
 
 export function fmtDate(isoStr: string): string {
-  const d = new Date(isoStr)
+  const d = new Date(asUtc(isoStr))
   if (Number.isNaN(d.getTime())) return isoStr
   return df.format(d)
 }
 
 export function ageSeconds(isoStr: string): number {
-  return (Date.now() - Date.parse(isoStr)) / 1000
+  return (Date.now() - Date.parse(asUtc(isoStr))) / 1000
 }
 
 export function relTime(isoStr: string): string {
