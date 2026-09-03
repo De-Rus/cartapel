@@ -13,7 +13,7 @@ primary_region = "cdg"
 
 # Runs the published image directly (it bakes the demo config at /demo) — the same
 # artifact anyone pulls. Bump the tag to adopt a new release.
-image = "ghcr.io/de-rus/cartapel:0.9.29"
+image = "ghcr.io/de-rus/cartapel:0.9.42"
 
 [env]
   CARTAPEL_CONFIG = "/demo/admin"
