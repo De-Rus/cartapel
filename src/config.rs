@@ -2941,7 +2941,8 @@ storage "uploads" {
         cfg.sources
             .insert("main".into(), NamedSource::from_url("postgres://x"));
         let mut tc = TableConfig::default();
-        tc.fields.insert("shipping_status".into(), remote_field("main"));
+        tc.fields
+            .insert("shipping_status".into(), remote_field("main"));
         cfg.tables.insert("orders".into(), tc);
         let err = validate_remote_fields(&cfg).unwrap_err();
         assert!(err.contains("postgres"), "{err}");
@@ -2984,8 +2985,10 @@ storage "uploads" {
     fn validate_actions_accepts_a_well_formed_when() {
         let mut cfg = ConfigDir::default();
         let mut tc = TableConfig::default();
-        tc.actions
-            .insert("mark_shipped".into(), action_with_when(Some("status != shipped")));
+        tc.actions.insert(
+            "mark_shipped".into(),
+            action_with_when(Some("status != shipped")),
+        );
         cfg.tables.insert("orders".into(), tc);
         assert!(validate_actions(&cfg).is_ok());
     }
@@ -2994,8 +2997,10 @@ storage "uploads" {
     fn validate_actions_rejects_an_unparseable_when() {
         let mut cfg = ConfigDir::default();
         let mut tc = TableConfig::default();
-        tc.actions
-            .insert("mark_shipped".into(), action_with_when(Some("status shipped")));
+        tc.actions.insert(
+            "mark_shipped".into(),
+            action_with_when(Some("status shipped")),
+        );
         cfg.tables.insert("orders".into(), tc);
         let err = validate_actions(&cfg).unwrap_err();
         assert!(err.contains("mark_shipped"), "{err}");

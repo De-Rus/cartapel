@@ -17,7 +17,11 @@ use std::sync::Arc;
 /// Fill `{column}` placeholders in `path` from the row, refusing any column
 /// that's masked for this user — a masked value must never leak into an
 /// outbound request just because it's hiding behind a template.
-fn fill_path(template: &str, row: &Map<String, Value>, masked: &[String]) -> Result<String, AppError> {
+fn fill_path(
+    template: &str,
+    row: &Map<String, Value>,
+    masked: &[String],
+) -> Result<String, AppError> {
     let mut out = String::with_capacity(template.len());
     let mut rest = template;
     while let Some(open) = rest.find('{') {
@@ -67,7 +71,9 @@ fn parse_at(p: &str) -> Vec<Seg<'_>> {
             continue;
         }
         while let Some(stripped) = rest.strip_prefix('[') {
-            let Some(close) = stripped.find(']') else { break };
+            let Some(close) = stripped.find(']') else {
+                break;
+            };
             if let Ok(idx) = stripped[..close].parse::<usize>() {
                 segs.push(Seg::Index(idx));
             }
@@ -184,7 +190,10 @@ mod tests {
     #[test]
     fn at_path_walks_a_dotted_path() {
         let body = serde_json::json!({ "data": { "status": "in_transit" } });
-        assert_eq!(at_path(body, Some("data.status")), Value::String("in_transit".into()));
+        assert_eq!(
+            at_path(body, Some("data.status")),
+            Value::String("in_transit".into())
+        );
     }
 
     #[test]
@@ -195,7 +204,8 @@ mod tests {
 
     #[test]
     fn at_path_indexes_an_array() {
-        let body = serde_json::json!({ "data": { "results": [{ "status": "a" }, { "status": "b" }] } });
+        let body =
+            serde_json::json!({ "data": { "results": [{ "status": "a" }, { "status": "b" }] } });
         assert_eq!(
             at_path(body, Some("data.results[1].status")),
             Value::String("b".into())

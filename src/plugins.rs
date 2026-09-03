@@ -111,7 +111,10 @@ pub async fn serve_public(
         return (StatusCode::BAD_REQUEST, "unsupported asset type").into_response();
     };
     let public_dir = dir.join("public");
-    let (real, base) = match (public_dir.join(&path).canonicalize(), public_dir.canonicalize()) {
+    let (real, base) = match (
+        public_dir.join(&path).canonicalize(),
+        public_dir.canonicalize(),
+    ) {
         (Ok(real), Ok(base)) => (real, base),
         _ => return (StatusCode::NOT_FOUND, "asset not found").into_response(),
     };
@@ -626,7 +629,11 @@ mod tests {
     }
 
     async fn get_public(dir: &std::path::Path, path: &str) -> Response {
-        serve_public(State(asset_state(dir.to_path_buf())), Path(path.to_string())).await
+        serve_public(
+            State(asset_state(dir.to_path_buf())),
+            Path(path.to_string()),
+        )
+        .await
     }
 
     #[tokio::test]
