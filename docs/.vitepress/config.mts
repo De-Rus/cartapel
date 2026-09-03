@@ -138,6 +138,7 @@ export default defineConfig({
           { text: 'Detail views', link: '/configuration/detail-views' },
           { text: 'Groups & navigation', link: '/configuration/groups-and-nav' },
           { text: 'Dashboard', link: '/configuration/dashboard' },
+          { text: 'Panel types', link: '/configuration/panel-types' },
           { text: 'Grafana panels', link: '/configuration/grafana-panels' },
         ],
       },
@@ -147,6 +148,7 @@ export default defineConfig({
         items: [
           { text: 'Fields & widgets', link: '/configuration/fields-and-widgets' },
           { text: 'Widgets', link: '/configuration/widgets' },
+          { text: 'Remote fields', link: '/configuration/remote-fields' },
           { text: 'Pages & queries', link: '/configuration/pages-and-queries' },
           { text: 'Theming', link: '/theming' },
           { text: 'Localization', link: '/localization' },

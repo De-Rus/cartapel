@@ -85,6 +85,9 @@ becomes `panel { query = "<name>" }`; one that read an HTTP source becomes
 
 ## How assets are served
 
+<details>
+<summary>Show</summary>
+
 cartapel serves any file under the config directory at
 `/static/<path-relative-to-config>`, behind the session, so a custom widget's
 JS and your image assets sit right next to the HCL that references them. Serving is path-confined (directory traversal
@@ -93,8 +96,12 @@ and out-of-tree symlinks are rejected) and extension-allowlisted:
 `ico`. Config and secret material (`.hcl`, `.toml`, `.env`, `.ini`, dotfiles)
 is never served.
 
+</details>
 
 ## Named queries
+
+<details>
+<summary>Show</summary>
 
 A `queries.hcl` file declares read-only SQL that pages and widgets can call. It
 can live in **any** folder under the config root — put it next to the page that
@@ -130,8 +137,12 @@ statement timeout** and a 1 000-row cap. A page calls one with
 `useQuery(api, "ops_fleet")` (or `this.api.get("query/ops_fleet")` from a raw
 custom element) and gets back `{ rows: [...] }`.
 
+</details>
 
 ## Template variables
+
+<details>
+<summary>Show</summary>
 
 A `variables.hcl` declares URL-backed parameters that queries interpolate with
 `{{name}}`. Like queries, they merge globally from any folder. A value **never**
@@ -187,8 +198,12 @@ panel {
 `VarBar` renders one selector per in-scope variable; changing it re-runs every
 `useQuery`/`useSource`/`useTable` on the page.
 
+</details>
 
 ## Custom widgets
+
+<details>
+<summary>Show</summary>
 
 A custom **field** widget is a web component you reference from a table config as
 `widget = "custom:<name>"`. The component's source lives at
@@ -262,3 +277,6 @@ field "has_subscription" {
   }
 }
 ```
+
+</details>
+

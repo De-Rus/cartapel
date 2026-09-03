@@ -81,6 +81,9 @@ even back onto the same table. See [The hook](#the-hook-how-the-database-finds-o
 
 ## The upload request
 
+<details>
+<summary>Show</summary>
+
 Uploading is a plain multipart `POST` to the field's own route, and it is
 exactly what the panel's file picker does under the hood — useful to know if
 you are scripting an import or wiring a form outside the UI:
@@ -102,7 +105,12 @@ curl -X POST "$CARTAPEL_URL/t/products/file/logo/42" \
 - Requires table `update` permission on the field's table; a masked or
   otherwise unreadable column refuses the upload the same as a read.
 
+</details>
+
 ## From a related table
+
+<details>
+<summary>Show</summary>
 
 A file often belongs to a *different* table than the one you're looking at —
 a product's logo living in a shared `assets` table, keyed by SKU rather than
@@ -124,7 +132,12 @@ The field needs no real column of its own — it renders as a virtual column,
 served by primary key. With only `name_sql` it is **read-only** (you edit the
 file on the table that owns it).
 
+</details>
+
 ## Editable across the join (write-through)
+
+<details>
+<summary>Show</summary>
 
 Add `write_to` to make the joined field uploadable *here* — an upload writes
 the file and upserts the target row, like Django's `ImageField`/`FileField`
@@ -152,7 +165,12 @@ none exists. The owning table stays the single source of truth; the parent
 never keeps a copy. Exactly one of `name_col` / `name_sql` is required, and
 `write_to` needs all of `name_sql`, `name_col` and a non-empty `write_key`.
 
+</details>
+
 ## Where uploads are stored
+
+<details>
+<summary>Show</summary>
 
 Two backends, chosen per field. The default needs nothing extra; the other is
 a named `storage "…" { }` block a field opts into.
@@ -215,7 +233,12 @@ everything else: an unknown `type`, a missing required key, or a
 `file { storage = "…" }` naming a block that doesn't exist are load errors,
 caught before anything tries to upload.
 
+</details>
+
 ## A generic file
+
+<details>
+<summary>Show</summary>
 
 Drop `widget = "image"` (or set any other widget, including none) and a
 `file { }` field stores the upload exactly as sent — no decode, no resize,
@@ -254,7 +277,12 @@ rendering in the panel itself yet; a plain `file` field falls back to the
 default text rendering until that widget is built.
 :::
 
+</details>
+
 ## The hook: how the database finds out
+
+<details>
+<summary>Show</summary>
 
 There isn't a separate "on save" callback to configure — `name_col` (or
 `write_to`'s upsert, for the joined case above) already **is** the hook, and
@@ -294,3 +322,6 @@ is fine — write-through never needs to read the old value, only the
 `write_key` columns (here, the row's own `id`). After the upload, the row's
 `logo_filename` holds the generated name (`42.png`), and every read after
 that resolves it the normal way.
+
+</details>
+

@@ -47,6 +47,9 @@ them keeps its bare key; a name that collides is keyed as `schema.table`.
 
 ## `cartapel user add`
 
+<details>
+<summary>Show</summary>
+
 Create or update a panel user without the server running. Useful for
 provisioning and password resets.
 
@@ -64,7 +67,12 @@ cartapel user add <email> [--role <role>] [--password <pw>] [--data <dir>]
 Running `user add` for an existing email updates that user's role and/or
 password.
 
+</details>
+
 ## `cartapel check`
+
+<details>
+<summary>Show</summary>
 
 Validate a config directory without running the server. Exit 0 = valid; exit 1
 with the errors printed — ready for CI.
@@ -85,7 +93,12 @@ cartapel check --config ./admin --db postgres://…  # + verify every configured
 Run it in CI next to your migrations: config drift against a schema change
 becomes a red build instead of a silently broken panel.
 
+</details>
+
 ## `cartapel i18n extract`
+
+<details>
+<summary>Show</summary>
 
 Prints the `config/i18n/<locale>.hcl` stub for everything the locale has not
 translated yet — group, table, field, filter, action, section, page and panel
@@ -104,7 +117,12 @@ cartapel i18n extract --config ./admin --locale es --db postgres://… # + the c
 | `--db` | `CARTAPEL_DB` | primary source url | With a Postgres URL, introspected column names are included. |
 | `--schema` | `CARTAPEL_SCHEMA` | primary source's `schemas` | Narrows introspection to one schema. |
 
+</details>
+
 ## Environment variables
+
+<details>
+<summary>Show</summary>
 
 Beyond the per-flag variables above, cartapel reads:
 
@@ -125,7 +143,15 @@ secret key — out of committed HCL. See
 [Configuration overview](/configuration/overview#environment-interpolation).
 :::
 
+</details>
+
 ## Health check
+
+<details>
+<summary>Show</summary>
 
 `serve` exposes an unauthenticated health endpoint for load balancers at
 `{base-path}/api/health`, returning `{"ok": true}`.
+
+</details>
+

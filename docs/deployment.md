@@ -27,6 +27,9 @@ A running cartapel needs:
 
 ## One-click deploy
 
+<details>
+<summary>Show</summary>
+
 **Render** (free tier): [deploy from this repo](https://render.com/deploy?repo=https://github.com/De-Rus/cartapel)
 — the blueprint (`render.yaml`) runs the published image, prompts for your
 `postgres://` URL and admin credentials, generates the secret key and seeds a
@@ -45,7 +48,12 @@ fly secrets set CARTAPEL_DB=postgres://… CARTAPEL_SECRET_KEY=$(openssl rand -h
 fly deploy
 ```
 
+</details>
+
 ## Docker
+
+<details>
+<summary>Show</summary>
 
 ```bash
 docker run -d --name cartapel -p 8686:8686 \
@@ -66,7 +74,12 @@ docker run -d --name cartapel -p 8686:8686 \
   (`CARTAPEL_LISTEN` / `CARTAPEL_DATA` in the `Dockerfile`), so the published
   port is reachable without extra flags.
 
+</details>
+
 ## Deploy to Fly.io + Supabase
+
+<details>
+<summary>Show</summary>
 
 The repo ships a [`fly.toml`](https://github.com/De-Rus/cartapel/blob/main/fly.toml)
 that runs the **published image** (pinned to a release tag — bump it to adopt a
@@ -101,7 +114,12 @@ re-bootstraps from `CARTAPEL_ADMIN_*` on each fresh machine. Mount a Fly volume 
 `/data` (the image's default `CARTAPEL_DATA`) if you want sessions and the audit
 log to survive redeploys.
 
+</details>
+
 ## Bare binary (from source)
+
+<details>
+<summary>Show</summary>
 
 Releases publish the Docker image only — for bare metal, build the binary
 yourself. The SPA must be built first because it is embedded at compile time:
@@ -123,7 +141,12 @@ CARTAPEL_SECRET_KEY="$(openssl rand -hex 32)" \
 The default bind is `127.0.0.1:8686` — pass `--listen 0.0.0.0:8686` (or put a
 reverse proxy in front) to expose it.
 
+</details>
+
 ## Environment-first configuration
+
+<details>
+<summary>Show</summary>
 
 Every `serve` flag has an environment variable, so a container needs no CLI args
 beyond the subcommand. The full set, matching `cartapel serve`:
@@ -151,7 +174,12 @@ Config values themselves can read the environment with `env:NAME` / `${NAME}`, s
 you can keep the DB URL and secret in `config/cartapel.hcl` while still sourcing
 them from the environment.
 
+</details>
+
 ## Writable config volume
+
+<details>
+<summary>Show</summary>
 
 cartapel can edit its own config through the in-app visual builder, but only when
 the config directory is **writable**. It probes this at startup:
@@ -168,7 +196,12 @@ copy a baked-in default bundle into the volume on first boot, then let admins
 evolve it live. That is exactly what the Render blueprint's `dockerCommand`
 does — it seeds a one-source `cartapel.hcl` into `/data/admin` if none exists.
 
+</details>
+
 ## Base path and mounting
+
+<details>
+<summary>Show</summary>
 
 The panel is served under **`/admin`** by default. The mount prefix is **injected
 into the SPA at runtime** (the server rewrites `index.html` at serve time), so a
@@ -203,13 +236,23 @@ location /panel/ {
 
 Keep `--secure-cookies` on (the default) when the proxy terminates HTTPS.
 
+</details>
+
 ## Health checks
+
+<details>
+<summary>Show</summary>
 
 `{base}/api/health` returns `{"ok": true}` unauthenticated — point your load
 balancer or orchestrator's liveness probe at it (the Render blueprint uses
 `/admin/api/health`).
 
+</details>
+
 ## Connection pooling note
+
+<details>
+<summary>Show</summary>
 
 cartapel keeps a small Postgres pool (5 connections). If you sit it behind a
 **transaction-mode** pooler (like Supabase's pgbouncer on port `6543`), cartapel
@@ -223,3 +266,6 @@ statement timeout.
 `cartapel check --config ./admin --db …` exits non-zero on any parse error or
 schema drift — run it in CI next to your migrations. See the [CLI reference](/cli#cartapel-check).
 :::
+
+</details>
+

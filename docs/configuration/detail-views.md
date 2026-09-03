@@ -139,6 +139,9 @@ detail {
 
 ## Inlines
 
+<details>
+<summary>Show</summary>
+
 Inlines embed rows of a related child table directly in a parent's detail view —
 the classic "orders on a customer" layout.
 
@@ -202,3 +205,6 @@ relations {
 Inline edits still pass through the child table's permission checks — an inline
 can never grant access the child config withholds. See
 [Roles & permissions](/roles-and-permissions).
+
+</details>
+

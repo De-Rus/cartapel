@@ -69,6 +69,8 @@ The shape of a config bundle, one topic per page.
   from folders: labels, icons, ordering.
 - **[Dashboard](/configuration/dashboard)** — SQL-defined stat tiles, charts,
   tables and template variables.
+- **[Panel types](/configuration/panel-types)** — `stat`, `chart`, `table` and
+  `iframe`, keys and a worked example each.
 - **[Grafana panels](/configuration/grafana-panels)** — Prometheus, Loki and
   Tempo as panel rows, with PromQL/LogQL/TraceQL examples.
 
@@ -80,6 +82,8 @@ Customization, access control, and how it looks.
   options: formats, colors, masking, computed columns.
 - **[Widgets](/configuration/widgets)** — every built-in renderer, grouped
   by kind, plus `custom:<name>` web-component widgets.
+- **[Remote fields](/configuration/remote-fields)** — a field fetched live
+  from an `http` source, and the `table` widget for an array response.
 - **[Pages, queries & custom widgets](/configuration/pages-and-queries)** —
   declarative pages, named read-only queries, template variables.
 - **[Theming](/theming)** — presets, accent colors, per-mode design tokens and

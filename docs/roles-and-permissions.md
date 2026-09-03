@@ -26,6 +26,9 @@ HCL to commit yourself).
 
 ## Public access (no login)
 
+<details>
+<summary>Show</summary>
+
 ```hcl
 # config/auth.hcl
 public_role = "viewer"
@@ -38,7 +41,12 @@ always wins over the anonymous identity, log in normally to switch. Naming an
 unknown role is a load error. Point it at a write-capable role only if you
 truly mean it: **everyone on the network gets that power**.
 
+</details>
+
 ## The `admin` role
+
+<details>
+<summary>Show</summary>
 
 `admin` is built in. It has full access to everything and cannot be edited or
 deleted. It bypasses the role-side refinements below (levels, `perm`, `editable`,
@@ -47,7 +55,12 @@ role masking, row filters) — but not the table itself: a table config's
 table) bind admins too, and so do automatic and field-level
 [column masking](/security#column-masking).
 
+</details>
+
 ## `config/auth.hcl`
+
+<details>
+<summary>Show</summary>
 
 Every role is a `role "<name>" { }` block:
 
@@ -91,7 +104,12 @@ role "power_user" {
 }
 ```
 
+</details>
+
 ## Role inheritance
+
+<details>
+<summary>Show</summary>
 
 A role can extend another with `extends` — the parent resolves first, then the
 child's own entries override it key by key:
@@ -118,7 +136,12 @@ role "support" {
   matrix (parents flattened in) read-only — what the role actually grants, not
   just its own overrides.
 
+</details>
+
 ## Multiple roles per user
+
+<details>
+<summary>Show</summary>
 
 A user may carry several roles (comma-separated in the Users editor — chips in
 the UI). Permissions are the **union**, Django-groups style:
@@ -139,7 +162,12 @@ columns or filtered rows **unmasks and unfilters everything that role can
 see**. Keep broad roles narrow, or give them the same masks.
 :::
 
+</details>
+
 ## Coarse table access
+
+<details>
+<summary>Show</summary>
 
 `tables` is the baseline. Two levels:
 
@@ -155,7 +183,12 @@ tables = {
 }
 ```
 
+</details>
+
 ## Granular capabilities (`perm`)
+
+<details>
+<summary>Show</summary>
 
 A `perm "<table>"` block refines the coarse level one capability at a time. Each
 of `view`, `create`, `update`, `delete` is optional: unset defers to the coarse
@@ -187,7 +220,12 @@ view   = (perm.view   ?? coarse)          # reads have no ceiling
 So `create = true` on a role means nothing if the table config sets
 `permissions { create = false }` (or `write = false`) — the ceiling wins.
 
+</details>
+
 ## Editable-column whitelist
+
+<details>
+<summary>Show</summary>
 
 `editable` restricts which columns a role can write, table by table. When a
 table has an `editable` list, any column **not** in it is rejected on every write
@@ -204,7 +242,12 @@ role "support" {
 This is orthogonal to `masked`: a column can be readable-but-not-editable, or
 editable-but-masked-in-display, independently.
 
+</details>
+
 ## Column masking
+
+<details>
+<summary>Show</summary>
 
 `masked` lists columns whose values this role should not see. Masked values come
 back pre-masked (never the real value), are excluded from search and export, and
@@ -220,7 +263,12 @@ Independent of roles, secret-shaped column names auto-mask for everyone
 (admins included), and a field-level `masked = true` binds admins too — see
 [Security → Column masking](/security#column-masking).
 
+</details>
+
 ## Row-level filters
+
+<details>
+<summary>Show</summary>
 
 `row_filter` scopes a role to a subset of rows via a SQL predicate that is ANDed
 into every query touching that table — list, count, search, and writes. A user
@@ -245,7 +293,12 @@ row_filter = {
 }
 ```
 
+</details>
+
 ## Actions
+
+<details>
+<summary>Show</summary>
 
 `actions` lists which bulk actions the role can invoke, each as
 `"<table>.<action>"` matching an `action "…"` block in that table's config. A
@@ -255,7 +308,12 @@ role can only run actions listed here.
 actions = ["orders.mark_shipped", "orders.refund", "products.deactivate"]
 ```
 
+</details>
+
 ## Managing roles & users at runtime
+
+<details>
+<summary>Show</summary>
 
 Admins can manage roles and users from the in-app access screens. Role edits
 write `config/auth.hcl` (atomically, versioned, hot-swapped); users live in
@@ -278,7 +336,12 @@ cartapel's SQLite state. Guardrails:
 Users can also be provisioned offline with
 [`cartapel user add`](/cli#cartapel-user-add).
 
+</details>
+
 ## View as a role
+
+<details>
+<summary>Show</summary>
 
 An admin can **impersonate any other defined role** to verify exactly what it
 sees — pick "View as" from the user menu. While impersonating:
@@ -292,3 +355,6 @@ sees — pick "View as" from the user menu. While impersonating:
 
 A banner shows the active role the whole time; exit via the banner or the user
 menu.
+
+</details>
+
