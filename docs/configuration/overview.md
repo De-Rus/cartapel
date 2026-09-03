@@ -126,6 +126,18 @@ Top-level `[cartapel]` keys:
 | `disable_sql_preview` | bool | Hardening: disable the dashboard builder's ad-hoc SQL preview (admin-supplied `SELECT`s). Blocks arbitrary read-SQL even for admins. Default `false`. |
 | `disable_webhooks` | bool | Hardening: disable outbound webhook actions (an SSRF surface). Default `false`. |
 
+```hcl
+group_nav = "page"    # every group collapses to one entry with siblings as tabs
+
+strings = {
+  new_record        = "Add {label}"           # every language
+  es = { new_record = "Añadir {label}" }       # Spanish only, wins over the flat one
+}
+
+disable_sql_preview = true   # a public/sensitive instance
+disable_webhooks    = true
+```
+
 ### `theme { }`
 
 | Key | Description |
@@ -138,126 +150,30 @@ Top-level `[cartapel]` keys:
 
 ### `source "…" { }`
 
-Databases are declared as named sources. The `primary` one is what cartapel
-introspects and serves by default — and when no source is declared at all, the
-`--db` / `CARTAPEL_DB` URL becomes the primary implicitly, its engine picked
-from the scheme (`postgres://…` or `mysql://…`). That is why the one-command
-run needs nothing but the URL. Additional sources (more Postgres databases, or MySQL/MariaDB ones)
-plug extra tables into the same panel: point a table at one with
+Databases (and anything else cartapel reads rows from) are declared as named
+sources. The `primary` one is what cartapel introspects and serves by
+default — and when no source is declared at all, the `--db` / `CARTAPEL_DB`
+URL becomes the primary implicitly, its engine picked from the scheme. That is
+why the one-command run needs nothing but the URL. Additional sources plug
+extra tables into the same panel: point a table at one with
 `from { source = "…" }`, and lists, detail pages, editing, filters, search,
 import/export and audit all work the same way.
 
 | Key | Description |
 | --- | --- |
-| `type` | `"postgres"`, `"mysql"` (also accepts `"mariadb"`), `"clickhouse"` (read-only), `"http"` (a JSON endpoint cartapel proxies server-side), `"grafana"` (a Grafana instance — its Prometheus/Loki/Tempo datasources as panel rows, see [dashboard](dashboard.md#metrics-logs-and-traces-through-grafana)), `"files"` (a directory listing) or `"s3"` (an object listing). |
-| `url` | Connection URL (`postgres://…`, `mysql://…`) or endpoint (http). Supports `env:NAME` / `${NAME}`. |
-| `schemas` | List of schemas to introspect (postgres). Defaults to `["public"]`. A MySQL source is scoped to the database in its URL. |
-| `primary` | Marks the source cartapel introspects and serves by default. With a single database source it is implied; declare it explicitly when you define several. |
-| `token_env` / `header` | For `http` sources: attach a secret from this env var under `header` (default `x-admin-token`). For `grafana` sources: the service-account token, sent as a bearer. The secret never reaches the browser. |
+| `type` | `"postgres"`, `"mysql"` (also accepts `"mariadb"`), `"clickhouse"` (read-only), `"grafana"`, `"http"`, `"files"` or `"s3"`. |
+| `url` | Connection URL or endpoint. Supports `env:NAME` / `${NAME}`. |
+| `schemas` | List of schemas to introspect (postgres only). Defaults to `["public"]`. |
+| `primary` | Marks the source cartapel introspects and serves by default. Implied with a single database source. |
+| `token_env` / `header` | Secret attachment for `http` and `grafana` sources — never reaches the browser. |
 | `roles` | Restrict a source to these roles (non-admins need an explicit match). |
 
 `--db postgres://…` / `CARTAPEL_DB` overrides the `primary` source's URL, so the
 same bundle can run against dev, staging or prod by swapping one env var.
 
-### `files` — a directory as rows
-
-A `files` source turns a directory tree into a table. The `pattern` says both
-what to walk and what the path *means*: every `{name}` captures a segment as a
-column, so a cache laid out as `<source>/<symbol>/<timeframe>.parquet` reads as
-rows without anyone writing a scanner.
-
-```hcl
-source "cache" {
-  type    = "files"
-  root    = "env:CACHE_DIR"
-  pattern = "{source}/{symbol}/{tf}.parquet"
-  ttl_secs    = 60      # a listing is reused this long (default 60)
-  max_entries = 5000    # hard cap on rows (default 5000)
-}
-```
-
-Each row carries the captured columns plus `path`, `bytes` and `modified_ms`,
-so a panel renders it directly:
-
-```hcl
-panel {
-  type   = "table"
-  label  = "Coverage"
-  source = "cache"
-
-  field {
-    key     = "bytes"
-    format  = "bytes"
-    align   = "r"
-    display = "bar"
-  }
-}
-```
-
-### `s3` — a bucket as rows
-
-The same pattern applies to object keys, because a key *is* a path. Works
-against any S3-compatible endpoint (AWS, R2, MinIO, Backblaze); Cloudflare R2
-wants `region = "auto"`.
-
-```hcl
-source "ohlcv" {
-  type           = "s3"
-  endpoint       = "env:AWS_ENDPOINT_URL"
-  bucket         = "feed-cache"
-  region         = "auto"
-  prefix         = "candles/"            # optional, stripped before matching
-  pattern        = "{source}/{symbol}/{tf}.parquet"
-  access_key_env = "R2_ACCESS_KEY_ID"    # the env var, never the key itself
-  secret_key_env = "R2_SECRET_ACCESS_KEY"
-  max_scan       = 50000                 # objects walked per refresh (default 50000)
-}
-```
-
-Rows carry the same columns a `files` source produces — the captures plus
-`path`, `bytes` and `modified_ms` — so a panel does not care which store
-answered. Listing only: cartapel signs a `ListObjectsV2` and reads names, sizes
-and mtimes, never object bodies. Credentials come from the environment, so they
-stay out of the config you commit.
-
-**Mind the difference between `max_entries` and `max_scan`.** `max_entries`
-bounds the rows a listing *returns*; `max_scan` bounds the objects it *walks*.
-They are not the same number, and only the second one protects you: a pattern
-that matches a small share of a large prefix never reaches the entry cap, so
-without a scan cap every refresh pages through the whole bucket a thousand
-objects at a time. A real bucket held 1.4M objects under one prefix, ~6.5k of
-which matched a three-segment pattern; each refresh cost 1,411 requests and
-about five minutes. When a listing stops at the scan cap it says so in the log —
-narrow `prefix`, widen `pattern`, or raise `max_scan` deliberately.
-
-**Metadata only.** cartapel reports names, sizes and mtimes and never reads a
-file's contents — a listing must not become a way to read arbitrary files.
-Walking is confined to `root`, symlinks are skipped rather than followed, and
-the entry cap bounds a runaway tree. For anything *inside* the files — a
-parquet footer, a header, a checksum — write a small HTTP endpoint and declare
-it as an `http` source; that is the extension point, and it can be in any
-language.
-
-::: info ClickHouse (read-only)
-A `clickhouse` source (`url = "clickhouse://user:pass@host:8123/db"`) exposes
-its tables for browsing, filtering, search, export and SQL queries — writes are
-off by design, and the panel simply doesn't offer them. Every request runs with
-ClickHouse's own `readonly=1`, a statement timeout and a row cap. MergeTree
-primary keys aren't unique, so detail pages show the first matching row.
-:::
-
-::: info MySQL & MariaDB
-MySQL 8.0+ and MariaDB 10.6+ are supported everywhere a database goes: as the
-primary (`CARTAPEL_DB=mysql://…` just works), as extra table sources, and for
-named queries and query-backed variables.
-The differences that matter are handled for you — `tinyint(1)` renders as a
-boolean, `enum` values become text, MariaDB's `json`-as-`longtext` is detected,
-and unsigned ids are read losslessly. Two honest limits: array columns don't
-exist on MySQL, and **upsert imports are refused on tables with a row filter**
-(MySQL's upsert can't be scoped by a WHERE, and widening a user's write surface
-silently is worse than saying no). Create the cartapel user with
-`mysql_native_password` — `ed25519` auth is not supported.
-:::
+A full worked example for every type — Postgres, MySQL & MariaDB, ClickHouse,
+Grafana, files, S3-compatible storage and HTTP — is on its own page:
+[Data sources](/configuration/sources).
 
 ## Environment interpolation
 
@@ -302,5 +218,7 @@ raw editor), not through the visual form.
 
 ## Next
 
+- **[Data sources](/configuration/sources)** — Postgres, MySQL, ClickHouse, Grafana, files, S3 and HTTP, each with a worked example.
+- **[Uploads & file storage](/configuration/uploads)** — the `file { }` field (`widget = "image"` or generic), the upload request, and local-disk or S3-compatible storage.
 - **[Tables](/configuration/tables)** — every block in a `screen.hcl`.
 - **[Groups & navigation](/configuration/groups-and-nav)** — `_group.hcl` in detail.

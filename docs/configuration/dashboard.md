@@ -212,6 +212,14 @@ save you from repeating yourself or reach data that is not in the database.
 | `source` | An `http` source alias: cartapel fetches it server-side (the secret never reaches the browser) and renders the JSON array it returns. Pair with `path` for a sub-path and `rows_at` for a dotted path to the array inside the payload. Or a `grafana` source alias — then the panel names a `ds` and an `expr` (below). |
 | `table` | A configured table slug: the panel renders **that screen's own list** — its columns, widgets, formats and permissions — instead of raw query rows. `sort` and `pp` tune it. |
 
+```hcl
+panel {
+  type  = "table"
+  label = "Latest orders"
+  query = "recent_orders"    # a query { } block declared elsewhere — see Pages & queries
+}
+```
+
 On a table panel, `max` is how many rows travel to the browser (50 by default,
 20000 at most) and `pp` is how many show at once — the panel pages through the
 rest in place, and `search = true` adds a box that filters them. A listing with thousands of rows wants both: `max` high enough to
@@ -443,6 +451,16 @@ files and declare it as a database source instead.
 | `link` | table | Target table for row links. |
 | `source` / `ds` / `expr` / `range` / `step` | stat, chart, table | A Grafana datasource query — see [Metrics, logs and traces through Grafana](#metrics-logs-and-traces-through-grafana). |
 | `url` | iframe | The embedded URL. |
+
+```hcl
+panel {
+  id     = "mrr"          # stable id — survives reordering panels
+  type   = "table"
+  label  = "Recent errors"
+  sql    = "SELECT * FROM error_log ORDER BY ts DESC"
+  expand = true            # a clicked row opens with every field in full
+}
+```
 
 ## Template variables
 

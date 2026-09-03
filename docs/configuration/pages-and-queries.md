@@ -112,6 +112,11 @@ query "ops_revenue" {
   sql   = "SELECT date_trunc('day', placed_at) AS t, coalesce(sum(total),0) AS usd FROM orders WHERE placed_at > now() - interval '14 days' GROUP BY 1 ORDER BY 1"
   roles = ["support"]
 }
+
+query "warehouse_skus" {
+  sql    = "SELECT sku, on_hand FROM inventory"
+  source = "warehouse"      # a non-primary source alias, not the primary DB
+}
 ```
 
 | Key | Description |

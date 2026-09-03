@@ -12,12 +12,17 @@ docs/
 ├── index.md                    # landing page / pitch / 60-second quickstart
 ├── getting-started.md          # install, first run, bootstrap admin
 ├── cli.md                      # cartapel serve / user add flags + env vars
+├── comparisons.md              # vs Django admin, Retool, Metabase, Directus…
 ├── architecture.md             # the self-contained bundle, SQLite state, hot-reload
 ├── roles-and-permissions.md    # config/auth.hcl, the permission matrix
 ├── security.md                 # secret key, masking, row filters, path confinement
+├── theming.md                  # presets, accent colors, design tokens
+├── localization.md             # per-viewer language, built-in locales, i18n extract
 ├── deployment.md               # Docker, env, writable config volume, reverse proxy
 ├── configuration/
 │   ├── overview.md             # HCL, folders = groups, config/
+│   ├── sources.md              # Postgres, MySQL, ClickHouse, Grafana, files, S3, HTTP
+│   ├── uploads.md              # image { } fields, the upload request, on-disk storage
 │   ├── tables.md               # screen.hcl: list / display / detail / edit / permissions / actions
 │   ├── fields-and-widgets.md   # the widget library, params, format, color, interpolation
 │   ├── detail-views.md         # detail.mode, sections, sidebar, inlines
@@ -50,7 +55,7 @@ that touches `docs/**`:
 - **<https://de-rus.github.io/cartapel/>** — a mirror on GitHub Pages, served
   under `/cartapel/`. It is built with `DOCS_SITE` pointing at the canonical
   host, so its `<link rel="canonical">` and sitemap hand authority to
-  docs.cartapel.com rather than competing with it for the same 29 pages.
+  docs.cartapel.com rather than competing with it for the same 19 pages.
 
 `robots.txt` is generated per build from `DOCS_SITE` (see `buildEnd` in
 `.vitepress/config.mts`) — as a static asset it was shipped to both hosts and

@@ -84,6 +84,13 @@ role "staff" {
 | `masked` | map | Per-table columns whose values are hidden from this role. |
 | `row_filter` | map | Per-table SQL predicate scoping which rows this role sees. |
 
+```hcl
+role "power_user" {
+  tables    = { "*" = "read" }
+  customize = true   # may open Personalizar and edit table configs
+}
+```
+
 ## Role inheritance
 
 A role can extend another with `extends` — the parent resolves first, then the

@@ -12,6 +12,10 @@ export default defineConfig({
     'Open-source, single-binary admin panel for your existing Postgres, MySQL or MariaDB. A Django-admin alternative in one Rust binary: introspected CRUD, roles, audit and dashboards, configured with HCL you version like code.',
   lang: 'en-US',
   cleanUrls: true,
+  // A contributor doc (repo layout, local dev commands), not a page for
+  // readers of the published site — it was building to a live, unlinked
+  // /README on both hosts and getting into the sitemap.
+  srcExclude: ['README.md'],
   ignoreDeadLinks: [/^https?:\/\/localhost/],
   lastUpdated: true,
   appearance: 'dark',
@@ -80,7 +84,10 @@ export default defineConfig({
     // A page may point its canonical elsewhere — comparisons.md is a summary of
     // the fuller comparison on cartapel.com and must not compete with it.
     const canonical = (pageData.frontmatter.canonical as string | undefined) ?? SITE + path
-    const title = pageData.frontmatter.layout === 'home' ? 'cartapel — database admin panel' : `${pageData.title} · cartapel`
+    // The root page sets its own title/titleTemplate (see index.md's frontmatter)
+    // for the <title> tag; this only controls the social-preview og:title, which
+    // wants the fuller marketing line regardless of what the tab shows.
+    const title = path === '' ? 'cartapel — database admin panel' : `${pageData.title} · cartapel`
     pageData.frontmatter.head ??= []
     pageData.frontmatter.head.push(
       ['link', { rel: 'canonical', href: canonical }],
@@ -114,7 +121,7 @@ export default defineConfig({
       {
         text: 'Start here',
         items: [
-          { text: 'What is cartapel?', link: '/' },
+          { text: 'Overview', link: '/' },
           { text: 'Getting started', link: '/getting-started' },
           { text: 'vs the alternatives', link: '/comparisons' },
           { text: 'CLI & environment', link: '/cli' },
@@ -125,6 +132,8 @@ export default defineConfig({
         collapsed: false,
         items: [
           { text: 'Configuration layout', link: '/configuration/overview' },
+          { text: 'Data sources', link: '/configuration/sources' },
+          { text: 'Uploads & file storage', link: '/configuration/uploads' },
           { text: 'Tables & lists', link: '/configuration/tables' },
           { text: 'Detail views', link: '/configuration/detail-views' },
           { text: 'Groups & navigation', link: '/configuration/groups-and-nav' },

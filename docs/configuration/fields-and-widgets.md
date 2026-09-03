@@ -33,13 +33,22 @@ field "price" {
 | `sort_by` | string | Computed columns only: sort by another **real** column instead of the expression. |
 | `group` | string | Detail-form section this field belongs to (an alternative to `detail { section { } }`). |
 | `params` | map | Widget-specific parameters (see each widget). |
-| `image` | block | Marks the field as an uploadable image (see [`image { }`](#image-uploads)). |
+| `file` | block | Marks the field as uploadable (see [Uploads](#uploads)). `widget = "image"` decodes/resizes/re-encodes on upload; any other widget stores the bytes as uploaded. |
 | `format` | string | A number/date formatter applied to the value. |
 | `prefix` / `suffix` | string | Text prepended / appended to the displayed value. |
 | `truncate` | number | Truncate the displayed string to N characters. |
 | `display` | string | A `{column}` template that replaces the displayed text. |
 | `href` | string | A `{column}` template turning the value into a link target. |
 | `color` | string / block | Conditional coloring — a named strategy or a rule set (see [Conditional color](#conditional-color)). |
+
+```hcl
+field "customer_notes" {
+  labels   = { es = "Notas del cliente" }
+  readonly = true
+  masked   = true
+  group    = "Internal"
+}
+```
 
 ## Computed columns (`sql`)
 
@@ -176,76 +185,52 @@ field "score" {
 `neutral`, `accent`, `muted`. Any other class or an unparseable condition is a
 load error.
 
-## Image uploads
+## Uploads
 
-An `image { }` block turns a column into an uploadable, on-disk-resized image.
-The filename lives in a column; the file lives on the storage backend (`dir`).
-
-```hcl
-field "image" {
-  image {
-    dir       = "products"     # directory the files live in
-    name_col  = "sku"          # column supplying the stored filename
-    max_px    = 256            # longest edge, default 256
-    normalize = true           # re-encode/normalize on upload, default true
-  }
-}
-```
-
-Uploaded images are served back through cartapel's static asset route. The field
-renders in the list (thumbnail) and the record view; upload happens right there —
-no edit-mode round-trip.
-
-### From a related table
-
-An image often belongs to a *different* table than the one you're looking at — a
-product's logo living in a shared `assets` table, keyed by SKU rather than by the
-product row's id. Point `name_sql` at a correlated expression (the current row is
-`t`) that yields the filename, and the image shows without denormalising anything:
+One block, `file { }`, turns a column into something uploadable, straight
+from the list or the record view, no edit-mode round-trip. The **widget**
+decides what happens to the bytes — `widget = "image"` decodes, resizes and
+re-encodes to PNG; anything else stores them exactly as uploaded, for a PDF,
+a CSV export or any other document:
 
 ```hcl
 field "logo" {
   widget = "image"
-  image {
-    name_sql = "SELECT a.filename FROM assets a WHERE a.sku = t.sku LIMIT 1"
-    dir      = "logos"
+  params = { max_px = 256, normalize = true }   # both optional; these are the defaults
+  file {
+    dir      = "products"     # directory the files live in (or an S3 key prefix)
+    name_col = "sku"          # an already non-null column — see the note below
+  }
+}
+
+field "invoice" {
+  widget = "file"          # or omit — "file" is the default for a file { } block
+  file {
+    dir       = "invoices"
+    name_col  = "invoice_ref"
+    max_bytes = 10485760    # 10MB; default 25MB (8MB for widget = "image")
   }
 }
 ```
 
-The field needs no real column of its own — it renders as a virtual column,
-served by primary key. With only `name_sql` it is **read-only** (you edit the
-image on the table that owns it).
+`name_col` is only ever *read*, never written, in this plain form — it names
+a column that must already hold a value before the first upload (`sku` here,
+not a dedicated upload column). A file can also live on a *related* table —
+read-only via `name_sql`, or writable across the join with `write_to` (even
+back onto the field's own table, the way to get a column cartapel populates
+for you with no pre-existing value needed), the same way Django's
+`ImageField`/`FileField` work on a related model. All of this — the exact
+upload request, the join/write-through forms, size limits, local disk vs. a
+named S3-compatible `storage`, and what to mount so files survive a
+redeploy — is on its own page: [Uploads & file storage](/configuration/uploads).
 
-### Editable across the join (write-through)
-
-Add `write_to` to make the joined image uploadable *here* — an upload writes the
-file and upserts the target row, like Django's `ImageField` on a related model:
-
-```hcl
-field "logo" {
-  widget = "image"
-  image {
-    name_sql       = "SELECT a.filename FROM assets a WHERE a.sku = t.sku AND a.status = 'ok' LIMIT 1"
-    dir            = "logos"
-    write_to       = "assets"                    # the table the upload writes to
-    name_col       = "filename"                  # its filename column
-    write_key      = { sku = "sku" }             # target_col = this row's column
-    write_defaults = { status = "ok" }           # extra columns set on a fresh row
-    max_px         = 128
-  }
-}
-```
-
-On upload cartapel writes the file (under a deterministic name built from the
-`write_key` values) and upserts `write_to`: it UPDATEs the row matched by
-`write_key` — setting `name_col` and the `write_defaults` — or INSERTs one if none
-exists. The owning table stays the single source of truth; the parent never keeps
-a copy. Exactly one of `name_col` / `name_sql` is required, and `write_to` needs
-all of `name_sql`, `name_col` and a non-empty `write_key`.
-
-The storage backend is `dir` — a filesystem path today; point it at object
-storage the same way once your deployment stores assets there.
+::: warning `widget = "file"` has no panel rendering yet
+The upload/download endpoints work — script against them, or use the visual
+builder's Fields tab to configure `dir`/`name_col`. But today only
+`widget = "image"` has an in-panel widget (a thumbnail with click-to-upload).
+A plain `file` field falls back to whatever the default text rendering does;
+there's no download-link/icon widget in the panel yet.
+:::
 
 ---
 
@@ -267,6 +252,15 @@ Set `widget = "<name>"`. Widgets that take parameters read them from the field's
 | `copyable` | Value with a click-to-copy affordance. | — |
 | `uuid` | Shortened UUID with click-to-copy. | — |
 
+```hcl
+field "bio"      { widget = "textarea" }
+field "payload"  { widget = "code"; params = { lang = "sql" } }
+field "settings" { widget = "json" }
+field "notes"    { widget = "truncate"; params = { chars = 60 } }
+field "ref"      { widget = "copyable" }
+field "id"       { widget = "uuid" }
+```
+
 ### Numbers
 
 | Widget | Renders | Notable `params` |
@@ -281,6 +275,17 @@ Set `widget = "<name>"`. Widgets that take parameters read them from the field's
 | `trend` | Signed value with ▲/▼ arrow, colored by sign. | — |
 | `heatcell` | A cell tinted by magnitude within a range. | `min` (default 0), `max` (default 100) |
 
+```hcl
+field "price"  { widget = "money"; params = { currency = "USD" } }
+field "margin" { widget = "percent" }
+field "uptime" { widget = "duration" }
+field "size"   { widget = "bytes" }
+field "quota"  { widget = "progress"; params = { max = 100, warn_at = 90 } }
+field "stars"  { widget = "rating"; params = { max = 5 } }
+field "delta"  { widget = "trend" }
+field "score"  { widget = "heatcell"; params = { min = 0, max = 100 } }
+```
+
 ### Booleans & enums
 
 | Widget | Renders | Notable `params` |
@@ -289,6 +294,11 @@ Set `widget = "<name>"`. Widgets that take parameters read them from the field's
 | `badge` | A colored badge from a value → color map. | `colors`, `labels` (value → printed text), `fallback` (color when no key matches) |
 | `pill` | Same as `badge` (pill styling). | `colors`, `labels`, `fallback` |
 | `tags` | Splits a list/CSV value into multiple badges. | `colors` |
+
+```hcl
+field "active" { widget = "toggle" }
+field "tags"   { widget = "tags"; params = { colors = { urgent = "red" } } }
+```
 
 The `colors` param maps values to one of `blue`, `green`, `orange`, `red`,
 `violet`, `gray`:
@@ -338,12 +348,24 @@ field "homepage" {
 | `color` | A swatch + the color string. | — |
 | `country` / `flag` | A flag emoji + the country code. | — |
 
+```hcl
+field "logo_url"    { widget = "image" }   # a URL/data-URL column — not an upload; see Uploads
+field "avatar_url"  { widget = "avatar"; params = { size = 32, rounded = true } }
+field "brand_color" { widget = "color" }
+field "region"       { widget = "country" }
+```
+
 ### Relations & arrays
 
 | Widget | Renders | Notable `params` |
 | --- | --- | --- |
 | `fk` | A link to the referenced record, using its label. | `target` (table), `target_column` |
 | `array` | Each array element as a small chip. | — |
+
+```hcl
+field "owner_id" { widget = "fk"; params = { target = "users" } }
+field "labels"   { widget = "array" }
+```
 
 Foreign-key columns are detected during introspection and render automatically
 as links showing the **target row's label** — its name-ish column (`name`,

@@ -248,6 +248,13 @@ action "deactivate" {
   confirm = "Deactivate {count} products?"
   danger  = false
 }
+
+action "resync" {
+  label  = "Resync"
+  kind   = "webhook"
+  url    = "https://internal.example.com/hooks/resync"
+  method = "POST"
+}
 ```
 
 | Key | Type | Description |
