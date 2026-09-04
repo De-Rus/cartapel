@@ -213,6 +213,7 @@ function CellValueBody({ col, value, row, mode, pkName, tableName }: CellValuePr
         row={row}
         params={col.params}
         mode={mode}
+        value={value}
         fallback={value == null ? <Empty /> : <span>{String(value)}</span>}
       />
     )

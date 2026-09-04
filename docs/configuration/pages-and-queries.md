@@ -237,14 +237,16 @@ All three read the panel's CSS variables, so they track the active theme.
 
 ### Authoring one
 
-Define a custom element named `sx-widget-<name>`. cartapel sets three properties
-on it; re-render whenever a property is assigned:
+Define a custom element named `sx-widget-<name>`. cartapel sets properties on
+it; re-render whenever a property is assigned:
 
 | Property | Value |
 | --- | --- |
 | `row` | The full record object. |
 | `params` | The field's `params` map from config. |
 | `api` | `{ get(path), post(path, body) }` — bound to the panel base path, sends the session cookie and CSRF header for you. |
+| `value` | The field's own current value. Set on every render, editable or not. |
+| `onChange` | `(value) => void`. **Only set when the field is being edited** — a plain read-only cell (list or detail display) never gets it. Its presence is how a widget tells the two contexts apart, since the same element renders in both: `if (this.onChange) { … }`. Call it to report a new value; cartapel doesn't save until the surrounding form does (same as every built-in field). |
 
 ```js
 // admin/config/widgets/sparkline.js
@@ -257,6 +259,29 @@ class Sparkline extends HTMLElement {
   }
 }
 customElements.define('sx-widget-sparkline', Sparkline)
+```
+
+An editable widget checks `onChange` before deciding whether to render inputs
+at all — a list cell and a read-only detail field get `row`/`params`/`value`
+like any other, just never a way to write back:
+
+```js
+// admin/config/widgets/richtext.js — sketch, not the sanitized real thing
+class RichText extends HTMLElement {
+  set value(v) { this._value = v; this.render() }
+  set onChange(fn) { this._onChange = fn; this.render() }
+  render() {
+    if (!this._onChange) {
+      this.innerHTML = this._value ?? ''   // read-only: just show it
+      return
+    }
+    if (this.isContentEditable) return      // already live-editing, don't reset the cursor
+    this.contentEditable = 'true'
+    this.innerHTML = this._value ?? ''
+    this.oninput = () => this._onChange(this.innerHTML)
+  }
+}
+customElements.define('sx-widget-richtext', RichText)
 ```
 
 A `custom:<name>` widget renders in **both** the list cell and the detail field.

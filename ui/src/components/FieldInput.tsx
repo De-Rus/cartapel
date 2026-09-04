@@ -74,6 +74,8 @@ export function FieldInput({
         row={row}
         params={col.params}
         mode="detail"
+        value={value}
+        onChange={onChange}
         fallback={<span className="text-sm text-sec">{value == null ? '—' : String(value)}</span>}
       />
     )
