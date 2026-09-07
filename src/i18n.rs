@@ -344,6 +344,7 @@ mod tests {
             order: 0,
             table_order: vec![],
             nav: None,
+            section: None,
         });
         let tc = crate::config::TableConfig {
             label: Some("order".into()),
@@ -399,6 +400,7 @@ mod tests {
             order: 0,
             table_order: vec![],
             nav: None,
+            section: None,
         });
         let (out, missing, all) = extract(&cfg, None, "es", StubFormat::Json);
         assert_eq!((missing, all), (2, 2));

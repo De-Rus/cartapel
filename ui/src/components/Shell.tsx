@@ -444,15 +444,48 @@ function SidebarNav({
     [meta.nav, meta.tables, filter, meta.group_nav],
   )
   const [expanded, toggle] = useExpandedGroups()
+  const pages = meta.pages ?? []
   if (groups === null) {
     return (
-      <SidebarGroups tables={meta.tables} pages={meta.pages ?? []} t={t} rail={rail} filter={filter} onHoverTable={onHoverTable} />
+      <SidebarGroups tables={meta.tables} pages={pages} t={t} rail={rail} filter={filter} onHoverTable={onHoverTable} />
     )
   }
+  // A section is the second level: several groups — of tables, of pages, or
+  // both — under one heading. Unsectioned entries keep their place at the top,
+  // so adding a section moves only what names it.
+  const sections: string[] = []
+  for (const g of groups) if (g.section && !sections.includes(g.section)) sections.push(g.section)
+  for (const p of pages) if (p.section && !sections.includes(p.section)) sections.push(p.section)
+  const loose = groups.filter((g) => !g.section)
+  const loosePages = pages.filter((p) => !p.section)
   return (
     <>
-      <TableNav groups={groups} rail={rail} filter={filter} expanded={expanded} onToggle={toggle} onHoverTable={onHoverTable} />
-      <SidebarGroups tables={[]} pages={meta.pages ?? []} t={t} rail={rail} filter={filter} />
+      <TableNav groups={loose} rail={rail} filter={filter} expanded={expanded} onToggle={toggle} onHoverTable={onHoverTable} />
+      <SidebarGroups tables={[]} pages={loosePages} t={t} rail={rail} filter={filter} />
+      {sections.map((name) => (
+        <div key={name} className="mt-4 border-t pt-3">
+          {!rail && (
+            <div className="mb-1 px-2 text-xxs font-semibold uppercase tracking-wider text-muted">
+              <span className="hidden truncate wide:block">{name}</span>
+            </div>
+          )}
+          <TableNav
+            groups={groups.filter((g) => g.section === name)}
+            rail={rail}
+            filter={filter}
+            expanded={expanded}
+            onToggle={toggle}
+            onHoverTable={onHoverTable}
+          />
+          <SidebarGroups
+            tables={[]}
+            pages={pages.filter((p) => p.section === name)}
+            t={t}
+            rail={rail}
+            filter={filter}
+          />
+        </div>
+      ))}
     </>
   )
 }

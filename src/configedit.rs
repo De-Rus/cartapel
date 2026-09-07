@@ -278,6 +278,7 @@ async fn create_in_group(
         order: g.order,
         table_order: g.table_order.clone(),
         nav: g.nav.clone(),
+        section: g.section.clone(),
     };
     if !group_cfg.table_order.iter().any(|t| t == stem) {
         group_cfg.table_order.push(stem.to_string());
@@ -507,6 +508,7 @@ pub async fn apply_setup(
             order: (i + 1) as i64,
             table_order: g.tables.clone(),
             nav: None,
+            section: None,
         };
         let group_hcl = hcl::to_string(&group_cfg)
             .map_err(|e| AppError::internal(format!("serialize group: {e}")))?;

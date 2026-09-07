@@ -28,8 +28,32 @@ table_order = ["customers", "subscriptions"]
 | `icon` | string | A [lucide](https://lucide.dev) icon name (`trending-up`, `bot`, `package`, …). |
 | `order` | number | Sort key among groups (lower first). Defaults to `0`. |
 | `table_order` | list | Explicit ordering of the tables within the group. Unlisted tables follow. |
+| `section` | string | A heading ABOVE this group, shared with every group naming the same one. Groups of tables and groups of pages sit under it together. Unsectioned groups keep their place at the top; sections follow, in the order their first group appears. |
 | `nav` | string | Sidebar mode for this group: `expanded` (every table listed) or `page` (one entry that opens the group's primary table with its siblings as tabs). Falls back to the global `group_nav`, then `expanded`. |
 | `labels` | map | Per-locale label overrides (`labels = { es = "Clientes" }`); the instance `locale` picks one. |
+
+## Sections — a second level
+
+Once a console has more than a handful of groups, the sidebar wants one more
+level. `section` gives it: every group naming the same section is drawn under
+that heading, and a section holds groups of tables and groups of pages
+together.
+
+```hcl
+# screens/ops-feeds/_group.hcl        # screens/ops-data/_group.hcl
+label   = "Feeds"                     label   = "Data"
+section = "Operations"                section = "Operations"
+```
+
+That togetherness is the point. Pages are panels and have no row actions, so
+anything with a button — a webhook action, a bulk edit — has to be a table
+screen. Without sections a console had to choose between putting such a screen
+where it belongs and keeping its button; now the table group simply names the
+section its dashboards live in.
+
+Groups without a `section` keep their place at the top of the sidebar.
+Sections follow in the order their first group appears, so adding one moves
+only the groups that name it.
 
 ## Ordering
 

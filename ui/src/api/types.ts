@@ -144,6 +144,8 @@ export interface NavGroup {
   label: string
   icon?: string | null
   nav?: string | null
+  /** Heading this group sits under, shared with every group naming the same one. */
+  section?: string | null
   tables: string[]
 }
 
@@ -152,6 +154,7 @@ export interface PageMeta {
   slug: string
   label: string
   group: string | null
+  section?: string | null
   icon?: string | null
   roles?: string[] | null
 }

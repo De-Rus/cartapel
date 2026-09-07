@@ -15,6 +15,7 @@ export interface SidebarGroup {
   /** `page` = collapse to a single entry linking the first table (tabbed group);
    *  `expanded` = list every table. */
   mode: 'page' | 'expanded'
+  section: string | null
   tables: SidebarTable[]
 }
 
@@ -50,7 +51,14 @@ export function buildSidebarNav(
     }
     if (mode === 'page' && f && !g.label.toLowerCase().includes(f)) continue
     if (items.length === 0) continue
-    groups.push({ slug: g.slug ?? null, label: g.label, icon: g.icon ?? null, mode, tables: items })
+    groups.push({
+      slug: g.slug ?? null,
+      label: g.label,
+      icon: g.icon ?? null,
+      mode,
+      section: g.section ?? null,
+      tables: items,
+    })
   }
   return groups
 }

@@ -205,6 +205,13 @@ pub struct GroupConfig {
     /// table as its own entry. Falls back to `[cartapel].group_nav`, then `expanded`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nav: Option<String>,
+    /// A heading ABOVE this group, shared with every group naming the same one —
+    /// the second level a console grows into once it has more than a handful of
+    /// groups. Groups of tables and groups of pages sit under it together, so a
+    /// table screen (the only surface with row actions) can live beside the
+    /// dashboards it belongs with. Sections order by their earliest group.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub section: Option<String>,
 }
 
 /// A group loaded from a `_group.hcl`, tagged with the folder (slug) it came from.
@@ -217,6 +224,7 @@ pub struct LoadedGroup {
     pub order: i64,
     pub table_order: Vec<String>,
     pub nav: Option<String>,
+    pub section: Option<String>,
 }
 
 /// Where a table config was loaded from: the exact file path (for write-back) and
@@ -1971,6 +1979,7 @@ pub fn load(dir: Option<&Path>) -> Result<ConfigDir, String> {
                     order: g.order,
                     table_order: g.table_order,
                     nav: g.nav,
+                    section: g.section,
                 });
             }
             "queries" => {

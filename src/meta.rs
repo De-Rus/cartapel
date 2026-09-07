@@ -865,7 +865,14 @@ pub(crate) fn derive_nav_groups(
         for m in &members {
             placed.insert(m);
         }
-        out.push(json!({ "slug": g.slug, "label": loc.pick(&g.labels, g.label.clone()), "icon": g.icon, "nav": g.nav, "tables": members }));
+        out.push(json!({
+            "slug": g.slug,
+            "label": loc.pick(&g.labels, g.label.clone()),
+            "icon": g.icon,
+            "nav": g.nav,
+            "section": g.section.as_ref().map(|s| loc.t(s.clone())),
+            "tables": members
+        }));
     }
     let leftover: Vec<&str> = order
         .iter()
@@ -893,9 +900,15 @@ pub(crate) fn pages_meta(
                 .group
                 .as_deref()
                 .and_then(|slug| cfg.group_label_in(slug, loc));
+            let section = p
+                .group
+                .as_deref()
+                .and_then(|slug| cfg.groups.iter().find(|g| g.slug == slug))
+                .and_then(|g| g.section.clone())
+                .map(|s| loc.t(s));
             json!({
                 "id": p.id(), "slug": p.slug, "label": loc.pick(&p.labels, p.label.clone()),
-                "group": group, "icon": p.icon, "roles": p.roles,
+                "group": group, "section": section, "icon": p.icon, "roles": p.roles,
             })
         })
         .collect()
@@ -929,6 +942,7 @@ mod nav_tests {
             order: 0,
             table_order: vec![],
             nav: None,
+            section: None,
         });
         cfg.pages.push(LoadedPage {
             slug: "fleet".into(),
@@ -975,6 +989,64 @@ mod nav_tests {
             pages_meta(&cfg, &admin, &Loc::default()).len(),
             1,
             "admin sees role-gated page"
+        );
+    }
+
+    /// A `section` on a group travels into the nav and into the pages meta, so a
+    /// group of tables and a group of pages can share one heading — the only way
+    /// a screen with row actions can sit beside the dashboards it belongs with.
+    #[test]
+    fn a_section_travels_into_the_nav_and_the_pages() {
+        use crate::config::{ConfigDir, LoadedGroup, LoadedPage, TableSource};
+        let mut cfg = ConfigDir::default();
+        let group = |slug: &str, label: &str, section: Option<&str>| LoadedGroup {
+            slug: slug.into(),
+            labels: Default::default(),
+            label: label.into(),
+            icon: None,
+            order: 0,
+            table_order: vec![],
+            nav: None,
+            section: section.map(str::to_string),
+        };
+        cfg.groups.push(group("ops-data", "Data", Some("Operations")));
+        cfg.groups.push(group("billing", "Billing", None));
+        cfg.pages.push(LoadedPage {
+            slug: "cache".into(),
+            group: Some("ops-data".into()),
+            label: "Candle cache".into(),
+            labels: Default::default(),
+            order: 0,
+            columns: None,
+            refresh: None,
+            widgets: vec![],
+            icon: None,
+            roles: vec![],
+        });
+        let sources = std::collections::BTreeMap::from([
+            (
+                "series_health".to_string(),
+                TableSource { path: Default::default(), group: Some("ops-data".into()) },
+            ),
+            (
+                "subscriptions".to_string(),
+                TableSource { path: Default::default(), group: Some("billing".into()) },
+            ),
+        ]);
+        let nav = derive_nav_groups(
+            &cfg.groups,
+            &sources,
+            &["series_health", "subscriptions"],
+            &Loc::default(),
+        );
+        assert_eq!(nav[0]["section"], "Operations", "a table group carries its section");
+        assert!(nav[1]["section"].is_null(), "a group without one carries none");
+
+        let admin = CurrentUser { email: "a@x.io".into(), role: "admin".into() };
+        let pages = pages_meta(&cfg, &admin, &Loc::default());
+        assert_eq!(
+            pages[0]["section"], "Operations",
+            "a page inherits the section of its group, so both land under one heading"
         );
     }
 
@@ -1045,6 +1117,7 @@ mod nav_tests {
             order: 0,
             table_order: vec![],
             nav: None,
+            section: None,
         }];
         let mut sources: BTreeMap<String, TableSource> = BTreeMap::new();
         sources.insert(
@@ -1082,6 +1155,7 @@ mod nav_tests {
             order: 0,
             table_order: vec!["c".into(), "a".into(), "ghost".into()],
             nav: None,
+            section: None,
         }];
         let mut sources: BTreeMap<String, TableSource> = BTreeMap::new();
         for t in ["a", "b", "c"] {

@@ -164,6 +164,7 @@ pub async fn create_group(
         order: body.order.unwrap_or(0),
         table_order: Vec::new(),
         nav: None,
+        section: None,
     };
     let hcl = serialize_group(&group_cfg)?;
 
@@ -246,6 +247,7 @@ pub async fn patch_group(
             .table_order
             .unwrap_or_else(|| existing.table_order.clone()),
         nav: existing.nav.clone(),
+        section: existing.section.clone(),
     };
     drop(cfg);
     let hcl = serialize_group(&group_cfg)?;
@@ -654,6 +656,7 @@ pub async fn save_layout(
             order: existing.order,
             table_order: reconcile_order(&members, preferred),
             nav: existing.nav.clone(),
+            section: existing.section.clone(),
         };
         let hcl = serialize_group(&group_cfg)?;
         ops.push(FsOp::Write {
