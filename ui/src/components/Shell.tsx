@@ -462,30 +462,31 @@ function SidebarNav({
     <>
       <TableNav groups={loose} rail={rail} filter={filter} expanded={expanded} onToggle={toggle} onHoverTable={onHoverTable} />
       <SidebarGroups tables={[]} pages={loosePages} t={t} rail={rail} filter={filter} />
-      {sections.map((name) => (
-        <div key={name} className="mt-4 border-t pt-3">
-          {!rail && (
-            <div className="mb-1 px-2 text-xxs font-semibold uppercase tracking-wider text-muted">
-              <span className="hidden truncate wide:block">{name}</span>
-            </div>
-          )}
-          <TableNav
-            groups={groups.filter((g) => g.section === name)}
-            rail={rail}
-            filter={filter}
-            expanded={expanded}
-            onToggle={toggle}
-            onHoverTable={onHoverTable}
-          />
-          <SidebarGroups
-            tables={[]}
-            pages={pages.filter((p) => p.section === name)}
-            t={t}
-            rail={rail}
-            filter={filter}
-          />
-        </div>
-      ))}
+      {sections.map((name) => {
+        // Inside a section a group is ONE heading holding both its tables and
+        // its pages — a group that has both would otherwise be drawn twice,
+        // once per block, under the very heading meant to unite them.
+        const keys = new Set(
+          groups.filter((g) => g.section === name).flatMap((g) => g.tables.map((e) => e.key)),
+        )
+        return (
+          <div key={name} className="mt-4 border-t pt-3">
+            {!rail && (
+              <div className="mb-1 px-2 text-xxs font-semibold uppercase tracking-wider text-muted">
+                <span className="hidden truncate wide:block">{name}</span>
+              </div>
+            )}
+            <SidebarGroups
+              tables={meta.tables.filter((tb) => keys.has(tb.name))}
+              pages={pages.filter((p) => p.section === name)}
+              t={t}
+              rail={rail}
+              filter={filter}
+              onHoverTable={onHoverTable}
+            />
+          </div>
+        )
+      })}
     </>
   )
 }

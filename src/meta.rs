@@ -1009,7 +1009,8 @@ mod nav_tests {
             nav: None,
             section: section.map(str::to_string),
         };
-        cfg.groups.push(group("ops-data", "Data", Some("Operations")));
+        cfg.groups
+            .push(group("ops-data", "Data", Some("Operations")));
         cfg.groups.push(group("billing", "Billing", None));
         cfg.pages.push(LoadedPage {
             slug: "cache".into(),
@@ -1026,11 +1027,17 @@ mod nav_tests {
         let sources = std::collections::BTreeMap::from([
             (
                 "series_health".to_string(),
-                TableSource { path: Default::default(), group: Some("ops-data".into()) },
+                TableSource {
+                    path: Default::default(),
+                    group: Some("ops-data".into()),
+                },
             ),
             (
                 "subscriptions".to_string(),
-                TableSource { path: Default::default(), group: Some("billing".into()) },
+                TableSource {
+                    path: Default::default(),
+                    group: Some("billing".into()),
+                },
             ),
         ]);
         let nav = derive_nav_groups(
@@ -1039,10 +1046,19 @@ mod nav_tests {
             &["series_health", "subscriptions"],
             &Loc::default(),
         );
-        assert_eq!(nav[0]["section"], "Operations", "a table group carries its section");
-        assert!(nav[1]["section"].is_null(), "a group without one carries none");
+        assert_eq!(
+            nav[0]["section"], "Operations",
+            "a table group carries its section"
+        );
+        assert!(
+            nav[1]["section"].is_null(),
+            "a group without one carries none"
+        );
 
-        let admin = CurrentUser { email: "a@x.io".into(), role: "admin".into() };
+        let admin = CurrentUser {
+            email: "a@x.io".into(),
+            role: "admin".into(),
+        };
         let pages = pages_meta(&cfg, &admin, &Loc::default());
         assert_eq!(
             pages[0]["section"], "Operations",
